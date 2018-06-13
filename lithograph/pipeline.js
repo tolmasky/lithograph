@@ -6,6 +6,7 @@ Error.stackTraceLimit = 1000;
 Queue.Enqueue = Record({ requests:List(), push:-1 });
 
 Queue.Request = Record({ arguments:[], context:-1 });
+Queue.Started = Record({ requests:-1, push:-1 });
 Queue.Response = Record({ request:-1, rejected:false, value:-1, index:-1, push:-1 });
 
 Queue.init = function ({ workers: workersIterable, requests })
@@ -34,6 +35,9 @@ Queue.update = function (queue, event)
     const push = event.get("push");
     const respond = (rejected, index, request) =>
         value => push(Queue.Response({ rejected, index, request, value }));
+
+    Promise.resolve()
+        .then(() => push(Queue.Started({ requests: dequeued })));
 
     dequeued.zipWith((request, index) =>
         Promise.resolve(workers.get(index)(...request.arguments))
