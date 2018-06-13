@@ -25,9 +25,10 @@ const { Repeat, Seq } = require("immutable");
         const node = root.getIn(keyPath);
         const state = states.get(keyPath);
         const prefix = Repeat(" ", keyPath.size).join("");
+        const duration = state.duration > -1 ? state.duration + "ms" : ""
         const emoji = state.aggregate === 3 ? "✓" : "✕";
 
-        console.log(`${prefix}${emoji} ${node.title}`);
+        console.log(`${prefix}${emoji} ${node.title} ${duration}`);
     }
 })();
 

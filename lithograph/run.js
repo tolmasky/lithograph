@@ -8,7 +8,7 @@ const testRequest = (keyPath, blocks) =>
 const Event = { type: (event, type) => event instanceof type };
 
 const Run = Record({ root:-1, states:Map(), pipeline:-1 });
-Run.State = Record({ aggregate:1, individual:1, reason:-1 });
+Run.State = Record({ aggregate:1, individual:1, reason:-1, start:-1, duration:-1 });
 
 Run.State.RUNNING   = 0;
 Run.State.WAITING   = 1;
@@ -53,17 +53,24 @@ function e(root, pull)
             {
                 const request = event.request;
                 const keyPath = request.context;
-                const state = event.rejected ?
-                    Run.State({ individual: Run.State.FAILURE, reason: event.value }) :
-                    Run.State({ individual: Run.State.SUCCESS });
-                const states = updateStates(run.root, run.states, keyPath, state);
+                const states = run.states;
+                
+                const reason = event.rejected && event.value;
+                const duration = Date.now() - states.get(keyPath).start;
+                const individual = event.rejected ?
+                    Run.State.FAILURE : Run.State.SUCCESS;
+
+                const state = Run.State({ individual, duration, reason });
+                const updated = updateStates(run.root, states, keyPath, state);
         
-                return run.set("states", states);
+                return run.set("states", updated);
             }
             
             if (event instanceof Pipeline.Started)
             {
-                const state = Run.State({ individual: Run.State.RUNNING });
+                const start = Date.now();
+                const individual = Run.State.RUNNING;
+                const state = Run.State({ start, individual });
                 const states = event.requests.reduce((states, request) =>
                     updateStates(run.root, states, request.context, state),
                     run.states);
