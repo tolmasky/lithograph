@@ -1,0 +1,13 @@
+{
+  "name": "@lithograph/browser",
+  "version": "0.0.1",
+  "description": "",
+  "main": "lithograph-browser.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "node ./build.js"
+  },
+  "keywords": [],
+  "author": "Francisco Ryan Tolmasky I",
+  "license": "MIT"
+}
