@@ -19,10 +19,8 @@ const Event = { type: (event, type) => event instanceof type };
 
     program(pipeline, function (pipeline, event)
     {
-        if (Event.type(event, Pipeline.Resolved))
-            console.log("TEST PASSED!", event);
-        else if (Event.type(event, Pipeline.Rejected))
-            console.log("TEST FAILED", event);
+        if (Event.type(event, Pipeline.Response))
+            console.log(`TEST ${event.rejected ? "FAILED" : "PASSED!"}`, event);
 
         const nextPipeline = Pipeline.update(pipeline, event);
 
@@ -53,7 +51,9 @@ function gather(group, prefix, keyPath = [])
         children.push(testRequest(keyPath, group.blocks));
 }
 
-function settle(keyPath, index, result, group)
+
+
+function settle(result, index, result, group)
 {
     if (keyPath.length - 1 === index) { console.log(group.get("result"));
         return group.set("result", result);}

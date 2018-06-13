@@ -6,8 +6,7 @@ Error.stackTraceLimit = 1000;
 Queue.Enqueue = Record({ requests:List(), push:-1 });
 
 Queue.Request = Record({ arguments });
-Queue.Resolved = Record({ value:-1, index:-1, push:-1 });
-Queue.Rejected = Record({ value:-1, index:-1, push:-1 });
+Queue.Response = Record({ request:-1, rejected:false, value:-1, index:-1, push:-1 });
 
 Queue.init = function ({ workers: workersIterable, backlog: backlogIterable })
 {
@@ -33,11 +32,13 @@ Queue.update = function (queue, event)
     const dequeued = backlog.take(free.size);
     const indexes = free.take(dequeued.size);
     const push = event.get("push");
+    const respond = (rejected, index, request) =>
+        value => push(Queue.Response({ rejected, index, request, value }));
 
-    dequeued.zipWith((request, index) =>{console.log(request);
+    dequeued.zipWith((request, index) =>
         Promise.resolve(workers.get(index)(...request.arguments))
-            .then(value => push(Queue.Resolved({ value, index, request })))
-            .catch(value => push(Queue.Rejected({ value, index, request }))) },
+            .then(respond(false, index, request))
+            .catch(respond(true, index, request)),
         indexes);
 
     return updated
@@ -51,11 +52,10 @@ Queue.Enqueue.update = function (queue, { requests })
     return queue.set("backlog", queue.backlog.concat(requests));
 }
 
-Queue.Resolved.update =
-Queue.Rejected.update = function (queue, event)
+Queue.Response.update = function (queue, event)
 {
     const { free, backlog, occupied, finished } = queue;
-console.log(event);
+
     return queue
         .set("free", free.push(event.index))
         .set("occupied", occupied.remove(event.index))
