@@ -1,31 +1,35 @@
-const { List, Map, Range } = require("immutable");
+const { List, Map, Range, Record } = require("immutable");
 const lithograph = require("./lithograph");
 const Pipeline = require("./pipeline");
 const forkRequire = require("fork-require");
 
 const testRequest = (keyPath, blocks) =>
-    Pipeline.Request({ arguments:[{ blocks, keyPath }] });
+    Pipeline.Request({ arguments:[{ blocks }], context: keyPath });
 const Event = { type: (event, type) => event instanceof type };
 
+const Run = Record({ root:-1, states:Map(), pipeline:-1 });
+Run.State = Record({ type:"waiting", reason:-1, consolidated:-1 });
 
-(module.exports = async function (group)
+(module.exports = async function (root)
 {
+    const server = require("./utility-server");
     const workers = Range(0, 8)
         .map(index => forkRequire(`${__dirname}/test-remote`, index));
-    const backlog = gather(group);
-    console.log(backlog);
-    const pipeline = Pipeline.init({ workers, backlog });
-    const server = require("./utility-server");
 
-    program(pipeline, function (pipeline, event)
+    const [states, requests] = consolidate(root);
+    const pipeline = Pipeline.init({ workers, requests });
+    const run = Run({ root, states, pipeline });
+
+    program(run, function (run, event)
     {
-        if (Event.type(event, Pipeline.Response))
-            console.log(`TEST ${event.rejected ? "FAILED" : "PASSED!"}`, event);
-
-        const nextPipeline = Pipeline.update(pipeline, event);
-
-        return nextPipeline;
+        const pipeline = Pipeline.update(run.pipeline, event);
+        const states = updateStates(run.states, event);
+console.log(states);
+        return run
+            .set("pipeline", pipeline)
+            .set("states", states);
     })(Map());
+
 })(lithograph(process.argv[2]));
 
 function program(state, update, pull)
@@ -41,27 +45,54 @@ function program(state, update, pull)
     };
 };
 
-function gather(group, prefix, keyPath = [])
+function consolidate(node, keyPath = [])
 {
-    const children = List().concat(...group.children
-        .map((child, index) => gather(child, [...keyPath, index])));
+    const self = node.blocks.size > 0 ? 
+        List.of(testRequest(keyPath, node.blocks)) : List();
+    const [children, runnable] = node.children
+        .reduce(function (accumulated, child, index)
+        {
+            const consolidated = consolidate(child, [...keyPath, index]);
+            const states = accumulated[0].merge(consolidated[0]);
+            const runnable = accumulated[1].concat(consolidated[1]);
+    
+            return [states, runnable];
+        }, [Map(), self]);
+    const states = runnable.size <= 0 ?
+        children : children.set(keyPath + "", Run.State());
 
-    return group.blocks.size <= 0 ?
-        children :
-        children.push(testRequest(keyPath, group.blocks));
+    return [states, runnable];
+}
+
+function updateStates(states, event)
+{
+    if (!(event instanceof Pipeline.Response))
+        return states;
+
+    const { request } = event;
+    const { context: keyPath } = request;
+
+    const type = event.rejected ? "failure" : "success";
+    const state = Run.State({ type });
+
+    console.log(`TEST ${event.rejected ? "FAILED" : "PASSED!"}`, keyPath);
+
+    return states.set(keyPath + "", state);
 }
 
 
 
-function settle(result, index, result, group)
+function settle(event, index, group)
 {
+    const { request: { context: keyPath }, value } = event;
+
     if (keyPath.length - 1 === index) { console.log(group.get("result"));
-        return group.set("result", result);}
+        return group.set("result", value);}
 
     const key = keyPath[index];
     const children = group.children;
     const child = children.get(key);
-    const nextChild = settle(keyPath, index + 1, result, child);
+    const nextChild = settle(event, index + 1, child);
     const nextChildren = children.set(key, nextChild);
 
     return group

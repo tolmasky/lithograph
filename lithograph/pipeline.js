@@ -5,13 +5,13 @@ module.exports = Queue;
 Error.stackTraceLimit = 1000;
 Queue.Enqueue = Record({ requests:List(), push:-1 });
 
-Queue.Request = Record({ arguments });
+Queue.Request = Record({ arguments:[], context:-1 });
 Queue.Response = Record({ request:-1, rejected:false, value:-1, index:-1, push:-1 });
 
-Queue.init = function ({ workers: workersIterable, backlog: backlogIterable })
+Queue.init = function ({ workers: workersIterable, requests })
 {
     const workers = List(workersIterable);
-    const backlog = backlogIterable ? List(backlogIterable) : List();
+    const backlog = requests ? List(requests) : List();
     const free = Range(0, workers.size).toList();
 
     return Queue({ workers, free, backlog });
