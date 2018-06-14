@@ -1,7 +1,3 @@
-if (!require.main || require.main.filename !== require.resolve("../fork-require/fork-wrapper"))
-    module.exports = require("../fork-require/cluster")(__filename, { count: 4 });
-else
-{
 const headless = process.env.HEADLESS !== "false";
 const launched = new Promise((resolve, reject) =>
     setImmediate(() =>
@@ -45,7 +41,7 @@ module.exports = async function ({ blocks })
     }
     finally
     {
-        await page.close();
+        page.close();
     }
 }
 
@@ -66,5 +62,4 @@ async function post(page, URL, postData)
     page.removeListener("request", listener);
 
     await page.setRequestInterception(false);
-}
 }

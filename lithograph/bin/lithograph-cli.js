@@ -1,5 +1,3 @@
-const path = process.argv[2];
-
 const run = require("../run");
 const { List } = require("immutable");
 
@@ -8,12 +6,13 @@ const glob = require("fast-glob");
 const { Repeat, Seq } = require("immutable");
 
 const Node = require("../node");
+const path = process.argv.length >= 2 ? process.argv[2] : null;
 
 
 
 (async function ()
 {
-    const paths = glob.sync("**/*.test.md");
+    const paths = path ? [path] : glob.sync("**/*.test.md");
     const children = List(paths
         .map(path => [path, readFileSync(path, "utf-8")])
         .map(([path, contents]) => Node.parse(path, contents)));
@@ -45,10 +44,3 @@ const Node = require("../node");
         console.log(`${prefix}${emoji} ${node.title} ${duration}`);
     }
 })();
-
-function compare()
-{
-}
-
-[0,1,2,3]
-[0,1,4]

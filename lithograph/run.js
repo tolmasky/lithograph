@@ -36,7 +36,7 @@ module.exports = function (root)
 function e(root, pull)
 {
     const server = require("./utility-server");
-    const workers = Range(0, 8)
+    const workers = Range(0, 4)
         .map(index => forkRequire(`${__dirname}/test-remote`, index));
 
     const [states, requests] = consolidate(root);
