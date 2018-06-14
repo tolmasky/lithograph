@@ -1,7 +1,8 @@
 const headless = process.env.HEADLESS !== "false";
 const launched = new Promise((resolve, reject) =>
     setImmediate(() =>
-        require("puppeteer").launch({ headless }).then(resolve, reject)));
+        require("puppeteer").launch({ headless, args:["--no-sandbox"] })
+            .then(resolve, reject)));
 
 const getLithographBrowser = () => (contents =>
     contents || (contents = require("fs")

@@ -35,7 +35,10 @@ module.exports = function (root)
 
 function e(root, pull)
 {
-    const workers = Range(0, 4)
+    console.log("NUMBER OF CPUS: " + require("os").cpus().length);
+
+    const count = require("os").cpus().length;
+    const workers = Range(0, count)
         .map(index => forkRequire(`${__dirname}/test-remote`, index));
 
     const [states, requests] = consolidate(root);
