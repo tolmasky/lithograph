@@ -11,7 +11,10 @@
   "license": "MIT",
   "dependencies": {
     "@lithograph/browser": "0.0.3",
+    "commonmark": "^0.28.1",
+    "fast-glob": "^2.2.2",
     "forked-require": "0.0.3",
-    "immutable": "^3.8.2"
+    "immutable": "^3.8.2",
+    "puppeteer": "^1.5.0"
   }
 }
