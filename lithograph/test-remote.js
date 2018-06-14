@@ -49,17 +49,18 @@ module.exports = async function ({ blocks })
 // requests.
 async function post(page, URL, postData)
 {
-    const override = { method:"POST", postData };
+    const status = 200;
+    const contentType = "text/html;";
+    const body = postData;
+
     const listener = request =>
-        request.continue(request.url() === URL ? override : { });
+        request.url() !== URL ? 
+            request.continue() :
+            request.respond({ status, contentType, body });
 
     await page.setRequestInterception(true);
 
     page.on("request", listener);
 
     await page.goto(URL);
-
-    page.removeListener("request", listener);
-
-    await page.setRequestInterception(false);
 }
