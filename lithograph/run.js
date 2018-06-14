@@ -1,6 +1,6 @@
 const { List, Map, Range, Record } = require("immutable");
 const Pipeline = require("./pipeline");
-const forkRequire = require("fork-require");
+const forkRequire = require("forked-require");
 
 const testRequest = (keyPath, blocks) =>
     Pipeline.Request({ arguments:[{ blocks }], context: keyPath });

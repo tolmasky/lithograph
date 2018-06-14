@@ -1,12 +1,15 @@
 {
-  "name": "fork-require",
-  "version": "1.0.0",
+  "name": "forked-require",
+  "version": "0.0.3",
   "description": "",
-  "main": "fork-require.js",
+  "main": "forked-require.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "Francisco Ryan Tolmasky I",
-  "license": " MIT"
+  "license": " MIT",
+  "dependencies": {
+    "immutable": "^3.8.2"
+  }
 }

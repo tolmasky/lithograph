@@ -55,7 +55,7 @@ function initRemoteFork(UUID, filename)
 
     const process = Object.keys(listeners).reduce(
         (process, event) => process.on(event, listeners[event]),
-        fork(`${__dirname}/fork-wrapper.js`, [filename]));
+        fork(`${__dirname}/forked-wrapper.js`, [filename]));
 
     process.unref();
     process.channel.unref();
