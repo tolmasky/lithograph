@@ -8,5 +8,10 @@
   },
   "keywords": [],
   "author": "Francisco Ryan Tolmasky I",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@lithograph/browser": "0.0.3",
+    "forked-require": "0.0.3",
+    "immutable": "^3.8.2"
+  }
 }
