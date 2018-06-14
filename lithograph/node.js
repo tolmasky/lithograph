@@ -7,17 +7,12 @@ const Block = Record({ language:"", code:"" });
 const Group = Record({ title:"", level:1, blocks:List(), children:List(), result:"initial" });
 
 
-module.exports = function (path)
-{
-    const contents = readFileSync(path, "utf-8");
-    const parser = new Parser();
+module.exports = Group;
 
-    return toGroups(parser.parse(contents));
-}
-
-function toGroups(document)
+Group.parse = function (title, contents)
 {
-    const root = Group({ level: 0 });
+    const document = new Parser().parse(contents);
+    const root = Group({ title, level: 0 });
 
     return getChildSeq(document).reduce(function (state, node)
     {

@@ -12,7 +12,7 @@ const getLithographBrowser = () => (contents =>
         .readFileSync(require.resolve("@lithograph/browser"), "utf-8")))();
 
 
-module.exports = async function ({ keyPath, blocks })
+module.exports = async function ({ blocks })
 {
     const browser = await launched;
     const page = await browser.newPage();
@@ -22,7 +22,7 @@ module.exports = async function ({ keyPath, blocks })
         for (let i = 0; i < msg.args().length; ++i)
             console.log(`${i}: ${(await msg.args())[i]}`)
     });*/
-    
+
     await page.evaluateOnNewDocument(getLithographBrowser());
 
     try
@@ -41,7 +41,7 @@ module.exports = async function ({ keyPath, blocks })
                     await page.evaluateOnNewDocument(code);
         }
 
-        console.log("DONE!");
+        console.log("DONE");
     }
     finally
     {

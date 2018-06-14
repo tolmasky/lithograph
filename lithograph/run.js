@@ -1,5 +1,4 @@
 const { List, Map, Range, Record } = require("immutable");
-const lithograph = require("./lithograph");
 const Pipeline = require("./pipeline");
 const forkRequire = require("fork-require");
 
@@ -62,7 +61,7 @@ function e(root, pull)
 
                 const state = Run.State({ individual, duration, reason });
                 const updated = updateStates(run.root, states, keyPath, state);
-        
+
                 return run.set("states", updated);
             }
             
