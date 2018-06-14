@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/browser",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "",
   "main": "lithograph-browser.js",
   "scripts": {
@@ -9,5 +9,10 @@
   },
   "keywords": [],
   "author": "Francisco Ryan Tolmasky I",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "browserify": "^16.2.2",
+    "expect": "^23.1.0",
+    "jest-mock": "^23.1.0"
+  }
 }
