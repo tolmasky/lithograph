@@ -43,4 +43,7 @@ const path = process.argv.length >= 2 ? process.argv[2] : null;
 
         console.log(`${prefix}${emoji} ${node.title} ${duration}`);
     }
+    
+    if (states.get(List()).aggregate === 2)
+        process.exit(1);
 })();
