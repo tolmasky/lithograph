@@ -18,7 +18,9 @@ Run.State.EMPTY     = 4;
 module.exports = function (root, { browserLogs, concurrency })
 {
     const workers = Range(0, concurrency)
-        .map(index => forkRequire(`${__dirname}/test-remote`, index));
+        .map(index => forkRequire(`${__dirname}/test-remote`,
+            Object.assign({ UUID: index },
+                browserLogs && { browserLogs })));
 
     const [states, requests] = consolidate(root);
     const pipeline = Pipeline.init({ workers, requests });

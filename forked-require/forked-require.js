@@ -2,17 +2,17 @@ const { fork } = require("child_process");
 const { Map, EmptyMap = Map(), Record } = require("immutable");
 
 const RemoteCall = Record({ resolve:0, reject:0, timeoutID: -1 });
-const RemoteFork = Record({ filename:"", process:0, calls: EmptyMap, nextCall:0 });
+const RemoteFork = Record({ env:null, filename:"", process:0, calls: EmptyMap, nextCall:0 });
 let RemoteRequire = Record({ forks: EmptyMap, exited: false, exports: EmptyMap })();
 
 
-module.exports = function (filename, identifier = "")
+module.exports = function (filename, env)
 {
-    const UUID = JSON.stringify({ filename, identifier });
+    const UUID = JSON.stringify({ filename, env });
 
     if (!RemoteRequire.exports.has(UUID))
         RemoteRequire = RemoteRequire
-            .setIn(["forks", UUID], initRemoteFork(UUID, filename))
+            .setIn(["forks", UUID], initRemoteFork(UUID, filename, env))
             .setIn(["exports", UUID], (...args) =>
                 new Promise(function (resolve, reject)
                 {
@@ -41,7 +41,7 @@ process.on("exit", function ()
     RemoteRequire.forks.forEach(({ process }) => process.kill("SIGHUP"));
 });
 
-function initRemoteFork(UUID, filename)
+function initRemoteFork(UUID, filename, env)
 {
     const remoteForkExited = () => exited(UUID);
     const listeners = 
@@ -53,14 +53,15 @@ function initRemoteFork(UUID, filename)
         disconnect: remoteForkExited
     };
 
-    const process = Object.keys(listeners).reduce(
-        (process, event) => process.on(event, listeners[event]),
-        fork(`${__dirname}/forked-wrapper.js`, [filename]));
+    const forked = Object.keys(listeners).reduce(
+        (forked, event) => forked.on(event, listeners[event]),
+        fork(`${__dirname}/forked-wrapper.js`, [filename],
+            Object.assign(process.env, env)));
 
-    process.unref();
-    process.channel.unref();
+    forked.unref();
+    forked.channel.unref();
 
-    return RemoteFork({ filename, process, listeners });
+    return RemoteFork({ env, filename, process: forked, listeners });
 }
 
 function exited(UUID)
@@ -87,7 +88,7 @@ function exited(UUID)
     catch (error) { }
     
     if (RemoteRequire.exited)
-        RemoteRequire.setIn(UUID, initRemoteFork(UUID, filename));
+        RemoteRequire.setIn(UUID, initRemoteFork(UUID, filename, env));
 }
 
 function forwardRemoteCall(UUID, { identifier, result })

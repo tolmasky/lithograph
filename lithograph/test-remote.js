@@ -8,17 +8,20 @@ const getLithographBrowser = () => (contents =>
     contents || (contents = require("fs")
         .readFileSync(require.resolve("@lithograph/browser"), "utf-8")))();
 
+const { browserLogs } = process.env;
+
 
 module.exports = async function ({ blocks })
 {
     const browser = await launched;
     const page = await browser.newPage();
-    /*
-    page.on("console", async msg =>
-    {
-        for (let i = 0; i < msg.args().length; ++i)
-            console.log(`${i}: ${(await msg.args())[i]}`)
-    });*/
+
+    if (browserLogs)
+        page.on("console", async msg =>
+        {
+            for (let i = 0; i < msg.args().length; ++i)
+                console.log(`${i}: ${(await msg.args())[i]}`)
+        });
 
     await page.evaluateOnNewDocument(getLithographBrowser());
 
