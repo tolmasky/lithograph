@@ -1,6 +1,6 @@
 {
   "name": "lithograph",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "",
   "main": "lithograph.js",
   "scripts": {
@@ -10,10 +10,10 @@
   "author": "Francisco Ryan Tolmasky I",
   "license": "MIT",
   "dependencies": {
-    "@lithograph/browser": "0.0.3",
+    "@lithograph/browser": "0.0.5",
     "commonmark": "^0.28.1",
     "fast-glob": "^2.2.2",
-    "forked-require": "0.0.3",
+    "forked-require": "0.0.5",
     "immutable": "^3.8.2",
     "puppeteer": "^1.5.0"
   }
