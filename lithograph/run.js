@@ -15,36 +15,31 @@ Run.State.FAILURE   = 2;
 Run.State.SUCCESS   = 3;
 Run.State.EMPTY     = 4;
 
-module.exports = function (root)
+module.exports = function (root, { browserLogs, concurrency })
 {
+    const workers = Range(0, concurrency)
+        .map(index => forkRequire(`${__dirname}/test-remote`, index));
+
+    const [states, requests] = consolidate(root);
+    const pipeline = Pipeline.init({ workers, requests });
+    const runState = Run({ root, states, pipeline });
+
     return new Promise(function (resolve, reject)
     {
-        e(root, function pull(run)
+        run(runState, function pull(run)
         {
             const { aggregate } = run.states.get(List());
 
             if (aggregate === Run.State.SUCCESS ||
-                aggregate === Run.State.FAILURE) {
-            console.log("HEY");
+                aggregate === Run.State.FAILURE)
                 resolve([run.root, run.states]);
-            }
         });
     });
     
 }
 
-function e(root, pull)
+function run(run, pull)
 {
-    console.log("NUMBER OF CPUS: " + require("os").cpus().length);
-
-    const count = require("os").cpus().length;
-    const workers = Range(0, count)
-        .map(index => forkRequire(`${__dirname}/test-remote`, index));
-
-    const [states, requests] = consolidate(root);
-    const pipeline = Pipeline.init({ workers, requests });
-    const run = Run({ root, states, pipeline });
-
     return program(run, function (run, event)
     {
         const pipeline = Pipeline.update(run.pipeline, event);

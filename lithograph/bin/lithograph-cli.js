@@ -6,20 +6,29 @@ const glob = require("fast-glob");
 const { Repeat, Seq } = require("immutable");
 
 const Node = require("../node");
-const path = process.argv.length >= 2 ? process.argv[2] : null;
 
 
+const options = require("commander")
+    .version(require("../package").version)
+    .option("-c, --concurrency [concurrency]",
+        "Max number of test files running at the same time (Default: CPU cores)",
+        require("os").cpus().length)
+    .option("--browser-logs")
+    .parse(process.argv);
+const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 
 (async function ()
 {
-    const paths = path ? [path] : glob.sync("**/*.test.md");
+    const paths = Array.from(new Set(
+        [].concat(...patterns
+            .map(pattern => glob.sync(pattern)))));
     const children = List(paths
         .map(path => [path, readFileSync(path, "utf-8")])
         .map(([path, contents]) => Node.parse(path, contents)));
     const root = Node({ children });
 
     const start = Date.now();
-    const [_, states] = await run(root);
+    const [_, states] = await run(root, options);
     const duration = Date.now() - start;
 
     const keyPaths = Seq(states.keys()).toList()
