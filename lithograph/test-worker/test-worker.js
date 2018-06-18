@@ -1,7 +1,7 @@
 const headless = process.env.HEADLESS !== "false";
 const launched = new Promise((resolve, reject) =>
     setImmediate(() =>
-        require("puppeteer").launch({ headless: false })
+        require("puppeteer").launch({ headless })
             .then(resolve, reject)));
 
 

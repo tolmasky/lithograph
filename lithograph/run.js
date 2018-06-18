@@ -10,12 +10,13 @@ Run.State.WAITING   = 1;
 Run.State.FAILURE   = 2;
 Run.State.SUCCESS   = 3;
 Run.State.EMPTY     = 4;
+Run.State.DISABLED  = 5;
 
-module.exports = function (root, { browserLogs, concurrency })
+module.exports = function (root, { browserLogs, headless, concurrency })
 {
     const workers = Range(0, concurrency)
         .map(index => forkRequire(`${__dirname}/test-worker/test-worker.js`,
-            Object.assign({ UUID: index },
+            Object.assign({ UUID: index, headless },
                 browserLogs && { browserLogs })));
 
     const states = getStates(root);
@@ -142,10 +143,10 @@ function getUnblockedRequests(states, root, keyPath = List())
             return List.of(request);
         }
 
-        if (individual !== Run.State.EMPTY)
+        if (individual < Run.State.EMPTY)
             return List();
 
-        if (aggregate === Run.State.EMPTY)
+        if (aggregate >= Run.State.EMPTY)
             return List();
 
         return getUnblockedRequests(states, root, childKeyPath);
@@ -154,8 +155,10 @@ function getUnblockedRequests(states, root, keyPath = List())
 
 function getStates(node, keyPath = List())
 {
-    const individual = node.blocks.size > 0 ?
-        Run.State.WAITING : Run.State.EMPTY;
+    const individual = 
+        node.disbaled ? Run.State.DISABLED :
+            node.blocks.size > 0 ?
+            Run.State.WAITING : Run.State.EMPTY;
 
     const [states, aggregate] = node.children
         .reduce(function (accum, node, index)

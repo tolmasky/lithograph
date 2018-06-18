@@ -37,7 +37,7 @@ function testRequire(parentExports)
     {
         const components = path.split("/");
         const [scope, name, ...rest] = components;
-
+console.log(scope, name);
         if (scope === "@lithograph" && name === "fetch")
             return ModuleRequire.apply(this, 
                 [`${fetchPath}/${rest.join("/")}`, ...args]);

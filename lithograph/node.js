@@ -4,7 +4,7 @@ const { List, Record, Seq, Stack } = require("immutable");
 const { Parser } = require("commonmark");
 
 const Block = Record({ language:"", code:"" });
-const Group = Record({ filename:"", title:"", level:1, blocks:List(), children:List(), result:"initial" });
+const Group = Record({ filename:"", title:"", level:1, blocks:List(), children:List(), disabled:false });
 
 
 module.exports = Group;
@@ -22,7 +22,8 @@ Group.parse = function (filename, contents)
         {
             const level = node.level;
             const title = getInnerText(node);
-            const group = Group({ filename, title, level });
+            const disabled = /^~~.+~~$/.test(title);
+            const group = Group({ filename, title, level, disabled });
 
             const popped = stack.skipWhile(keyPath =>
                 state.getIn(keyPath).level >= level);

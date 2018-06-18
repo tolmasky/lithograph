@@ -13,6 +13,7 @@ const options = require("commander")
     .option("-c, --concurrency [concurrency]",
         "Max number of test files running at the same time (Default: CPU cores)",
         require("os").cpus().length)
+    .option("--no-headless")
     .option("--browser-logs")
     .parse(process.argv);
 const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
