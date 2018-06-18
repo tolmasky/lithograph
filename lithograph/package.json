@@ -1,6 +1,6 @@
 {
   "name": "lithograph",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "",
   "main": "lithograph.js",
   "scripts": {
@@ -12,6 +12,7 @@
   "dependencies": {
     "@lithograph/browser": "0.0.5",
     "@lithograph/expect": "0.0.6",
+    "commander": "^2.15.1",
     "commonmark": "^0.28.1",
     "fast-glob": "^2.2.2",
     "forked-require": "0.0.6",
