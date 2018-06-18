@@ -1,5 +1,5 @@
 const { Range, List, Record, Set } = require("immutable");
-const Queue = Record({ backlog:List(), workers:-1, free:List(), occupied:Set(), finished:null });
+const Queue = Record({ backlog:List(), workers:-1, free:List(), occupied:Set() });
 
 module.exports = Queue;
 Error.stackTraceLimit = 1000;
@@ -58,10 +58,9 @@ Queue.Enqueue.update = function (queue, { requests })
 
 Queue.Response.update = function (queue, event)
 {
-    const { free, backlog, occupied, finished } = queue;
+    const { free, backlog, occupied } = queue;
 
     return queue
         .set("free", free.push(event.index))
-        .set("occupied", occupied.remove(event.index))
-        .set("finished", event);
+        .set("occupied", occupied.remove(event.index));
 }

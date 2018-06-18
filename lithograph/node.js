@@ -4,15 +4,15 @@ const { List, Record, Seq, Stack } = require("immutable");
 const { Parser } = require("commonmark");
 
 const Block = Record({ language:"", code:"" });
-const Group = Record({ title:"", level:1, blocks:List(), children:List(), result:"initial" });
+const Group = Record({ filename:"", title:"", level:1, blocks:List(), children:List(), result:"initial" });
 
 
 module.exports = Group;
 
-Group.parse = function (title, contents)
+Group.parse = function (filename, contents)
 {
     const document = new Parser().parse(contents);
-    const root = Group({ title, level: 0 });
+    const root = Group({ title: filename, filename, level: 0 });
 
     return getChildSeq(document).reduce(function (state, node)
     {
@@ -22,7 +22,7 @@ Group.parse = function (title, contents)
         {
             const level = node.level;
             const title = getInnerText(node);
-            const group = Group({ title, level });
+            const group = Group({ filename, title, level });
 
             const popped = stack.skipWhile(keyPath =>
                 state.getIn(keyPath).level >= level);

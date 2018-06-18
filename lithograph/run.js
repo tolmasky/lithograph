@@ -2,12 +2,8 @@ const { List, Map, Range, Record } = require("immutable");
 const Pipeline = require("./pipeline");
 const forkRequire = require("forked-require");
 
-const testRequest = (keyPath, blocks) =>
-    Pipeline.Request({ arguments:[{ blocks }], context: keyPath });
-const Event = { type: (event, type) => event instanceof type };
-
 const Run = Record({ root:-1, states:Map(), pipeline:-1 });
-Run.State = Record({ aggregate:1, individual:1, reason:-1, start:-1, duration:-1 });
+Run.State = Record({ aggregate:1, individual:1, value:-1, start:-1, duration:-1 });
 
 Run.State.RUNNING   = 0;
 Run.State.WAITING   = 1;
@@ -18,11 +14,12 @@ Run.State.EMPTY     = 4;
 module.exports = function (root, { browserLogs, concurrency })
 {
     const workers = Range(0, concurrency)
-        .map(index => forkRequire(`${__dirname}/test-remote`,
+        .map(index => forkRequire(`${__dirname}/test-worker/test-worker.js`,
             Object.assign({ UUID: index },
                 browserLogs && { browserLogs })));
 
-    const [states, requests] = consolidate(root);
+    const states = getStates(root);
+    const requests = getUnblockedRequests(states, root);
     const pipeline = Pipeline.init({ workers, requests });
     const runState = Run({ root, states, pipeline });
 
@@ -37,7 +34,6 @@ module.exports = function (root, { browserLogs, concurrency })
                 resolve([run.root, run.states]);
         });
     });
-    
 }
 
 function run(run, pull)
@@ -45,41 +41,47 @@ function run(run, pull)
     return program(run, function (run, event)
     {
         const pipeline = Pipeline.update(run.pipeline, event);
-        const updated = (function ()
+
+        if (event instanceof Pipeline.Response)
         {
-            if (event instanceof Pipeline.Response)
-            {
-                const request = event.request;
-                const keyPath = request.context;
-                const states = run.states;
-                
-                const reason = event.rejected && event.value;
-                const duration = Date.now() - states.get(keyPath).start;
-                const individual = event.rejected ?
-                    Run.State.FAILURE : Run.State.SUCCESS;
+            const request = event.request;
+            const keyPath = request.context;
+            const states = run.states;
 
-                const state = Run.State({ individual, duration, reason });
-                const updated = updateStates(run.root, states, keyPath, state);
+            const { value, push } = event;
+            const duration = Date.now() - states.get(keyPath).start;
+            const individual = event.rejected ?
+                Run.State.FAILURE : Run.State.SUCCESS;
 
-                return run.set("states", updated);
-            }
-            
-            if (event instanceof Pipeline.Started)
-            {
-                const start = Date.now();
-                const individual = Run.State.RUNNING;
-                const state = Run.State({ start, individual });
-                const states = event.requests.reduce((states, request) =>
-                    updateStates(run.root, states, request.context, state),
-                    run.states);
+            const state = Run.State({ individual, duration, value });
+            const updatedStates =
+                updateStates(run.root, states, keyPath, state);
+            const requests =
+                getUnblockedRequests(updatedStates, run.root, keyPath);
+            const updatedPipeline = requests.size > 0 ?
+                Pipeline.update(pipeline, Pipeline.Enqueue({ requests, push })) :
+                pipeline;
 
-                return run.set("states", states);
-            }
-        
-            return run;
-        })();
+            return run
+                    .set("states", updatedStates)
+                    .set("pipeline", updatedPipeline);
+        }
 
-        return updated.set("pipeline", pipeline);
+        if (event instanceof Pipeline.Started)
+        {
+            const start = Date.now();
+            const individual = Run.State.RUNNING;
+            const state = Run.State({ start, individual });
+            const states = event.requests.reduce((states, request) =>
+                updateStates(run.root, states, request.context, state),
+                run.states);
+
+            return run
+                .set("states", states)
+                .set("pipeline", pipeline);
+        }
+
+        return run.set("pipeline", pipeline);
     }, pull)(Map());
 }
 
@@ -96,27 +98,6 @@ function program(state, update, pull)
     };
 };
 
-function consolidate(node, keyPath = List())
-{
-    const hasBlocks = node.blocks.size > 0;
-    const self = hasBlocks ? 
-        List.of(testRequest(keyPath, node.blocks)) : List();
-    const [children, runnable] = node.children
-        .reduce(function (accumulated, child, index)
-        {
-            const consolidated = consolidate(child, keyPath.push("children", index));
-            const states = accumulated[0].merge(consolidated[0]);
-            const runnable = accumulated[1].concat(consolidated[1]);
-    
-            return [states, runnable];
-        }, [Map(), self]);
-    const individual = hasBlocks ? Run.State.WAITING : Run.State.EMPTY;
-    const states = runnable.size <= 0 ?
-        children : children.set(keyPath, Run.State({ individual }));
-
-    return [states, runnable];
-}
-
 function updateStates(root, states, keyPath, state)
 {
     const updated = states.set(keyPath, state);
@@ -127,17 +108,66 @@ function updateStates(root, states, keyPath, state)
 function propagateState(root, states, keyPath)
 {
     const node = root.getIn(keyPath);
+    const individual = states.get(keyPath).individual;
     const aggregate = node.children.reduce((aggregate, child, index) =>
         aggregate === Run.State.RUNNING ?
             aggregate :
             Math.min(aggregate,
                 getStateAggregate(keyPath.push("children", index), states)),
-        states.get(keyPath).individual);
+        individual);
     const updated = states.setIn([keyPath, "aggregate"], aggregate);
 
     return keyPath.size === 0 ?
             updated :
             propagateState(root, updated, keyPath.pop().pop());
+}
+
+function getUnblockedRequests(states, root, keyPath = List())
+{
+    const { value: exports } = states.get(keyPath);
+
+    return root.getIn(keyPath).children.flatMap(function (child, index)
+    {
+        const childKeyPath = keyPath.push("children", index);
+        const { individual, aggregate } = states.get(childKeyPath);
+
+        if (individual === Run.State.WAITING)
+        {
+            const { filename, blocks } = child;
+            const args = [{ filename, blocks, exports }];
+            const context = childKeyPath;
+            const request =
+                Pipeline.Request({ arguments: args, context });
+
+            return List.of(request);
+        }
+
+        if (individual !== Run.State.EMPTY)
+            return List();
+
+        if (aggregate === Run.State.EMPTY)
+            return List();
+
+        return getUnblockedRequests(states, root, childKeyPath);
+    });
+}
+
+function getStates(node, keyPath = List())
+{
+    const individual = node.blocks.size > 0 ?
+        Run.State.WAITING : Run.State.EMPTY;
+
+    const [states, aggregate] = node.children
+        .reduce(function (accum, node, index)
+        {
+            const childKeyPath = keyPath.push("children", index);
+            const states = getStates(node, childKeyPath);
+            const { aggregate } = states.get(childKeyPath);
+
+            return [accum[0].merge(states), Math.min(accum[1], aggregate)];
+        }, [Map(), individual]);
+
+    return states.set(keyPath, Run.State({ individual, aggregate }));
 }
 
 function getStateAggregate(keyPath, states)

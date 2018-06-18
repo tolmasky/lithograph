@@ -1,0 +1,20 @@
+{
+  "name": "@lithograph/expect",
+  "version": "0.0.5",
+  "description": "",
+  "main": "lithograph-expect.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "node ./build.js"
+  },
+  "keywords": [],
+  "author": "Francisco Ryan Tolmasky I",
+  "license": "MIT",
+  "devDependencies": {
+    "browserify": "^16.2.2"
+  },
+  "dependencies": {
+    "expect": "^23.1.0",
+    "jest-mock": "^23.1.0"
+  }
+}
