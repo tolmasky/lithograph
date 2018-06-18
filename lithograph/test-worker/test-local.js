@@ -2,8 +2,6 @@ const { dirname } = require("path");
 const Module = require("module");
 
 const expect = require("@lithograph/expect");
-const fetchPath = require.resolve("node-fetch");
-
 const ModuleRequire = Module.prototype.require;
 
 
@@ -37,10 +35,6 @@ function testRequire(parentExports)
     {
         const components = path.split("/");
         const [scope, name, ...rest] = components;
-console.log(scope, name);
-        if (scope === "@lithograph" && name === "fetch")
-            return ModuleRequire.apply(this, 
-                [`${fetchPath}/${rest.join("/")}`, ...args]);
 
         if (scope === "@lithograph" && name === "parent")
             return parentExports;
