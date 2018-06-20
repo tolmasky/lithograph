@@ -10,6 +10,7 @@
   "author": "Francisco Ryan Tolmasky I",
   "license": " MIT",
   "dependencies": {
-    "immutable": "^3.8.2"
+    "immutable": "^3.8.2",
+    "magic-ws": "^1.0.0"
   }
 }
