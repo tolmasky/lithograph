@@ -1,8 +1,14 @@
-const headless = process.env.HEADLESS !== "false";
+const headless = process.env.headless !== "false";
 const launched = new Promise((resolve, reject) =>
     setImmediate(() =>
         require("puppeteer").launch({ headless })
             .then(resolve, reject)));
+
+const getPackageDescriptions = require("magic-ws/get-package-descriptions");
+const packageDescriptions = getPackageDescriptions([], [`${__dirname}/../node_modules/puppeteer`]);
+
+require("magic-ws/modify-resolve-lookup-paths")(packageDescriptions);
+require("./static");
 
 
 module.exports = async function ({ filename, blocks, exports })

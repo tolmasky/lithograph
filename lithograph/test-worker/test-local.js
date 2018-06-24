@@ -31,7 +31,7 @@ module.exports = async function (filename, blocks, parent, browser)
 
 function testRequire(parentExports)
 {
-    return function (path, ...args)
+    return function (path)
     {
         const components = path.split("/");
         const [scope, name, ...rest] = components;
