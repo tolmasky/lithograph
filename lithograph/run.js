@@ -1,9 +1,12 @@
+const { normalize, relative } = require("path");
+const getCommonPath = require("./get-common-path");
+
 const { List, Map, Range, Record } = require("immutable");
 const Pipeline = require("./pipeline");
 const forkRequire = require("forked-require");
 
 const Run = Record({ root:-1, states:Map(), pipeline:-1 });
-Run.State = Record({ aggregate:1, individual:1, value:-1, start:-1, duration:-1 });
+Run.State = Record({ aggregate:1, individual:1, metaDataPath:"", value:-1, start:-1, duration:-1 });
 
 Run.State.RUNNING   = 0;
 Run.State.WAITING   = 1;
@@ -12,14 +15,17 @@ Run.State.SUCCESS   = 3;
 Run.State.EMPTY     = 4;
 Run.State.DISABLED  = 5;
 
-module.exports = function (root, { browserLogs, headless, concurrency })
+module.exports = function (root, options)
 {
+    const { concurrency, headless, browserLogs } = options;
     const workers = Range(0, concurrency)
         .map(index => forkRequire(`${__dirname}/test-worker/test-worker.js`,
             Object.assign({ UUID: index, headless },
                 browserLogs && { browserLogs })));
 
-    const states = getStates(root);
+    const basePath = getCommonPath(root.children.map(node => node.filename));
+    const states = getStates(root, basePath, options.metadata);
+
     const requests = getUnblockedRequests(states, root);
     const pipeline = Pipeline.init({ workers, requests });
     const runState = Run({ root, states, pipeline });
@@ -136,12 +142,12 @@ function getUnblockedRequests(states, root, keyPath = List())
     return root.getIn(keyPath).children.flatMap(function (child, index)
     {
         const childKeyPath = keyPath.push("children", index);
-        const { individual, aggregate } = states.get(childKeyPath);
+        const { individual, aggregate, metaDataPath } = states.get(childKeyPath);
 
         if (individual === Run.State.WAITING)
         {
             const { filename, blocks } = child;
-            const args = [{ filename, blocks, exports }];
+            const args = [{ filename, blocks, exports, metaDataPath }];
             const context = childKeyPath;
             const request =
                 Pipeline.Request({ arguments: args, context });
@@ -159,24 +165,30 @@ function getUnblockedRequests(states, root, keyPath = List())
     });
 }
 
-function getStates(node, keyPath = List())
+function getStates(node, basePath, parentMetaDataPath, keyPath = List())
 {
     const individual = 
         node.disbaled ? Run.State.DISABLED :
             node.blocks.size > 0 ?
             Run.State.WAITING : Run.State.EMPTY;
 
+    const metaDataPathAddition = keyPath.size <= 0 ? "" :
+        keyPath.size <= 2 ?
+            `${relative(basePath, node.filename)}` :
+            `${node.title}`;
+    const metaDataPath = normalize(`${parentMetaDataPath}/${metaDataPathAddition}`);
+
     const [states, aggregate] = node.children
         .reduce(function (accum, node, index)
         {
             const childKeyPath = keyPath.push("children", index);
-            const states = getStates(node, childKeyPath);
+            const states = getStates(node, basePath, metaDataPath, childKeyPath);
             const { aggregate } = states.get(childKeyPath);
 
             return [accum[0].merge(states), Math.min(accum[1], aggregate)];
         }, [Map(), individual]);
 
-    return states.set(keyPath, Run.State({ individual, aggregate }));
+    return states.set(keyPath, Run.State({ individual, aggregate, metaDataPath }));
 }
 
 function getStateAggregate(keyPath, states)

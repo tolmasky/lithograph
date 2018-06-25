@@ -14,7 +14,7 @@ require("magic-ws/modify-resolve-lookup-paths")(packageDescriptions);
 require("./static");
 
 
-module.exports = async function ({ filename, blocks, exports, screenshots })
+module.exports = async function ({ filename, blocks, exports, metaDataPath })
 {
     const browser = await launched;
     const context = await browser.createIncognitoBrowserContext();
@@ -28,15 +28,9 @@ module.exports = async function ({ filename, blocks, exports, screenshots })
     }
     catch (error)
     {
-        screenshots = "/tmp";
+        await require("./screenshots")(browser, `${metaDataPath}/Screenshots`);
 
-        const results = await Promise.all((await browser.pages())
-            .map((page, index) => [page, `${screenshots}/${index}.png`])
-            .map(([page, path]) => page.screenshot({ path })
-                .then(() => path)
-                .catch(() => null)));
-
-        console.log(results);
+        throw error;
     }
     finally
     {

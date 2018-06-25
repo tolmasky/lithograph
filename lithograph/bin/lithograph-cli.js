@@ -8,22 +8,13 @@ const Node = require("../node");
 
 const { resolve } = require("path");
 const moment = require("moment");
-const getCommonPath = paths => paths
-    .map(path => path.split("/"))
-    .sort((lhs, rhs) => lhs.length - rhs.length)
-    .reduce((commonPath, path) => commonPath === null ?
-        path :
-        path.slice(0, commonPath.findIndex((component, index) =>
-            component !== path[index])), null)
-    .join("/") + "/";
-
 
 const options = require("commander")
     .version(require("../package").version)
     .option("-c, --concurrency [concurrency]",
         "Max number of test files running at the same time (Default: CPU cores)",
         require("os").cpus().length)
-    .option("-s, --screenshots [screenshots]",
+    .option("-m, --metadata [metadata]",
         "",
         `/tmp/lithograph-run-${moment().format("YYYY-MM-DD-hh:mm:ss")}`)
     .option("--no-headless")
@@ -36,7 +27,6 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
     const paths = Array.from(new Set(
         [].concat(...patterns.map(pattern => glob.sync(pattern)))))
         .map(path => [path, resolve(path)]);
-    const basePath = getCommonPath(paths.map(([, path]) => path));
 
     const children = List(paths
         .map(([title, filename]) => Node.parse({ title, filename })));
