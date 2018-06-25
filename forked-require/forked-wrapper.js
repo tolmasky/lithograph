@@ -10,7 +10,7 @@ process.on("message", async function ({ identifier, args })
             return [true, [0, await f(...args)]];
         }
         catch (error)
-        {console.log("oh...", error);
+        {
             if (!(error instanceof Error))
                 return [false, [0, error]];
 

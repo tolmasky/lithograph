@@ -54,6 +54,12 @@ function run(run, pull)
             const individual = event.rejected ?
                 Run.State.FAILURE : Run.State.SUCCESS;
 
+            if (individual === Run.State.FAILURE)
+            {
+                console.error(run.root.getIn(keyPath).title + " FAILED");
+                console.error(value);
+            }
+
             const state = Run.State({ individual, duration, value });
             const updatedStates =
                 updateStates(run.root, states, keyPath, state);
