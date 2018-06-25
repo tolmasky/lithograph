@@ -17,6 +17,7 @@
     "forked-require": "0.0.7",
     "immutable": "^3.8.2",
     "magic-ws": "^1.0.0",
+    "moment": "^2.22.2",
     "puppeteer": "^1.5.0"
   }
 }

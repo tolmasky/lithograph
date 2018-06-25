@@ -9,10 +9,11 @@ const Group = Record({ filename:"", title:"", level:1, blocks:List(), children:L
 
 module.exports = Group;
 
-Group.parse = function (filename, contents)
+Group.parse = function ({ title = filename, filename })
 {
+    const contents = readFileSync(filename, "utf-8");
     const document = new Parser().parse(contents);
-    const root = Group({ title: filename, filename, level: 0 });
+    const root = Group({ title, filename, level: 0 });
 
     return getChildSeq(document).reduce(function (state, node)
     {

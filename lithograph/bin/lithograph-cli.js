@@ -1,11 +1,21 @@
 const run = require("../run");
 const { List } = require("immutable");
 
-const { readFileSync } = require("fs");
 const glob = require("fast-glob");
 const { Repeat, Seq } = require("immutable");
 
 const Node = require("../node");
+
+const { resolve } = require("path");
+const moment = require("moment");
+const getCommonPath = paths => paths
+    .map(path => path.split("/"))
+    .sort((lhs, rhs) => lhs.length - rhs.length)
+    .reduce((commonPath, path) => commonPath === null ?
+        path :
+        path.slice(0, commonPath.findIndex((component, index) =>
+            component !== path[index])), null)
+    .join("/") + "/";
 
 
 const options = require("commander")
@@ -13,6 +23,9 @@ const options = require("commander")
     .option("-c, --concurrency [concurrency]",
         "Max number of test files running at the same time (Default: CPU cores)",
         require("os").cpus().length)
+    .option("-s, --screenshots [screenshots]",
+        "",
+        `/tmp/lithograph-run-${moment().format("YYYY-MM-DD-hh:mm:ss")}`)
     .option("--no-headless")
     .option("--browser-logs")
     .parse(process.argv);
@@ -21,11 +34,12 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 (async function ()
 {
     const paths = Array.from(new Set(
-        [].concat(...patterns
-            .map(pattern => glob.sync(pattern)))));
+        [].concat(...patterns.map(pattern => glob.sync(pattern)))))
+        .map(path => [path, resolve(path)]);
+    const basePath = getCommonPath(paths.map(([, path]) => path));
+
     const children = List(paths
-        .map(path => [path, readFileSync(path, "utf-8")])
-        .map(([path, contents]) => Node.parse(path, contents)));
+        .map(([title, filename]) => Node.parse({ title, filename })));
     const root = Node({ children });
 
     const start = Date.now();
@@ -53,7 +67,7 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 
         console.log(`${prefix}${emoji} ${node.title} ${duration}`);
     }
-    
+
     if (states.get(List()).aggregate === 2)
         process.exit(1);
 })();
