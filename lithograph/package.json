@@ -11,7 +11,7 @@
   "license": "MIT",
   "repository" :
   {
-    "type" : "git"
+    "type" : "git",
     "url" : "https://github.com/runkitdev/lithograph.git"
   },
   "dependencies": {
