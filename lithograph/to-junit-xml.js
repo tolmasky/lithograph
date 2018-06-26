@@ -4,6 +4,11 @@ const { spawnSync } = require("child_process");
 const { List } = require("immutable");
 
 const { openSync: open, writeSync: write, closeSync: close } = require("fs");
+const escape = (map =>
+    (regexp =>
+        string => string.replace(regexp, item => map[item]))
+    (new RegExp(`[${Object.keys(map).join("")}]`, "g")))
+    ({ ">": "&gt;", "<": "&lt;", "'": "&apos;", "\"": "&quot;", "&": "&amp;" });
 
 
 module.exports = function (path, root, states, time)
@@ -61,7 +66,7 @@ function tag(fd, tabs, name, attributes, children)
 {
     const attributesString = Object
         .keys(attributes)
-        .map(key => `${key} = ${JSON.stringify(attributes[key])}`)
+        .map(key => `${key} = "${escape(attributes[key])}"`)
         .join(" ");
     const spaces = " ".repeat(tabs * 4);
 
