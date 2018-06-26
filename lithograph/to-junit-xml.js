@@ -43,8 +43,18 @@ function toXML(fd, node, states, keyPath, tabs = 0)
             { name: node.title }, toChildrenXML);
 
     if (node.blocks.size > 0 && node.children.size <= 0)
+    {
+        const { individual } = states.get(keyPath);
+        const success = individual === 3;
+        const children = success ?
+            null :
+            () => tag(fd, tabs + 1, "failure",
+                { message: "yikes", type: "FATAL" },
+                () => write(fd, "Oh no.\n"));
+
         return tag(fd, tabs, "testcase",
-            { name: node.title }, () => { });
+            { name: node.title }, children);
+    }
 }
 
 function tag(fd, tabs, name, attributes, children)
@@ -55,7 +65,12 @@ function tag(fd, tabs, name, attributes, children)
         .join(" ");
     const spaces = " ".repeat(tabs * 4);
 
-    write(fd, `${spaces}<${name} ${attributesString}>\n`);
+    write(fd, `${spaces}<${name} ${attributesString}`);
+
+    if (!children)
+        return write(fd, "/>\n");
+
+    write(fd, ">\n");
 
     children();
 
