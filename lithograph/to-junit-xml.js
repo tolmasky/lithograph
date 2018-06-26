@@ -49,13 +49,13 @@ function toXML(fd, node, states, keyPath, tabs = 0)
 
     if (node.blocks.size > 0 && node.children.size <= 0)
     {
-        const { individual } = states.get(keyPath);
+        const { individual, value } = states.get(keyPath);
         const success = individual === 3;
         const children = success ?
             null :
             () => tag(fd, tabs + 1, "failure",
-                { message: "yikes", type: "FATAL" },
-                () => write(fd, "Oh no.\n"));
+                { message: value.message, type: "FATAL" },
+                () => write(fd, escape(value.stack) + "\n"));
 
         return tag(fd, tabs, "testcase",
             { name: node.title }, children);
