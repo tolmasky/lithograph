@@ -4,8 +4,7 @@
   "description": "",
   "main": "lithograph-expect.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "prepare": "node ./build.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "Francisco Ryan Tolmasky I",
