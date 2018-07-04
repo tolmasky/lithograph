@@ -1,9 +1,10 @@
 const PagePrototype = require("puppeteer/lib/Page").prototype;
 const BrowserContextPrototype = require("puppeteer/lib/Browser").BrowserContext.prototype;
 
-const getLithographBrowser = () => (contents =>
-    contents || (contents = require("fs")
-        .readFileSync(require.resolve("@lithograph/expect/browser"), "utf-8")))();
+const getPreloadSource = (contents => () =>
+    contents ||
+    (contents = require("fs")
+        .readFileSync(require.resolve("./preload.js"), "utf-8")))();
 
 
 PagePrototype.static = async function (HTML)
@@ -33,7 +34,13 @@ PagePrototype.static = async function (HTML)
 
     this.on("console", captureScope);
 
-    await this.evaluateOnNewDocument(getLithographBrowser() + ";console.log({ expect: window.expect })");
+    await this.evaluateOnNewDocument(
+        `${getPreloadSource()};\n` +
+        `const { preload, expect } = require("preload");\n` +
+        `console.log(expect);\n` +
+        `preload([${(this._preloadScripts || []).join(",")}])`);
+
+    this._preloadScripts = [];
 
     await this.goto("https://lithograph/static");
 
@@ -49,14 +56,23 @@ PagePrototype.static = async function (HTML)
 PagePrototype.test = function (f, ...args)
 {
     return this.evaluate(
-        ({ mock, expect }, f, ...args) => eval(f)(...args),
+        (expect, f, ...args) => eval(f)(...args),
         this.testScope, f + "", ...args);
 }
-/*
-PagePrototype.preload = function (f)
+
+PagePrototype.preload = function (...args)
 {
-    page.mainFrame().evaluateOnNewDocument(f);
-}*/
+    if (!this._preloadScripts)
+        this._preloadScripts = [];
+
+    const serialize = value =>
+        typeof value === "function" ? `${JSON.stringify(value + "")}` :
+        typeof value === "undefined" ? "undefined" :
+        JSON.stringify(value);
+    const serialized = `[${args.map(serialize).join(", ")}]`;
+
+    this._preloadScripts.push(serialized);
+}
 
 BrowserContextPrototype.static = async function (HTML)
 {

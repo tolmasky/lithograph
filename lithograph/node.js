@@ -4,8 +4,8 @@ const { List, Record, Seq, Stack } = require("immutable");
 const { Parser } = require("commonmark");
 
 const Block = Record({ language:"", code:"" });
-const Group = Record({ filename:"", title:"", level:1, blocks:List(), children:List(), disabled:false });
-
+const Group = Record({ filename:"", title:"", level:1, resources:List(), blocks:List(), children:List(), disabled:false });
+const Resource = Record({ URL:"", text:"" });
 
 module.exports = Group;
 
@@ -38,6 +38,16 @@ Group.parse = function ({ title = filename, filename })
                 .set("stack", popped.push(keyPath));
         }
 
+        if (node.type === "block_quote")
+        {
+            const parentKeyPath = [...stack.peek(), "blocks"];
+            const resource = getResource(node);
+            const index = state.getIn(parentKeyPath).size;
+            const keyPath = [...parentKeyPath, index];
+
+            return resource ? state.setIn(keyPath, resource) : state;
+        }
+
         if (node.type === "code_block")
         {
             const parentKeyPath = [...stack.peek(), "blocks"];
@@ -51,6 +61,24 @@ Group.parse = function ({ title = filename, filename })
 
         return state;
     }, Record({ root, stack: Stack.of(["root"]) })()).root;
+}
+
+function getResource(node)
+{
+    const children = getChildSeq(node);
+
+    if (children.size !== 2)
+        return null;
+
+    const [first, second] = children;
+
+    if (second.type !== "code_block")
+        return null;
+
+    const URL = getInnerText(first);
+    const contents = second.literal;
+
+    return Resource({ URL, contents });
 }
 
 function getInnerText(node)
