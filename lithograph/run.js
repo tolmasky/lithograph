@@ -146,8 +146,8 @@ function getUnblockedRequests(states, root, keyPath = List())
 
         if (individual === Run.State.WAITING)
         {
-            const { filename, blocks } = child;
-            const args = [{ filename, blocks, exports, metaDataPath }];
+            const { filename, blocks, resources } = child;
+            const args = [{ filename, blocks, resources, exports, metaDataPath }];
             const context = childKeyPath;
             const request =
                 Pipeline.Request({ arguments: args, context });

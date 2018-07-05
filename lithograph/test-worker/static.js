@@ -1,3 +1,6 @@
+const { parse } = require("url");
+const { Map } = require("immutable");
+
 const PagePrototype = require("puppeteer/lib/Page").prototype;
 const BrowserContextPrototype = require("puppeteer/lib/Browser").BrowserContext.prototype;
 
@@ -6,6 +9,21 @@ const getPreloadSource = (contents => () =>
     (contents = require("fs")
         .readFileSync(require.resolve("./preload.js"), "utf-8")))();
 
+const goto = PagePrototype.goto;
+
+
+PagePrototype.goto = function (URL)
+{
+    const { protocol, hostname, pathname } = parse(URL);
+
+    if (protocol !== "resource:")
+        return goto.apply(this, URL);
+
+    const { resources } = this.target().browserContext();
+    const name = `${hostname}${pathname || ""}`;
+
+    return this.static(resources[name].contents);
+}
 
 PagePrototype.static = async function (HTML)
 {
@@ -42,7 +60,7 @@ PagePrototype.static = async function (HTML)
 
     this._preloadScripts = [];
 
-    await this.goto("https://lithograph/static");
+    await goto.call(this, "https://lithograph/static");
 
     this.removeListener("request", listener);
     this.removeListener("pageerror", onError);

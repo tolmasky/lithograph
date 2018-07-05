@@ -14,10 +14,12 @@ require("magic-ws/modify-resolve-lookup-paths")(packageDescriptions);
 require("./static");
 
 
-module.exports = async function ({ filename, blocks, exports, metaDataPath })
+module.exports = async function ({ filename, resources, blocks, exports, metaDataPath })
 {
     const browser = await launched;
     const context = await browser.createIncognitoBrowserContext();
+
+    context.resources = resources;
 
     try
     {

@@ -1,11 +1,11 @@
 const { readFileSync } = require("fs");
 
-const { List, Record, Seq, Stack } = require("immutable");
+const { List, Map, Record, Seq, Stack } = require("immutable");
 const { Parser } = require("commonmark");
 
 const Block = Record({ language:"", code:"" });
-const Group = Record({ filename:"", title:"", level:1, resources:List(), blocks:List(), children:List(), disabled:false });
-const Resource = Record({ URL:"", text:"" });
+const Group = Record({ filename:"", title:"", level:1, resources:Map(), blocks:List(), children:List(), disabled:false });
+const Resource = Record({ name:"", contents:"" });
 
 module.exports = Group;
 
@@ -40,12 +40,14 @@ Group.parse = function ({ title = filename, filename })
 
         if (node.type === "block_quote")
         {
-            const parentKeyPath = [...stack.peek(), "blocks"];
             const resource = getResource(node);
-            const index = state.getIn(parentKeyPath).size;
-            const keyPath = [...parentKeyPath, index];
 
-            return resource ? state.setIn(keyPath, resource) : state;
+            if (!resource)
+                return state;
+
+            const keyPath = [...stack.peek(), "resources", resource.name];
+
+            return state.setIn(keyPath, resource);
         }
 
         if (node.type === "code_block")
@@ -65,7 +67,7 @@ Group.parse = function ({ title = filename, filename })
 
 function getResource(node)
 {
-    const children = getChildSeq(node);
+    const children = getChildSeq(node).toList();
 
     if (children.size !== 2)
         return null;
@@ -75,10 +77,10 @@ function getResource(node)
     if (second.type !== "code_block")
         return null;
 
-    const URL = getInnerText(first);
+    const name = getInnerText(first);
     const contents = second.literal;
 
-    return Resource({ URL, contents });
+    return Resource({ name, contents });
 }
 
 function getInnerText(node)
