@@ -12,7 +12,7 @@ module.exports = async function (filename, blocks, parent, browser)
 
     // FIXME: Should be require from originating module?
     const parentExports = JSON.parse(parent,
-        reviver(module.require.bind(module), environment.expect));
+        reviver(module.require.bind(module), environment));
 
     module.require = testRequire(parentExports);
     module.filename = filename;
@@ -43,13 +43,14 @@ function testRequire(parentExports)
     }
 }
 
-function reviver(require, expect)
+function reviver(require, environment)
 {
     return function (key, value)
     {
         if (value.__function === true)
-            return (new Function("require", "expect",
-            "return " + value.source))(require, expect);
+            return (new Function("require",
+            `const { expect, fetch, mock } = arguments[1];\n` +
+            "return " + value.source))(require, environment);
     
         return value;
     }
