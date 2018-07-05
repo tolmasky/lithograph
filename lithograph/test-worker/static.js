@@ -27,19 +27,21 @@ PagePrototype.goto = function (URL)
 
 PagePrototype.static = async function (HTML)
 {
+    this.logs = [];
+
     const status = 200;
     const contentType = "text/html;";
     const body = /<!DOCTYPE HTML>/i.test(HTML) ?
         HTML : `<!DOCTYPE HTML>${HTML}`;
-    const listener = request =>
-        request.url() !== "https://lithograph/static" ? 
-            request.continue() :
-            request.respond({ status, contentType, body });
+    const listener = intercept({ status, contentType, body });
 
     const errors = [];
     const onError = error => errors.push(error);
 
     await this.setRequestInterception(true);
+
+    this.on("console", message =>
+        this.logs.push({ type: message.type(), text: message.text() }));
 
     this.on("pageerror", onError);
     this.on("request", listener);
@@ -55,26 +57,52 @@ PagePrototype.static = async function (HTML)
     await this.evaluateOnNewDocument(
         `${getPreloadSource()};\n` +
         `const { preload, expect } = require("preload");\n` +
-        `console.log(expect);\n` +
+        `const { mock } = expect;\n` +
+        `console.log([expect, mock]);\n` +
         `preload([${(this._preloadScripts || []).join(",")}])`);
 
     this._preloadScripts = [];
 
     await goto.call(this, "https://lithograph/static");
 
-    this.removeListener("request", listener);
+//    this.removeListener("request", listener);
     this.removeListener("pageerror", onError);
 
-    await this.setRequestInterception(false);
+//    await this.setRequestInterception(false);
 
     if (errors.length > 0)
         throw errors[0];
 }
 
+const SmallFavicon = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAABmJLR0QA/wD/AP+gvaeTAAA" +
+    "AADUlEQVQImWNgYGD4DwABBAEAfbLI3wAAAABJRU5ErkJggg==", "base64");
+
+function intercept({ status, contentType, body })
+{
+    return function (request)
+    {
+        const URL = request.url();
+
+        if (URL === "https://lithograph/favicon.ico")
+            return request.respond(
+            {
+                status: 200,
+                contentType: "img/png",
+                body: SmallFavicon
+            });
+
+        if (URL === "https://lithograph/static")
+            return request.respond({ status, contentType, body });
+
+        request.continue();
+    }
+}
+
 PagePrototype.test = function (f, ...args)
 {
-    return this.evaluate(
-        (expect, f, ...args) => eval(f)(...args),
+    return this.evaluateHandle(
+        ([expect, mock], f, ...args) => eval(f)(...args),
         this.testScope, f + "", ...args);
 }
 

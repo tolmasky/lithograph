@@ -19,7 +19,11 @@ const options = require("commander")
         "")
     .option("--no-headless")
     .option("--browser-logs")
+    .option("-r, --require [path]",
+        "A package to automatically require in the test environment.",
+        (v, m) => (m.push(v), m), [])
     .parse(process.argv);
+
 const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 
 (async function ()
@@ -36,6 +40,7 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 
     options.output = options.output || `/tmp/lithograph-results/${title}`;
     options.metadata = options.output;
+    options.requires = options.require.map(path => resolve(path));
 
     const start = Date.now();
     const [_, states] = await run(root, options);

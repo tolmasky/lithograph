@@ -1,4 +1,5 @@
 const headless = process.env.headless !== "false";
+const requires = JSON.parse(process.env.requires || "[]");
 const launched = new Promise((resolve, reject) =>
     setImmediate(() =>
         require("puppeteer").launch({ headless })
@@ -12,6 +13,8 @@ const packageDescriptions = getPackageDescriptions([], [puppeteerPath]);
 
 require("magic-ws/modify-resolve-lookup-paths")(packageDescriptions);
 require("./static");
+
+requires.map(path => require(path));
 
 
 module.exports = async function ({ filename, resources, blocks, exports, metaDataPath })

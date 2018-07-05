@@ -18,9 +18,10 @@ Run.State.DISABLED  = 5;
 module.exports = function (root, options)
 {
     const { concurrency, headless, browserLogs } = options;
+    const requires = JSON.stringify(options.requires || []);
     const workers = Range(0, concurrency)
         .map(index => forkRequire(`${__dirname}/test-worker/test-worker.js`,
-            Object.assign({ UUID: index, headless },
+            Object.assign({ UUID: index, headless, requires },
                 browserLogs && { browserLogs })));
 
     const basePath = getCommonPath(root.children.map(node => node.filename));
