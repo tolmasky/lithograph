@@ -6,8 +6,8 @@ const browserify = require("browserify");
 {
     try
     {
-        const input = `${__dirname}/preload.js`;
-        const output = `${__dirname}/../test-worker/preload.js`;
+        const input = `${__dirname}/test-environment-preload.js`;
+        const output = `${__dirname}/test-environment-preload.bundle.js`;
 
         await compile(input, output);
     }
@@ -24,7 +24,7 @@ function compile(input, output)
     return new Promise(function (resolve, reject)
     {
         browserify()
-            .require(input, { expose: "preload" })
+            .require(input, { expose: "test-environment-preload" })
             .bundle()
             .pipe(createWriteStream(output))
             .on("error", reject)

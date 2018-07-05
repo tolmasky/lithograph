@@ -5,7 +5,7 @@
   "main": "lithograph.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "prepare": "node ./src/build.js"
+    "prepare": "node ./test-worker/build.js"
   },
   "keywords": [],
   "author": "Francisco Ryan Tolmasky I",
@@ -15,12 +15,13 @@
     "url": "https://github.com/runkitdev/lithograph.git"
   },
   "dependencies": {
-    "@lithograph/expect": "0.0.8",
     "commander": "^2.15.1",
     "commonmark": "^0.28.1",
+    "expect": "^23.3.0",
     "fast-glob": "^2.2.2",
     "forked-require": "0.0.7",
     "immutable": "^3.8.2",
+    "jest-mock": "^23.2.0",
     "magic-ws": "^1.0.0",
     "moment": "^2.22.2",
     "puppeteer": "^1.5.0"

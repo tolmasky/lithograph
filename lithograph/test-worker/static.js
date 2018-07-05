@@ -2,12 +2,14 @@ const { parse } = require("url");
 const { Map } = require("immutable");
 
 const PagePrototype = require("puppeteer/lib/Page").prototype;
-const BrowserContextPrototype = require("puppeteer/lib/Browser").BrowserContext.prototype;
+const BrowserContextPrototype = require("puppeteer/lib/Browser")
+    .BrowserContext.prototype;
 
 const getPreloadSource = (contents => () =>
-    contents ||
-    (contents = require("fs")
-        .readFileSync(require.resolve("./preload.js"), "utf-8")))();
+    contents || (contents = require("fs")
+    .readFileSync(
+        require.resolve("./test-environment-preload.bundle.js"),
+        "utf-8")))();
 
 const goto = PagePrototype.goto;
 
@@ -56,8 +58,7 @@ PagePrototype.static = async function (HTML)
 
     await this.evaluateOnNewDocument(
         `${getPreloadSource()};\n` +
-        `const { preload, expect } = require("preload");\n` +
-        `const { mock } = expect;\n` +
+        `const { preload, expect, mock } = require("test-environment-preload");\n` +
         `console.log([expect, mock]);\n` +
         `preload([${(this._preloadScripts || []).join(",")}])`);
 

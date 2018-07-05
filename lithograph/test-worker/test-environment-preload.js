@@ -1,7 +1,8 @@
-const expect = require("@lithograph/expect");
-
+const { expect, mock } = require("./test-environment");
 
 module.exports.expect = expect;
+module.exports.mock = mock;
+
 module.exports.preload = function (scripts)
 {
     for (const [functionSource, ...args] of scripts)

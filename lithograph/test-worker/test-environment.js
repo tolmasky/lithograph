@@ -27,7 +27,7 @@ module.exports.expect = function expect(expected)
                         if (expected && typeof expected.rerun === "function")
                             return await jestExpect(await expected.rerun())[key](received);
 
-                        return await expectation[key](...received);
+                        return await expectation[key](received);
                     }
                     catch (error) { }
 

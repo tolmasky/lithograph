@@ -1,7 +1,8 @@
 const { dirname } = require("path");
 const Module = require("module");
 
-const expect = require("@lithograph/expect");
+const mock = require("jest-mock");
+const expect = require("expect");
 const ModuleRequire = Module.prototype.require;
 
 
