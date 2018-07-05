@@ -19,7 +19,7 @@ PagePrototype.goto = function (URL)
     const { protocol, hostname, pathname } = parse(URL);
 
     if (protocol !== "resource:")
-        return goto.apply(this, URL);
+        return goto.call(this, URL);
 
     const { resources } = this.target().browserContext();
     const name = `${hostname}${pathname || ""}`;
