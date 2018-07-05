@@ -1,8 +1,7 @@
 const { dirname } = require("path");
 const Module = require("module");
 
-const mock = require("jest-mock");
-const expect = require("expect");
+const { mock, expect } = require("./test-environment");
 const ModuleRequire = Module.prototype.require;
 
 
