@@ -14,6 +14,15 @@ const getPreloadSource = (contents => () =>
 const goto = PagePrototype.goto;
 
 
+BrowserContextPrototype.open = async function (URL)
+{
+    const page = await this.newPage();
+
+    await page.goto(URL);
+
+    return page;
+}
+
 PagePrototype.goto = function (URL)
 {
     const { protocol, hostname, pathname } = parse(URL);
@@ -58,8 +67,8 @@ PagePrototype.static = async function (HTML)
 
     await this.evaluateOnNewDocument(
         `${getPreloadSource()};\n` +
-        `const { preload, expect, mock } = require("test-environment-preload");\n` +
-        `console.log([expect, mock]);\n` +
+        `const { preload, expect, fetch, mock } = require("test-environment-preload");\n` +
+        `console.log([expect, fetch, mock]);\n` +
         `preload([${(this._preloadScripts || []).join(",")}])`);
 
     this._preloadScripts = [];
@@ -103,7 +112,7 @@ function intercept({ status, contentType, body })
 PagePrototype.test = function (f, ...args)
 {
     return this.evaluateHandle(
-        ([expect, mock], f, ...args) => eval(f)(...args),
+        ([expect, fetch, mock], f, ...args) => eval(f)(...args),
         this.testScope, f + "", ...args);
 }
 

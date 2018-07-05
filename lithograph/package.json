@@ -24,6 +24,7 @@
     "jest-mock": "^23.2.0",
     "magic-ws": "^1.0.0",
     "moment": "^2.22.2",
+    "node-fetch": "^2.1.2",
     "puppeteer": "^1.5.0"
   },
   "devDependencies": {

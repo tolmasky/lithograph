@@ -3,6 +3,8 @@ const jestExpect = require("expect");
 const delay = timeout => new Promise(resolve => setTimeout(resolve, timeout));
 
 
+module.exports.fetch = require("node-fetch");
+
 module.exports.mock = mock;
 
 module.exports.expect = function expect(expected)
