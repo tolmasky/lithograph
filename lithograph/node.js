@@ -22,8 +22,9 @@ Group.parse = function ({ title = filename, filename })
         if (node.type === "heading")
         {
             const level = node.level;
-            const title = getInnerText(node);
-            const disabled = /^~~.+~~$/.test(title);
+            const text = getInnerText(node);
+            const disabled = text.match(/^~~(.+)~~$/);
+            const title = disabled ? disabled[1] : text;
             const group = Group({ filename, title, level, disabled });
 
             const popped = stack.skipWhile(keyPath =>

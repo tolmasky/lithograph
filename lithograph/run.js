@@ -169,7 +169,7 @@ function getUnblockedRequests(states, root, keyPath = List())
 function getStates(node, basePath, parentMetaDataPath, keyPath = List())
 {
     const individual = 
-        node.disbaled ? Run.State.DISABLED :
+        node.disabled ? Run.State.DISABLED :
             node.blocks.size > 0 ?
             Run.State.WAITING : Run.State.EMPTY;
 

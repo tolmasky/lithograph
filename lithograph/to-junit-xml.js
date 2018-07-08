@@ -53,16 +53,18 @@ function toXML(fd, node, states, keyPath, tabs = 0)
         const success = individual === 3;
         const children = success ?
             null :
-            () => tag(fd, tabs + 1, "failure",
-                { message: value.message, type: "FATAL" },
-                () => write(fd, escape(value.stack) + "\n"));
+            individual === 5 ?
+                () => tag(fd, tabs + 1, "skipped") :
+                () => tag(fd, tabs + 1, "failure",
+                    { message: value.message, type: "FATAL" },
+                    () => write(fd, escape(value.stack) + "\n"));
 
         return tag(fd, tabs, "testcase",
             { name: node.title }, children);
     }
 }
 
-function tag(fd, tabs, name, attributes, children)
+function tag(fd, tabs, name, attributes = { }, children)
 {
     const attributesString = Object
         .keys(attributes)

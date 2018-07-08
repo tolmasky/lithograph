@@ -10,10 +10,16 @@ const puppeteerPath = dirname(require.resolve("puppeteer"));
 
 const getPackageDescriptions = require("magic-ws/get-package-descriptions");
 const packageDescriptions = getPackageDescriptions([], [puppeteerPath]);
-const environment = require("./test-local");
 
 require("magic-ws/modify-resolve-lookup-paths")(packageDescriptions);
 require("./static");
+
+// We need to do this to make them available to packages brought in with -r.
+const environment = require("./test-environment");
+
+global.fetch = environment.fetch;
+global.mock = environment.mock;
+global.expect = environment.expect;
 
 requires.map(path => require(path));
 
@@ -27,7 +33,7 @@ module.exports = async function ({ filename, resources, blocks, exports, metaDat
 
     try
     {
-        return await environment(filename, blocks, exports, context);
+        return await require("./test-local")(filename, blocks, exports, context);
     }
     catch (error)
     {

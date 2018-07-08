@@ -66,9 +66,13 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
         const state = states.get(keyPath);
         const prefix = Repeat(" ", keyPath.size).join("");
         const duration = state.duration > -1 ? `(${state.duration}ms)` : ""
-        const emoji = state.aggregate === 3 ? "✓" : "✕";
+        const skipped = state.aggregate === 5;
+        const emoji =
+            state.aggregate === 5 ? "-" :
+            state.aggregate === 3 ? "✓" : "✕";
+        const post = skipped ? "(skipped)" : duration;
 
-        console.log(`${prefix}${emoji} ${node.title} ${duration}`);
+        console.log(`${prefix}${emoji} ${node.title} ${post}`);
     }
 
     if (states.get(List()).aggregate === 2)
