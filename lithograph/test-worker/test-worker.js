@@ -10,6 +10,7 @@ const puppeteerPath = dirname(require.resolve("puppeteer"));
 
 const getPackageDescriptions = require("magic-ws/get-package-descriptions");
 const packageDescriptions = getPackageDescriptions([], [puppeteerPath]);
+const environment = require("./test-local");
 
 require("magic-ws/modify-resolve-lookup-paths")(packageDescriptions);
 require("./static");
@@ -26,9 +27,6 @@ module.exports = async function ({ filename, resources, blocks, exports, metaDat
 
     try
     {
-        const environment = blocks[0].language === "html" ?
-            require("./test-browser") : require("./test-local");
-
         return await environment(filename, blocks, exports, context);
     }
     catch (error)
