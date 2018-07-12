@@ -1,5 +1,6 @@
 const React = require("react");
-const { Record } = require("immutable");
+const { Map, Record } = require("immutable");
+const Fields = require("./fields");
 
 
 const OEmbed = Object.assign(props => OEmbed[props.data.state](props),
@@ -51,15 +52,42 @@ const OEmbedContainer = function ({ data, keyPath, update })
         update([...keyPath, "height"], () => height);
     })
 
-    const __html = data.result.iframe.outerHTML;
+    const result = data.result;
+    const __html = result.get("iframe").outerHTML;
     const id = JSON.stringify(keyPath);
     const height = data.height;
     const style = Object.assign({ }, IFrameContainerStyle, { height });
 
     return  <div id = { id } style = { style } >
+                <div style = { OEmbedCalloutStyle } />
+                <div style = { OEmbedInfoStyle } >
+                    <Fields data = { Map({ "dynamic-height": height }) } />
+                    <Fields data = { result.get("JSON") } />
+                </div>
                 <div    style = { { height:"100%", width: "100%" } }
                         dangerouslySetInnerHTML = { { __html } } />
             </div>
+}
+
+const OEmbedCalloutStyle =
+{
+    position: "absolute",
+    top: "-2px",
+    width: "20px",
+    right: "100%",
+    borderTop: "2px dashed red"
+}
+
+const OEmbedInfoStyle =
+{
+    position: "absolute",
+    top: "-2px",
+    width: "270px",
+    right: "100%",
+    lineHeight: "1.58",
+    marginRight: "20px",
+    paddingRight: "20px",
+    borderRight: "2px dashed red"
 }
 
 module.exports = OEmbed;
@@ -86,15 +114,15 @@ async function fetchOEmbed({ URL, maxwidth })
     if (response.status !== 200)
         throw Object.assign(new Error(), { status });
 
-    const value = await response.json();
+    const JSON = await response.json();
     
-    if (!value.html)
+    if (!JSON.html)
         throw new Error(
             `OEmbed response must contain an "html" property.`);
  
     const fragment = Object.assign(
         document.createElement("div"),
-        { innerHTML: value.html });
+        { innerHTML: JSON.html });
 
     if (fragment.childNodes.length !== 1 ||
         !fragment.firstElementChild ||
@@ -114,5 +142,5 @@ async function fetchOEmbed({ URL, maxwidth })
     iframe.width = "100%";
     iframe.height = "100%";
 
-    return { iframe, response };
+    return Map({ iframe, JSON: Map(JSON), response });
 }

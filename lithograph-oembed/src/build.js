@@ -22,11 +22,14 @@ const babelify = require("babelify");
 
 function compile(input, output)
 {
+    const presets = ["react"];
+    const plugins = ["transform-object-rest-spread"];
+
     return new Promise(function (resolve, reject)
     {
         browserify()
             .add(input)
-            .transform("babelify", { presets: ["babel-preset-react"] })
+            .transform("babelify", { presets, plugins })
             .bundle()
             .pipe(createWriteStream(output))
             .on("error", reject)

@@ -34,7 +34,7 @@ const Application = Object.assign(props => Application[props.data.state](props),
     },
 
     loaded: ({ data: { items, interactive, input }, keyPath, update }) =>
-    {console.log("INPUT: {" + input + "}"); 
+    {
         const onOEmbedURLChange = URL =>
             update([...keyPath, "items", 1], () => OEmbed.Data({ URL }));
 
@@ -43,7 +43,7 @@ const Application = Object.assign(props => Application[props.data.state](props),
                                 keyPath = { [...keyPath, "input"] }
                                 update = { update }
                                 action = { onOEmbedURLChange } />
-                    { 
+                    {
                         items.map((item, index) =>
                             !(item instanceof OEmbed.Data) ?
                                 item :
