@@ -1,4 +1,4 @@
-const { Range, List, Record, Set } = require("immutable");
+const { Range, Iterable, List, Record, Set } = require("immutable");
 const Queue = Record({ backlog:List(), workers:-1, free:List(), occupied:Set() });
 
 module.exports = Queue;
@@ -11,7 +11,7 @@ Queue.Response = Record({ request:-1, rejected:false, value:-1, index:-1, push:-
 
 Queue.init = function ({ workers: workersIterable, requests })
 {
-    const workers = List(workersIterable);
+    const workers = Iterable.Indexed(workersIterable);
     const backlog = requests ? List(requests) : List();
     const free = Range(0, workers.size).toList();
 
