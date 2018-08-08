@@ -20,12 +20,9 @@ module.exports = function (filename)
         program(Run.init(suite), Run.update, function (run, event)
         {
             console.log("running...");
-        /*
-            const { aggregate } = run.states.get(List());
-
-            if (aggregate === Run.State.SUCCESS ||
-                aggregate === Run.State.FAILURE)
-                resolve([run.root, run.states]);*/
+            
+            if (run.results.has(suite))
+                console.log("ALL DONE");
         })(Map());
     });
 
@@ -34,7 +31,7 @@ module.exports = function (filename)
 Run.init = function (suite)
 {
     const root = Path({ node: suite, index: 0 });
-    const workers = Range(0, 10).map(() => node => process);
+    const workers = Range(0, 10).map(() => process);
     const requests = getPostOrderLeaves(root);
 
     return Run({ queue: Queue.init({ workers, requests }) });
@@ -54,7 +51,7 @@ Run.update = function (run, event)
             const queue = requests.size <= 0 ?
                 run.queue :
                 Queue.update(run.queue, Queue.Enqueue({ requests, push }));
-console.log("NOW I HAVE TO DO " + requests.map(request => request.arguments.get(0).node.metadata.title));
+
             return run
                 .set("results", results)
                 .set("queue", queue);
@@ -101,22 +98,23 @@ function getUnblockedRequests(path, results)
 
     if (siblingsComplete)
         return parent ?
-            List.of(Queue.Request({ arguments: List.of(parent) })) :
+            List.of(Queue.Request({ arguments: List.of(parent, results) })) :
             List();
 
     if (!isSerial)
         return List();
 
     return getPostOrderLeaves(
-        Path({ index: index + 1, parent, node: siblings.get(index + 1) }));
+        Path({ index: index + 1, parent, node: siblings.get(index + 1) }),
+        results);
 }
 
-function getPostOrderLeaves(path)
+function getPostOrderLeaves(path, results)
 {
     const { node } = path;
 
     if (node instanceof Test)
-        return List.of(Queue.Request({ arguments: List.of(path) }));
+        return List.of(Queue.Request({ arguments: List.of(path, results) }));
 
     const { children } = node;
 
@@ -125,49 +123,22 @@ function getPostOrderLeaves(path)
 
     if (node.metadata.schedule === Suite.Serial)
         return getPostOrderLeaves(
-            Path({ parent: path, node: node.children.get(0), index: 0 }));
+            Path({ parent: path, node: node.children.get(0), index: 0 }),
+            results);
 
     return node.children.flatMap((node, index) =>
-        getPostOrderLeaves(Path({ parent: path, node, index })));
+        getPostOrderLeaves(Path({ parent: path, node, index })),
+        results);
 }
 
-/*
-
-function postOrderLeaves(path)
+function process({ node }, states)
 {
-    if (path.node instanceof Test)
-        return path;
-
-    const { children } = path.node;
-
-    if (children.size <= 0)
-        return List();
-
-    return path.node.metadata.schedule === Suite.Serial ?
-        postOrderLeaves(
-            Path({ parent: path, node: children.get(0), index: 0 })) :
-        children.flatMap((node, index) =>
-            postOrderLeaves(Path({ parent: path, node, index }));
-}
-
-function postOrderLeaves(parent, index)
-{console.log(parent, index);
-    const siblings = parent.node.children;
-    const node = siblings.get(index);
-console.log("THE NODE IS " + node.metadata.schedule);
-    return node instanceof Test ?
-        Path({ node, parent, index }) :
-        node.metadata.schedule === Suite.Serial ?
-            postOrderLeaves(node, 0) :
-            node.children.flatMap((_, index) =>
-                postOrderLeaves(node, index));
-}*/
-
-async function process({ node }, states)
-{console.log("HEY!");
+    console.log("1");
+    return 1;
+/*console.log("HEY!");
     return node instanceof Suite ? 
         process.suite(node, states) :
-        await process.test(node);
+        await process.test(node);*/
 }
 
 process.test = async function (test)
