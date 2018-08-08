@@ -19,6 +19,10 @@ const Test = Record({ type:"Test", metadata:-1, children:List() }, "Test");
 const Block = Record({ type:"Block", code:"" }, "Block");
 const Section = Record({ node:-1, metadata:-1, children:List() }, "Section");
 
+module.exports.Suite = Suite;
+module.exports.Test = Test;
+module.exports.Block = Block;
+
 const toSection = (function ()
 {
     const scheduleRegExp = new RegExp(`\\s*\\((${schedules.join("|")})\\)$`);
@@ -98,29 +102,10 @@ const markdown =
         (stack.takeWhile(parent => heading.depth <= parent.node.depth).size)
 }
 
-/*
-console.log(JSON.stringify(markdown.document(parse(`
-# TITLE
-\`\`\`javascript
-5+5
-\`\`\`
-## TITLE 2
-### ~~TITLE 3 (Serial)~~
-\`\`\`javascript
-5+5
-\`\`\``), "blah.md").toJS(), null, 2))
+module.exports.fromMarkdown = function (filename)
+{
+    const contents = require("fs").readFileSync(filename, "utf-8");
 
-
-console.log(JSON.stringify(markdown.document(parse(`
-# ~~ROOT bye (Serial)~~
-\`\`\`javascript
-5+5
-\`\`\`
-  ### THREE (FIRST)...
-  ### ~~THREE (SECOND)...~~
- ## something
- \`\`\`javascript
-5+5
-\`\`\`
-`), "blah.md").toJS(), null, 2))*/
+    return markdown.document(parse(contents), filename);
+}
 
