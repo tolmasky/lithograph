@@ -6,7 +6,7 @@ const Queue = require("./pipeline");
 const Path = Record({ parent: null, node:-1, index:-1 });
 const Run = Record({ queue: -1, results:Map(), starts:Map() });
 
-
+console.log("--->" + global.process.pid);
 Suite.Serial = "Serial";
 Suite.Concurrent = "Concurrent";
 
@@ -20,7 +20,7 @@ module.exports = function (filename)
         program(Run.init(suite), Run.update, function (run, event)
         {
             console.log("running...");
-            
+
             if (run.results.has(suite))
                 console.log("ALL DONE");
         })(Map());
@@ -79,7 +79,7 @@ function program(state, update, pull)
     };
 };
 
-module.exports("/Users/tolmasky/Development/tonic/app/__tests__/notebook-cloning.test.md");
+//module.exports("/Users/tolmasky/Development/tonic/app/__tests__/notebook-cloning.test.md");
 //module.exports("/Users/tolmasky/Development/tonic/app/__tests__/notebook-editing.test.md");
 
 function getUnblockedRequests(path, results)
@@ -131,18 +131,18 @@ function getPostOrderLeaves(path, results)
         results);
 }
 
-function process({ node }, states)
+async function process({ node }, states)
 {
-    console.log("1");
-    return 1;
-/*console.log("HEY!");
     return node instanceof Suite ? 
         process.suite(node, states) :
-        await process.test(node);*/
+        await process.test(node);
 }
 
 process.test = async function (test)
 {
+    console.log("RUNNING " + test.metadata.title);
+    return Success();
+/*
     const duration = (start => () => 
         (Date.now() - start))(Date.now());
 
@@ -156,11 +156,13 @@ process.test = async function (test)
         return Failure({ duration: duration(), reason });
     }
 
-    return Success({ duration: duration() });
+    return Success({ duration: duration() });*/
 }
 
 process.suite = function (suite, states)
 {
+    console.log("ENTERING " + suite.metadata.title);
+    return Success();
     const children = suite.children
         .map(child => states.get(child));
     const failures = children

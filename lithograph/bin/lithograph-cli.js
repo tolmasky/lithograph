@@ -30,8 +30,10 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 {
     const paths = Array.from(new Set(
         [].concat(...patterns.map(pattern => glob.sync(pattern)))))
-        .map(path => [path, resolve(path)]);
-
+        .map(path => resolve(path));
+console.log(process.pid);
+    await run(paths, options);
+/*
     const children = List(paths
         .map(([title, filename]) => Node.parse({ title, filename })));
 
@@ -76,5 +78,5 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
     }
 
     if (states.get(List()).aggregate === 2)
-        process.exit(1);
+        process.exit(1);*/
 })();
