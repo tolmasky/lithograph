@@ -1,0 +1,71 @@
+const { Range } = require("immutable");
+const { Cause, field, event, update, IO } = require("cause");
+const Pool = require("@cause/pool");
+const Process = require("@cause/process");
+
+setTimeout(function() { }, 50000);
+module.exports = function main(paths, options)
+{
+    const requires = JSON.stringify(options.requires || []);
+
+    return IO.toPromise(Main.create({ ...options, paths, requires }));
+}
+
+const Main = Cause("Main",
+{
+    [field `paths`]: -1,
+    [field `fileProcessPool`]: -1,
+    [field `fileProcesses`]: -1,
+
+    init({ paths, concurrency })
+    {
+        const fileProcessPool = Pool.create({ count: concurrency });
+        const fileProcesses = Range(0, concurrency)
+            .map(index => Process.node({ path:`${__dirname}/file-process` }))
+            .toList();
+
+        return { fileProcessPool, fileProcesses, paths };
+    },
+
+    [event.on (Process.Started)]: main =>
+        main.fileProcesses.every(Process.isRunning) ?
+            update.in(main, "fileProcessPool",
+                Pool.Enqueue({ requests: main.paths })) :
+            main,
+
+    [event.on (Pool.Allotted)]: (main, { allotments }) =>
+        update.in.all(allotments.map(({ request, index }) => 
+            [["fileProcesses", index],
+                Process.Message({ data: { name: "execute", path: request } })]),
+            main),
+
+    [event.on (Cause.Start)]: main => {
+    console.log("HEY!");
+    console.log(update.in.all(
+        main.fileProcesses
+            .map((_, index) => [["fileProcesses", index], Cause.Start()]),
+        main));
+    return update.in.all(
+        main.fileProcesses
+            .map((_, index) => [["fileProcesses", index], Cause.Start()]),
+        main) },
+/*
+    [event.on (Pool.Released)]: (main, { indexes })
+    
+    [event.on (Process.Message())]: (main)
+
+    [event.on (Pool.Allotted)]: (main, { allotments }) =>
+        update.in.all(alottment.map(({ index, request }) =>
+            [["fileProcess", index], Process.Message({ path: request })],
+            main),
+        
+        
+        fileExecution.set("running", fileExecution.running
+            .merge(Map(allotments.map(({ request: path, key }) =>
+                [path.data.id, IO.fromAsync(() => testRun({ path, key })) ])))),
+        request: path, index
+        update.in(main, ["fileProcesses", index], Process.Message({ path })),
+
+    [event.on (Cause.Start)]: main =>
+        update.in(main, ["fileProcessPool"], Pool.Enqueue({ requests: main.paths }))*/
+});
