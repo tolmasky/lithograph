@@ -2,13 +2,15 @@ const { Record, List, Map, Range } = require("immutable");
 const { Cause, IO, field, event, update } = require("cause");
 const LNode = require("cause/lnode");
 const Pool = require("@cause/pool");
+const Scope = require("./scope");
 
 const { Suite, Test, Block, fromMarkdown } = require("./suite");
 const TestPath =
 {
-    root: node => new LNode({ index:0, node, id:"0" }),
-    child: (parent, index, child) => ((data, node) =>
-        new LNode({ index, id: `${data.id},${index}`, node }, parent))
+    root: node =>
+        new LNode({ index:0, node, scope: Scope(), id:"0" }),
+    child: (parent, scope, index, child) => ((data, node) =>
+        new LNode({ index, scope, id: `${data.id},${index}`, node }, parent))
         (parent.data, child || parent.data.node.children.get(index))
 };
 
@@ -69,8 +71,15 @@ module.exports = FileExecution;
 async function testRun({ path, index })
 {
     const start = Date.now();
-console.log("RUN " + path.data.node.metadata.title);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const { scope, node: test } = path.data;
+    const blocks = test.children;
+
+    console.log("RUN " + test.metadata.title);
+
+    const content = blocks.map(block => block.code).join("\n");
+    const source = `(async () => { ${content} })`;
+
+    await scope(source)();
 
     const outcome = Report.Success();
     const report = { duration: Date.now() - start , outcome };
@@ -86,7 +95,7 @@ function updateReports(inReports, path, report)
     if (!parent)
         return [outReports, List()];
 
-    const { node: suite, id } = parent.data;
+    const { node: suite, scope, id } = parent.data;
     const isSerial = suite.metadata.schedule === Suite.Serial;
     const siblings = suite.children;
     const siblingsComplete = isSerial ?
@@ -101,7 +110,7 @@ function updateReports(inReports, path, report)
             getSuiteReport(parent, outReports));
 
     const unblockedTestPaths = isSerial ?
-        getPostOrderLeaves(TestPath.child(parent, data.index + 1)) :
+        getPostOrderLeaves(TestPath.child(parent, scope, data.index + 1)) :
         List();
 
     return [outReports, unblockedTestPaths];
@@ -125,7 +134,7 @@ function getSuiteReport(path, reports)
 
 function getPostOrderLeaves(path)
 {
-    const { data: { node } } = path;
+    const { data: { node, scope } } = path;
 
     if (node instanceof Test)
         return List.of(path);
@@ -136,8 +145,8 @@ function getPostOrderLeaves(path)
         return List();
 
     if (node.metadata.schedule === Suite.Serial)
-        return getPostOrderLeaves(TestPath.child(path, 0));
+        return getPostOrderLeaves(TestPath.child(path, scope, 0));
 
     return node.children.flatMap((node, index) =>
-        getPostOrderLeaves(TestPath.child(path, index, node)));
+        getPostOrderLeaves(TestPath.child(path, Scope(scope), index, node)));
 }
