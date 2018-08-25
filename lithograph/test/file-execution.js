@@ -21,13 +21,14 @@ const Report = Object.assign(
 
 const FileExecution = Cause("FileExecution",
 {
+    [field `path`]: -1,
     [field `root`]: -1,
     [field `pool`]: Pool.create({ count: 2 }),
     [field `running`]: Map(),
     [field `reports`]: Map(),
 
     init: ({ path }) =>
-        ({ root: TestPath.root(fromMarkdown(path)) }),
+        ({ path, root: TestPath.root(fromMarkdown(path)) }),
 
     [event.on (Cause.Start)]: fileExecution => { console.log("START ",fileExecution.root.data.node.metadata.title);
         return update.in(fileExecution, ["pool"], Pool.Enqueue(
@@ -140,22 +141,3 @@ function getPostOrderLeaves(path)
     return node.children.flatMap((node, index) =>
         getPostOrderLeaves(TestPath.child(path, index, node)));
 }
-
-/*
-
-    {
-        const pairs = allotments.map(({ request: path, key }) =>
-        [
-            path.id, AsynchronousCause.from(testRun, { path, key })
-        ]);
-        
-        return fileExecution.set("running", running);
-    }
-
-        const running = fileExecution.running.concat(Map(pairs));
-
-        return update.start.all(
-            pairs.map(pair => ["running", pair[1]]),
-            fileExecution.set("running", running));
-
-*/
