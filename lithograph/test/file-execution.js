@@ -29,16 +29,15 @@ const FileExecution = Cause("FileExecution",
     init: ({ path }) =>
         ({ root: TestPath.root(fromMarkdown(path)) }),
 
-    [event.on (Cause.Start)]: fileExecution =>
+    [event.on (Cause.Start)]: fileExecution => { console.log("START ",fileExecution.root.node);
         update.in(fileExecution, ["pool"], Pool.Enqueue(
             { requests: getUnblockedTestPaths(
-                fileExecution.root, fileExecution.reports) })),
+                fileExecution.root, fileExecution.reports) })) },
 
-    [event.on (Pool.Released)]: event.ignore,
-    [event.on (Pool.Allotted)]: (fileExecution, { allotments }) =>
-        fileExecution.set("running", fileExecution.running
-            .merge(Map(allotments.map(({ request: path, index }) =>
-                [path.data.id, IO.fromAsync(() => testRun({ path, index })) ])))),
+    [event.on (Pool.Retained)]: (fileExecution, { index, request }) =>
+        fileExecution.setIn(
+            ["running", request.data.id],
+            IO.fromAsync(() => testRun({ path: request, index }))),
 
     [event.out `Finished`]: { },
 
@@ -47,7 +46,7 @@ const FileExecution = Cause("FileExecution",
     {console.log("FINISHED!" + path.data.node.metadata.title);
         const reports = fileExecution.reports.set(path.data.id, report);
         const requests = getUnblockedTestPaths(path, reports);
-        const release = Pool.Release({ index: [index] });
+        const release = Pool.Release({ indexes: [index] });
         const enqueue = requests.size > 0 && Pool.Enqueue({ requests });
 
         return update.in_(
