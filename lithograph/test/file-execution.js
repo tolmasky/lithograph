@@ -29,10 +29,9 @@ const FileExecution = Cause("FileExecution",
     init: ({ path }) =>
         ({ root: TestPath.root(fromMarkdown(path)) }),
 
-    [event.on (Cause.Start)]: fileExecution => { console.log("START ",fileExecution.root.node);
-        update.in(fileExecution, ["pool"], Pool.Enqueue(
-            { requests: getUnblockedTestPaths(
-                fileExecution.root, fileExecution.reports) })) },
+    [event.on (Cause.Start)]: fileExecution => { console.log("START ",fileExecution.root.data.node.metadata.title);
+        return update.in(fileExecution, ["pool"], Pool.Enqueue(
+            { requests: getPostOrderLeaves(fileExecution.root) })) },
 
     [event.on (Pool.Retained)]: (fileExecution, { index, request }) =>
         fileExecution.setIn(
@@ -43,18 +42,24 @@ const FileExecution = Cause("FileExecution",
 
     [event.in `TestFinished`]: { path:-1, index:-1, report:-1 },
     [event.on `TestFinished`](fileExecution, { report, path, index })
-    {console.log("FINISHED!" + path.data.node.metadata.title);
-        const reports = fileExecution.reports.set(path.data.id, report);
-        const requests = getUnblockedTestPaths(path, reports);
-        const release = Pool.Release({ indexes: [index] });
-        const enqueue = requests.size > 0 && Pool.Enqueue({ requests });
-
-        return update.in_(
-            ["pool"],
-            [release, enqueue],
+    {
+        const [reports, requests] =
+            updateReports(fileExecution.reports, path, report);
+        const finished = reports.has(fileExecution.root.data.id);
+        const [released, fromReleaseEvents] = update.in(
             fileExecution
                 .set("reports", reports)
-                .removeIn(["running", path.data.id]));
+                .removeIn(["running", path.data.id]),
+            "pool",
+            Pool.Release({ indexes: [index] }));
+
+        if (finished)
+            return [released, [FileExecution.Finished(), ...fromReleaseEvents]];
+
+        const [enqueued, fromEnqueueEvents] =
+            update.in(released, "pool", Pool.Enqueue({ requests }));
+
+        return [enqueued, [...fromReleaseEvents, ...fromEnqueueEvents]];
     }
 });
 
@@ -69,40 +74,43 @@ console.log("RUN " + path.data.node.metadata.title);
     const outcome = Report.Success();
     const report = { duration: Date.now() - start , outcome };
 
-    return FileExecution.TestFinished({ pathn, index, report });
+    return FileExecution.TestFinished({ path, index, report });
 }
 
-function getUnblockedTestPaths(path, reports)
+function updateReports(inReports, path, report)
 {
-    if (!reports.has(path.data.id))
-        return getPostOrderLeaves(path);
-
-    const { parent, index } = path;
+    const { next: parent, data } = path;
+    const outReports = inReports.set(data.id, report);
 
     if (!parent)
-        return List();
+        return [outReports, List()];
 
-    const suite = parent.node;
+    const { node: suite, id } = parent.data;
     const isSerial = suite.metadata.schedule === Suite.Serial;
     const siblings = suite.children;
-    const siblingsComplete = isSerial ? 
-        index === siblings.size - 1 :
-        siblings.every(sibling => reports.has(sibling));
+    const siblingsComplete = isSerial ?
+        data.index === siblings.size - 1 :
+        siblings.every((_, index) =>
+            outReports.has(`${id},${index}`));
 
-    if (!siblingsComplete)
-        return isSerial ?
-            [getPostOrderLeaves(TestPath.child(parent, index + 1)), results] :
-            [List(), results];
+    if (siblingsComplete)
+        return updateReports(
+            outReports,
+            parent,
+            getSuiteReport(parent, outReports));
 
-    return getUnblockedTestPaths(
-        parent, 
-        reports.set(parent.id, getSuiteReport(suite, reports)));
+    const unblockedTestPaths = isSerial ?
+        getPostOrderLeaves(TestPath.child(parent, data.index + 1)) :
+        List();
+
+    return [outReports, unblockedTestPaths];
 }
 
 function getSuiteReport(path, reports)
 {
+    const { data: { id, node: suite } } = path;
     const childReports = suite.children
-        .map((_, index) => reports.get(`${path.data.id},${index}`));
+        .map((_, index) => reports.get(`${id},${index}`));
     const failures = childReports.filter(report =>
         report.outcome instanceof Report.Failure);
     const duration = childReports.reduce(

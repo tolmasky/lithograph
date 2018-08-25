@@ -2,9 +2,6 @@ const { Cause, IO, field, event, update } = require("cause");
 const Process = require("@cause/process");
 const Parent = require("@cause/process/parent");
 const FileExecution = require("./file-execution");
-setTimeout(function()
-{
-}, 50000);
 console.log("IN SEPARATE PROCESS");
 const FileProcess = Cause("FileProcess",
 {
@@ -27,11 +24,9 @@ const FileProcess = Cause("FileProcess",
 
     [event.on (Cause.Start)]: event.ignore,
 
-    [event.on (FileExecution.Finished)]: (fileProcess, event) =>
-    {
-        console.log("FINISHED!");
-        return fileProcess;
-    }
+    [event.out `Executed`]: { },
+    [event.on (FileExecution.Finished)]: fileProcess =>
+        [fileProcess, [FileProcess.Executed()]]
 });
 
 FileProcess.fork = () => Process.node({ path: __filename });

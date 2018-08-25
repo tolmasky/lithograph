@@ -4,7 +4,7 @@ const Pool = require("@cause/pool");
 const Process = require("@cause/process");
 const FileProcess = require("./file-process");
 
-setTimeout(function() { }, 50000);
+
 module.exports = function main(paths, options)
 {
     const requires = JSON.stringify(options.requires || []);
@@ -40,11 +40,17 @@ const Main = Cause("Main",
             updated;
     },
 
-    [event.on (Process.Started)]: main =>
-        main.fileProcesses.every(([_, ready]) => ready) ?
-            update.in(main, "fileProcessPool",
-                Pool.Enqueue({ requests: main.paths })) :
+    [event.on (FileProcess.Executed)](main, event, fromKeyPath)
+    {
+        const index = fromKeyPath.next.data;
+        console.log("LOUD AND CLEAR FROM " + index);
+        return update.in(
             main,
+            "fileProcessPool",
+            Pool.Release({ indexes: [index] }));
+    },
+
+    [event.on (Process.Started)]: event.ignore,
 
     [event.on (Pool.Retained)]: (main, { request: path, index }) =>
         update.in(main, ["fileProcesses", index, 0],
