@@ -1,7 +1,10 @@
-module.exports = function scope(parent)
+const toGeneratorFunction = require("./to-generator-function");
+
+
+module.exports = function scopeR(parent)
 {
     if (parent)
-        return parent("(" + scope + ")()");
+        return parent("(" + scopeR + ")()");
 
     return (function (iterator)
     {
@@ -16,7 +19,9 @@ module.exports = function scope(parent)
 
             iterator.next(originalEval);
 
-            const result = iterator.next(source).value
+            const result = typeof source === "string" ?
+                iterator.next(source).value :
+                iterator.next(toGeneratorFunction(source)).value();
 
             iterator.next(originalEval);
             iterator.next(currentEval);

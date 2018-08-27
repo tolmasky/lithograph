@@ -1,5 +1,5 @@
 const t = require("babel-types");
-const syscall = require("./syscall");
+const { declare } = require("./syscall");
 
 
 module.exports = function declarationsToYield()
@@ -11,6 +11,9 @@ module.exports = function declarationsToYield()
             const { node: { kind, declarations }, scope } = path;
             
             if (kind !== "var" && !t.isFile(scope.parent.parentBlock))
+                return;
+
+            if (!declarations[0].id.loc)
                 return;
 
             const [names, expression] =
@@ -33,15 +36,15 @@ module.exports = function declarationsToYield()
 function assignmentsFromVariableDeclaration(kind, declarations)
 {
     const [names, expressions] = declarations
-        .reduce(function ([names, expressions], { id, init })
-        {        
+        .reduce(function ([names, expressions], declarator)
+        {
+            const { id, init } = declarator;
             const keys = variableNamesFromPattern(id);
             const expression = kind === "var" ?
                 init ?
                     t.assignmentExpression("=", id, init) :
                     patternToExpression(id) :
-                t.AssignmentExpression("=", id,
-                    syscall("declare", { kind, keys, init }));
+                toIFFEDeclare(kind, keys, declarator);
 
             return [[...names, ...keys], [...expressions, expression]];
         }, [[], []]);
@@ -49,6 +52,23 @@ function assignmentsFromVariableDeclaration(kind, declarations)
     return expressions.length === 1 ?
         [names, expressions[0]] :
         [names, t.sequenceExpression(expressions)];
+}
+
+
+function toIFFEDeclare(kind, keys, declarator)
+{
+    const functionExpression = t.functionExpression(null, [],
+        t.blockStatement(
+        [
+            t.variableDeclaration(kind, [declarator]),
+            t.returnStatement(t.arrayExpression(
+                keys.map(key => t.arrayExpression(
+                    [t.stringLiteral(key), t.identifier(key)]))))
+        ]));
+    const pairsGenerator = t.callExpression(
+        Object.assign(functionExpression, { generator: true }), []);
+
+    return declare({ kind, pairsGenerator });
 }
 
 function patternToExpression(pattern)
