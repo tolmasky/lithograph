@@ -2,15 +2,15 @@ const { Record, List, Map, Range } = require("immutable");
 const { Cause, IO, field, event, update } = require("cause");
 const LNode = require("cause/lnode");
 const Pool = require("@cause/pool");
-const Scope = require("./scope");
+const toFunctions = require("./compile/to-functions");
 
 const { Suite, Test, Block, fromMarkdown } = require("./suite");
 const TestPath =
 {
     root: node =>
-        new LNode({ index:0, node, scope: Scope(), id:"0" }),
-    child: (parent, scope, index, child) => ((data, node) =>
-        new LNode({ index, scope, id: `${data.id},${index}`, node }, parent))
+        new LNode({ index:0, node, id:"0" }),
+    child: (parent, index, child) => ((data, node) =>
+        new LNode({ index, id: `${data.id},${index}`, node }, parent))
         (parent.data, child || parent.data.node.children.get(index))
 };
 
@@ -28,18 +28,29 @@ const FileExecution = Cause("FileExecution",
     [field `pool`]: Pool.create({ count: 2 }),
     [field `running`]: Map(),
     [field `reports`]: Map(),
+    [field `functions`]: Map(),
 
-    init: ({ path }) =>
-        ({ path, root: TestPath.root(fromMarkdown(path)) }),
+    init({ path })
+    {
+        const root = TestPath.root(fromMarkdown(path));
+        const functions = toFunctions(root);
+    
+        return { path, root, functions };
+    },
 
     [event.on (Cause.Start)]: fileExecution => { console.log("START ",fileExecution.root.data.node.metadata.title);
         return update.in(fileExecution, ["pool"], Pool.Enqueue(
             { requests: getPostOrderLeaves(fileExecution.root) })) },
 
     [event.on (Pool.Retained)]: (fileExecution, { index, request }) =>
-        fileExecution.setIn(
+    {
+        const path = request;
+        const functions = fileExecution.functions;
+
+        return fileExecution.setIn(
             ["running", request.data.id],
-            IO.fromAsync(() => testRun({ path: request, index }))),
+            IO.fromAsync(() => testRun({ functions, path, index })));
+    },
 
     [event.out `Finished`]: { },
 
@@ -68,18 +79,17 @@ const FileExecution = Cause("FileExecution",
 
 module.exports = FileExecution;
 
-async function testRun({ path, index })
-{
+async function testRun({ functions, path, index })
+{console.log("ABOUT TO " + path.data.id);
+
     const start = Date.now();
-    const { scope, node: test } = path.data;
-    const blocks = test.children;
+    const { id, node: test } = path.data;
+    const f = functions.get(id);
 
+    console.log(f + "");
     console.log("RUN " + test.metadata.title);
-
-    const content = blocks.map(block => block.code).join("\n");
-    const source = `(async () => { ${content} })`;
-
-    await scope(source)();
+    
+    await f();
 
     const outcome = Report.Success();
     const report = { duration: Date.now() - start , outcome };
@@ -95,7 +105,7 @@ function updateReports(inReports, path, report)
     if (!parent)
         return [outReports, List()];
 
-    const { node: suite, scope, id } = parent.data;
+    const { node: suite, id } = parent.data;
     const isSerial = suite.metadata.schedule === Suite.Serial;
     const siblings = suite.children;
     const siblingsComplete = isSerial ?
@@ -110,7 +120,7 @@ function updateReports(inReports, path, report)
             getSuiteReport(parent, outReports));
 
     const unblockedTestPaths = isSerial ?
-        getPostOrderLeaves(TestPath.child(parent, scope, data.index + 1)) :
+        getPostOrderLeaves(TestPath.child(parent, data.index + 1)) :
         List();
 
     return [outReports, unblockedTestPaths];
@@ -134,7 +144,7 @@ function getSuiteReport(path, reports)
 
 function getPostOrderLeaves(path)
 {
-    const { data: { node, scope } } = path;
+    const { data: { node } } = path;
 
     if (node instanceof Test)
         return List.of(path);
@@ -145,8 +155,8 @@ function getPostOrderLeaves(path)
         return List();
 
     if (node.metadata.schedule === Suite.Serial)
-        return getPostOrderLeaves(TestPath.child(path, scope, 0));
+        return getPostOrderLeaves(TestPath.child(path, 0));
 
     return node.children.flatMap((node, index) =>
-        getPostOrderLeaves(TestPath.child(path, Scope(scope), index, node)));
+        getPostOrderLeaves(TestPath.child(path, index, node)));
 }
