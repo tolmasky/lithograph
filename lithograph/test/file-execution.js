@@ -33,12 +33,14 @@ const FileExecution = Cause("FileExecution",
     init({ path })
     {
         const root = TestPath.root(fromMarkdown(path));
+        console.log(getPostOrderLeaves(root).map(path => path.data.id));
+        
         const functions = toFunctions(root);
     
         return { path, root, functions };
     },
 
-    [event.on (Cause.Start)]: fileExecution => { console.log("START ",fileExecution.root.data.node.metadata.title);
+    [event.on (Cause.Start)]: fileExecution => { console.log("START ",fileExecution.root.data.node.metadata.title + " " + getPostOrderLeaves(fileExecution.root).size);
         return update.in(fileExecution, ["pool"], Pool.Enqueue(
             { requests: getPostOrderLeaves(fileExecution.root) })) },
 
@@ -80,16 +82,16 @@ const FileExecution = Cause("FileExecution",
 module.exports = FileExecution;
 
 async function testRun({ functions, path, index })
-{console.log("ABOUT TO " + path.data.id);
+{
+    console.log("ABOUT TO " + path.data.id);
 
     const start = Date.now();
     const { id, node: test } = path.data;
     const f = functions.get(id);
 
-    console.log(f + "");
-    console.log("RUN " + test.metadata.title);
-    
+    console.log("RUN " + path.data.id + " -> " + test.metadata.title); 
     await f();
+    console.log("finished " + path.data.id + " -> " + test.metadata.title + " " + (Date.now() - start));
 
     const outcome = Report.Success();
     const report = { duration: Date.now() - start , outcome };
@@ -106,7 +108,7 @@ function updateReports(inReports, path, report)
         return [outReports, List()];
 
     const { node: suite, id } = parent.data;
-    const isSerial = suite.metadata.schedule === Suite.Serial;
+    const isSerial = suite.metadata.schedule === "Serial";
     const siblings = suite.children;
     const siblingsComplete = isSerial ?
         data.index === siblings.size - 1 :
@@ -154,7 +156,7 @@ function getPostOrderLeaves(path)
     if (node.children.size <= 0)
         return List();
 
-    if (node.metadata.schedule === Suite.Serial)
+    if (node.metadata.schedule === "Serial")
         return getPostOrderLeaves(TestPath.child(path, 0));
 
     return node.children.flatMap((node, index) =>

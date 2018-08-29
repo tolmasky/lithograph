@@ -51,12 +51,12 @@ function toAsync(key, iterator)
             throw Error(`Attempted to run test ${key} before it was ready.`);
 
         (function step(method, input)
-        {
+        {console.log("INCOMING WITH " + method + " " + input);
             const { done, value } = iterator[method](input);
             const border = !done && value.name === "start";
-console.log("IT IS" , value);
+console.log("IT IS" , value, border);
             if (border)
-                iterator.waiting = value.test;
+                iterator.waiting = value.value;
 
             if (done || border)
                 return resolve();
