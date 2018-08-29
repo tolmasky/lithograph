@@ -2,7 +2,7 @@ const { List, Map } = require("immutable");
 const { Suite, Test } = require("../suite");
 const TestPath = require("../test-path");
 const valueToExpression = require("./value-to-expression");
-
+const { transformFromAst } = require("babel-core"); 
 
 //console.log(JSON.stringify(suite, null, 2));
 
@@ -30,7 +30,7 @@ module.exports = function (root)
     const { fragment } = fromPath(root).get(0);
     const { code } = generate(t.returnStatement(fragment));
     
-    console.log(code);
+//    console.log(code);
     
     return (new Function(`${code}`))();
 }
@@ -56,10 +56,10 @@ const TEST_TEMPLATE = template(function * ()
 function fromTest(path, wrap)
 {
     const { data: { node, id } } = path;
-    const allowAwaitOutsideOfFunction = true;
+    const allowAwaitOutsideFunction = true;
     const $statements = node.children
         .flatMap(({ code }) =>
-            parseStatements(code, { allowAwaitOutsideOfFunction }))
+            parseStatements(code, { allowAwaitOutsideFunction }))
         .toArray();
     const fragment = wrap ?
         TEST_TEMPLATE({ $id: t.stringLiteral(id), $statements }) :
@@ -128,13 +128,35 @@ function fromSerial(path, wrap)
     const $statements = tests
         .flatMap(({ path: { data: { id } }, fragment }) =>
         [
-            t.yieldExpression(valueToExpression({ name:"start", test: id })),
-            ...fragment
+            yield("start", id),
+            ...transformStatements(fragment)
         ]).toArray();
     const $children = valueToExpression([concurrent, serial]);
     const fragment = SERIAL_TEMPLATE({ $statements, $children });
 
     return List.of(SourceEntry({ path, fragment }));
 }
+
+function yield(name, value)
+{
+    return t.yieldExpression(valueToExpression({ name, value }));
+}
+
+
+const transformStatements = (function ()
+{
+    const toVisitor = visitor => () => ({ visitor });
+    const AwaitExpression = path => { console.log("HERE!");
+        path.replaceWith(yield("await", path.node.argument)) };
+    const Function = path =>
+        !t.isProgram(path.getFunctionParent().node) && path.skip()
+    const awaitToYield = toVisitor({ AwaitExpression, Function }) ;
+    const options = { plugins: [awaitToYield] };
+
+    return statements =>
+        transformFromAst(t.program(statements), "", options)
+            .ast.program.body;
+})();
+
 
 
