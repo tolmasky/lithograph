@@ -33,7 +33,7 @@ const FileExecution = Cause("FileExecution",
     init: ({ path, environment }) =>
     {
         const root = TestPath.root(fromMarkdown(path));
-        const functions = toFunctions(environment, root);
+        const functions = toFunctions(environment, root, path);
 
         return { path, root, functions };
     },
