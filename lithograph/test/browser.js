@@ -10,15 +10,14 @@ const Browser = Cause("Browser",
     [field `puppeteerBrowser`]: -1,
 
     [event.in `Launched`]: { puppeteerBrowser: -1 },
-    [event.on `Launched`]: (browser, { puppeteerBrowser }) => {
-    console.log("GOT IT!");
-    return [
+    [event.on `Launched`]: (browser, { puppeteerBrowser }) =>
+    [
         browser
             .set("ready", true)
             .set("puppeteerBrowser", puppeteerBrowser)
             .set("endpoint", puppeteerBrowser.browserWSEndpoint),
         [Cause.Ready()]
-    ] }
+    ]
 });
 
 module.exports = Browser;

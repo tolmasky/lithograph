@@ -40,15 +40,15 @@ const Main = Cause("Main",
 
     [event.on (FileProcess.Executed)](main, event)
     {
-        console.log("DONE FROM " + event.fromKeyPath);
-/*        const reported = main.setIn(["reports", event.path], true);
+        const [,, index] = event.fromKeyPath;
+        const reported = main.setIn(["reports", event.path], true);
         const finished = reported.reports.size === reported.paths.size;
         const [updated, events] = update.in(
             reported,
             "fileProcessPool",
             Pool.Release({ indexes: [index] }));
 
-        return [updated, [...events, finished && Cause.Finished()]];*/
+        return [updated, [...events, finished && Cause.Finished()]];
     },
 
     [event.on (Pool.Retained)]: (main, { request: path, index }) => {

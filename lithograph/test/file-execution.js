@@ -30,23 +30,13 @@ const FileExecution = Cause("FileExecution",
     [field `reports`]: Map(),
     [field `functions`]: Map(),
 
-    init: ({ path }) =>
+    init: ({ path, environment }) =>
     {
         const root = TestPath.root(fromMarkdown(path));
-        const functions = toFunctions({ }, root);
+        const functions = toFunctions(environment, root);
 
         return { path, root, functions };
     },
-/*
-    [event.on `GetBrowserReady`]: (fileExecution, event)
-    {
-        const { getBrowser, getBrowserContext } = event;
-
-        return fileExecution.set("functions",
-            toFunctions(
-                { getBrowser, getBrowserContext },
-                fileExecution.root));
-    },*/
 
     [event.on (Cause.Start)]: fileExecution =>
         update.in(fileExecution, ["pool"], Pool.Enqueue(
@@ -85,33 +75,6 @@ const FileExecution = Cause("FileExecution",
 
         return [enqueued, [...fromReleaseEvents, ...fromEnqueueEvents]];
     },
-    
-    //
-    
-    [field `browserCallbacks`]: Map({ id: 0 }),
-    [field `browserResponses`]: Map({ }),
-    
-    [event.out `BrowserRequest`]: { id:-1 },
-    [event.in `TestCalledGetBrowser`]: { resolve:-1, reject:-1 },
-    [event.on `TestCalledGetBrowser`](fileExecution, event) 
-    {
-        const id = fileExecution.browserRequests.get("id");
-        const outFileExecution = fileExecution
-            .setIn(["browserCallbacks", id], resolve)
-            .setIn(["browserCallbacks", "id"], id + 1);
-
-        return [outFileExecution, FileExecution.BrowserRequest({ id })];
-    }, 
-
-    [event.in `BrowserResponse`]: { id:-1, endpoint: -1 },
-    [event.on `BrowserResponse`](fileExecution, { id, endpoint })
-    {
-        const resolve = browserCallbacks.get(id);
-
-        return fileExecution.setIn(
-            ["browserCallbacks", id],
-            IO.fromVoid(() => resolve(endpoint)));
-    }
 });
 
 module.exports = FileExecution;
@@ -197,29 +160,3 @@ function getPostOrderLeaves(path)
     return node.children.flatMap((node, index) =>
         getPostOrderLeaves(TestPath.child(path, index, node)));
 }
-/*
-function generateGetBrowser(push)
-{
-    push(FileExecution.GetBrowserReady({ getBrowser, getBrowserContext }));
-
-    async function getBrowserContext()
-    {
-        return await (await getBrowser()).createIncognitoBrowserContext()
-    }
-
-    async function getBrowser()
-    {
-        const browserWSEndpoint = await (new Promise(
-            (resolve, reject) => push(
-                FileExecution.TestCalledGetBrowser({ resolve, reject }))));
-        const browser = await puppeteer.connect({ browserWSEndpoint });
-console.log("yes!");
-        return browser;
-    }
-}
-    
-    
-    
-    process.send({ serialized: serialize(event) })
-}
-*/
