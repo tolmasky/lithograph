@@ -19,7 +19,11 @@ const FileProcess = Cause("FileProcess",
     [event.out `Executed`]: { path: -1 },
     [event.on (FileExecution.Finished)]: fileProcess =>
         (path => [fileProcess, [FileProcess.Executed({ path })]])
-        (fileProcess.fileExecution.path)
+        (fileProcess.fileExecution.path),
+
+    [event.on (FileExecution.BrowserRequest)]: event.bubble,
+    [event.on (FileExecution.BrowserResponse)]: (fileProcess, event) =>
+        update.in(fileProcess, "fileExecution", event)
 });
 
 module.exports = FileProcess;
