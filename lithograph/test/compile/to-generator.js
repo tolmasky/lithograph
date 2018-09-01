@@ -2,7 +2,7 @@ const { List, Map } = require("immutable");
 const { Suite, Test } = require("../suite");
 const TestPath = require("../test-path");
 const valueToExpression = require("./value-to-expression");
-const { transformFromAst } = require("babel-core"); 
+const { transformFromAst } = require("babel-core");
 
 //console.log(JSON.stringify(suite, null, 2));
 
@@ -40,7 +40,7 @@ function fromPath(path, wrap)
     const { node, id } = path.data;
 
     if (node instanceof Test)
-        return fromTest(path, wrap);
+        return fromTest(path, wrap || !path.next);
 
     if (node.metadata.schedule === "Serial")
         return fromSerial(path, wrap);
@@ -83,7 +83,7 @@ function fromConcurrent(path)
 
     if (children.length <= 0)
         return List();
-        
+
     const $children = Array.from(
         children,
         ({ fragment }) => fragment);
@@ -146,10 +146,10 @@ function yield(name, value)
 const transformStatements = (function ()
 {
     const toVisitor = visitor => () => ({ visitor });
-    const AwaitExpression = path => { console.log("HERE!");
-        path.replaceWith(yield("await", path.node.argument)) };
+    const AwaitExpression = path =>
+        path.replaceWith(yield("await", path.node.argument));
     const Function = path =>
-        !t.isProgram(path.getFunctionParent().node) && path.skip()
+        t.isProgram(path.getFunctionParent().node) && path.skip()
     const awaitToYield = toVisitor({ AwaitExpression, Function }) ;
     const options = { plugins: [awaitToYield] };
 
