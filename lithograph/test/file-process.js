@@ -48,19 +48,23 @@ const FileProcess = Cause("FileProcess",
     [event.in `GetBrowserCalled`]: { resolve: -1, reject: -1 },
     [event.on `GetBrowserCalled`](fileProcess, event)
     {
-        const id = fileProcess.browserRequests.get("id");
+        const id = fileProcess.getBrowserCallbacks.get("id");
         const outFileProcess = fileProcess.set("getBrowserCallbacks",
             fileProcess
-                .browserCallbacks
-                .concat({ id: id + 1, [id]: event }));
+                .getBrowserCallbacks
+                .concat([["id", id + 1], [id, event]]));
 
-        return [outFileProcess, FileProcess.BrowserRequest({ id })];
+        return [outFileProcess, [FileProcess.EndpointRequest({ id })]];
     },
 
     [event.out `EndpointRequest`]: { id: -1 },
     [event.in `EndpointResponse`]: { id: -1, endpoint: -1 },
-    [event.on `EndpointResponse`]: (fileProcess, event) =>
-        (console.log("GOT " + event.endpoint), fileProcess)
+    [event.on `EndpointResponse`]: (fileProcess, { id, endpoint }) =>
+    {
+        // IO!
+        fileProcess.getBrowserCallbacks.get(id).resolve(endpoint);
+        return fileProcess;
+    }
 });
 
 module.exports = FileProcess;
@@ -84,7 +88,7 @@ function generateGetEnvironment(push)
     async function getBrowser()
     {
         const browserWSEndpoint = await new Promise((resolve, reject) =>
-            push(FileExecution.BrowserRequest({ resolve, reject })));
+            push(FileProcess.GetBrowserCalled({ resolve, reject })));
 
         return await require("puppeteer").connect({ browserWSEndpoint });
     }
