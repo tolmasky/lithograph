@@ -1,4 +1,4 @@
-const run = require("../run");
+const main = require("../test/main");
 const { List } = require("immutable");
 
 const glob = require("fast-glob");
@@ -31,12 +31,9 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
     const paths = Array.from(new Set(
         [].concat(...patterns.map(pattern => glob.sync(pattern)))))
         .map(path => resolve(path));
-console.log(process.pid);
-    await run(paths, options);
-/*
-    const children = List(paths
-        .map(([title, filename]) => Node.parse({ title, filename })));
 
+    await main(paths, options);
+/*
     const title = `${moment().format("YYYY-MM-DD-HH.mm.ss")}`;
     const root = Node({ title, children });
 

@@ -24,6 +24,8 @@ module.exports = Browser;
 
 async function launch()
 {
+    await new Promise(resolve => setImmediate(resolve));
+
     const puppeteerBrowser = await puppeteer.launch({ headless: false });
 
     return Browser.Launched({ puppeteerBrowser });
