@@ -3,9 +3,9 @@ const toGenerator = require("./to-generator");
 const FunctionEntry = Record({ id: -1, function:-1 });
 
 
-module.exports = function(root)
+module.exports = function(exposed, root)
 {
-    return Map(toPairs(toGenerator(root)));
+    return Map(toPairs(toGenerator(exposed, root)));
 }
 
 

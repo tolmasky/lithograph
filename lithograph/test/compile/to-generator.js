@@ -25,14 +25,14 @@ const SourceEntry = Record({ path:-1, fragment:-1 }, "SourceEntry");
 
 
 
-module.exports = function (root)
+module.exports = function (exposed, root)
 {
     const { fragment } = fromPath(root).get(0);
     const { code } = generate(t.returnStatement(fragment));
-    
-//    console.log(code);
-    
-    return (new Function(`${code}`))();
+    const keys = Object.keys(exposed);
+    const args = keys.map(key => exposed[key]);
+
+    return (new Function(...keys, `${code}`))(...args);
 }
 
 function fromPath(path, wrap)
