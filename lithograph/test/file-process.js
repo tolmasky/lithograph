@@ -71,7 +71,7 @@ module.exports = FileProcess;
 
 function generateGetEnvironment(push)
 {
-    const template = { getBrowser, getBrowserContext };
+    const template = { getBrowser, getBrowserContext, require };
     const getEnvironment = () => Map(Object.keys(template)
         .map(key => [key, (...args) => template[key](...args)]))
         .toObject();
