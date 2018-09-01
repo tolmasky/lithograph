@@ -51,25 +51,40 @@ const Main = Cause("Main",
         return [updated, [...events, finished && Cause.Finished()]];
     },
 
-    [event.on (Pool.Retained)]: (main, { request: path, index }) => {
+    [event.on (Pool.Retained) .from `fileProcessPool`](main, event)
+    {
+        const { request: path, index } = event;
     console.log("RETAINED");
         return update.in(
             main,
             ["fileProcessPool", "items", index],
-            FileProcess.Execute({ path }))
-        },
-
-    [event.on (Cause.Start)]: main => {
-    console.log("ENQUEUEING");
-        return update.in(main,
-            "fileProcessPool",
-            Pool.Enqueue({ requests: main.paths })) },
-
-    [event.on (FileExecution.BrowserRequest)](main, { id, fromKeyPath })
-    {
-        console.log("GOT BROWSER REQUEST FROM " + fromKeyPath);
-//        const [,, index] = fromKeyPath;
+            FileProcess.Execute({ path }));
     },
+
+    [event.on (Cause.Start)]: main =>
+        update.in(main,
+            "fileProcessPool",
+            Pool.Enqueue({ requests: main.paths })),
+
+    [event.on (FileProcess.EndpointRequest)](main, { id, fromKeyPath })
+    {
+        const [,, fromFileProcess] = fromKeyPath;
+        const requests = [{ id, fromFileProcess }];
+console.log("REQUEST", fromKeyPath);
+        return update.in(main, "browserPool", Pool.Enqueue({ requests }));
+    },
+
+    [event.on (Pool.Retained) .from `browserPool`](main, event)
+    {console.log("BROWSER!!!");
+        const { request, index } = event;
+        const { id, fromFileProcess } = request;
+        const { endpoint } = main.browserPool.items.get(index);
+
+        return update.in(
+            main,
+            ["fileProcessPool", "items", fromFileProcess],
+            FileProcess.EndpointResponse({ id, endpoint }));
+    }
 /*
     [event.on (Pool.Retained) .from `browserPool`](main, { request, index })
     {

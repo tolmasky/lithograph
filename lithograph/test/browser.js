@@ -15,7 +15,7 @@ const Browser = Cause("Browser",
         browser
             .set("ready", true)
             .set("puppeteerBrowser", puppeteerBrowser)
-            .set("endpoint", puppeteerBrowser.browserWSEndpoint),
+            .set("endpoint", puppeteerBrowser.wsEndpoint()),
         [Cause.Ready()]
     ]
 });
