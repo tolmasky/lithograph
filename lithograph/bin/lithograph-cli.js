@@ -32,6 +32,8 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
         [].concat(...patterns.map(pattern => glob.sync(pattern)))))
         .map(path => resolve(path));
 
+    options.requires = options.require.map(path => resolve(path));
+
     await main(paths, options);
 /*
     const title = `${moment().format("YYYY-MM-DD-HH.mm.ss")}`;
