@@ -21,18 +21,31 @@ const template = string =>
 
 const { Record } = require("immutable");
 const SourceEntry = Record({ path:-1, fragment:-1 }, "SourceEntry");
-//    console.log(generate(fromPath(TestPath.root(suite)).get(0).fragment).code)
+const Module = require("module");
 
 
+module.exports = function (root, environment, filename)
+{
+    const parameters = Object.keys(environment);
+    const source = toModuleSource(root, parameters);
+    const module = new Module(filename);
 
-module.exports = function (exposed, root)
+    module.filename = filename;
+    module.paths = Module._nodeModulePaths(__dirname);
+
+    const toGenerator = module._compile(source, filename);
+
+    module.loaded = true;
+
+    return toGenerator(...parameters.map(key => environment[key]));
+}
+
+function toModuleSource(root, parameters)
 {
     const { fragment } = fromPath(root).get(0);
-    const { code } = generate(t.returnStatement(fragment));
-    const keys = Object.keys(exposed);
-    const args = keys.map(key => exposed[key]);
+    const { code } = generate(fragment);
 
-    return (new Function(...keys, `${code}`))(...args);
+    return `return (${parameters}) => (${code})`;
 }
 
 function fromPath(path, wrap)
