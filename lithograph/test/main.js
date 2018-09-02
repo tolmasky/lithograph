@@ -9,9 +9,8 @@ const Browser = require("./browser");
 
 module.exports = async function main(paths, options)
 {
-    const requires = JSON.stringify(options.requires || []);
     const promise =
-        IO.toPromise(Main.create({ ...options, paths, requires }));
+        IO.toPromise(Main.create({ ...options, paths }));
 
     await promise;
 
@@ -26,14 +25,15 @@ const Main = Cause("Main",
     [field `browserPool`]: -1,
     [field `fileProcessPool`]: -1,
 
-    init({ paths: iterable, concurrency })
+    init({ paths: iterable, concurrency, requires })
     {
         const paths = List(iterable);
 
         const browserPool = Pool.create(
             { items: Repeat(Browser(), concurrency) });
+        const fork = Fork.create({ type: FileProcess, fields: { requires } });
         const fileProcessPool = Pool.create(
-            { items: Repeat(Fork(FileProcess), concurrency) });
+            { items: Repeat(fork, concurrency) });
 
         return { fileProcessPool, browserPool, paths };
     },

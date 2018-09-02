@@ -1,11 +1,17 @@
-const { Map } = require("immutable");
+const { List, Map } = require("immutable");
 const { Cause, IO, field, event, update } = require("cause");
 const FileExecution = require("./file-execution");
 
+require("/Users/tolmasky/Development/RunKit/@lithograph/lithograph/test-worker/test-environment.js");
 
 const FileProcess = Cause("FileProcess",
 {
     // FIXME: Make this not necessary...
+    // Instead, some sort of compound Ready would be nice, since this
+    // should really be in an IO.
+    init: ({ requires }) =>
+        (requires.map(path => require(path)), { }),
+
     [event.on (Cause.Start)]: event.ignore,
 
     [field `ready`]: false,
