@@ -1,27 +1,12 @@
 const { List, Map, Record } = require("immutable");
 const toGenerator = require("./to-generator");
 const FunctionEntry = Record({ id: -1, function:-1 });
-const Module = require("module");
 const { dirname } = require("path");
 
 
-module.exports = function(exposed, root, __filename)
+module.exports = function(root, environment, filename)
 {
-    const __dirname = dirname(__filename);
-    const module = new Module(__filename);
-    const { exports } = module;
-
-    module.filename = __filename;
-    module.paths = Module._nodeModulePaths(__dirname);
-    module._compile("module.exports = require", __filename);
-
-    const require = module.exports;
-
-    module.exports = exports;
-
-    const generator = toGenerator(
-        { ...exposed, module, exports, require, __filename, __dirname },
-        root);
+    const generator = toGenerator(root, environment, filename);
 
     return Map(toPairs(generator));
 }
