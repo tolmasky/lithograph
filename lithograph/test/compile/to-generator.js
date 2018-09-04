@@ -22,6 +22,7 @@ const template = string =>
 const { Record } = require("immutable");
 const SourceEntry = Record({ path:-1, fragment:-1 }, "SourceEntry");
 const Module = require("module");
+const { dirname } = require("path");
 
 
 module.exports = function (root, environment, filename)
@@ -31,7 +32,7 @@ module.exports = function (root, environment, filename)
     const module = new Module(filename);
 
     module.filename = filename;
-    module.paths = Module._nodeModulePaths(__dirname);
+    module.paths = Module._nodeModulePaths(dirname(filename));
 
     const toGenerator = module._compile(source, filename);
 
