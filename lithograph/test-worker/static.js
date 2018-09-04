@@ -2,6 +2,7 @@ const { parse } = require("url");
 const { Map } = require("immutable");
 
 const PagePrototype = require("puppeteer/lib/Page").prototype;
+const FramePrototype = require("puppeteer/lib/FrameManager").Frame.prototype;
 const BrowserContextPrototype = require("puppeteer/lib/Browser")
     .BrowserContext.prototype;
 
@@ -109,9 +110,18 @@ function intercept({ status, contentType, body })
     }
 }
 
-PagePrototype.test = function (f, ...args)
+FramePrototype.testHandle =
+PagePrototype.testHandle = function (f, ...args)
 {
     return this.evaluateHandle(
+        ([expect, fetch, mock], f, ...args) => eval(f)(...args),
+        this.testScope, f + "", ...args);
+}
+
+FramePrototype.test =
+PagePrototype.test = function (f, ...args)
+{
+    return this.evaluate(
         ([expect, fetch, mock], f, ...args) => eval(f)(...args),
         this.testScope, f + "", ...args);
 }
