@@ -1,9 +1,7 @@
 const { List, Map } = require("immutable");
 const { Cause, IO, field, event, update } = require("cause");
 const FileExecution = require("./file-execution");
-
-require("magic-ws-puppeteer");
-require("/Users/tolmasky/Development/RunKit/@lithograph/lithograph/test-worker/test-environment.js");
+const generateGetEnvironment = require("./generate-get-environment");
 
 
 const FileProcess = Cause("FileProcess",
@@ -76,28 +74,3 @@ const FileProcess = Cause("FileProcess",
 });
 
 module.exports = FileProcess;
-
-function generateGetEnvironment(push)
-{
-    const template = { getBrowser, getBrowserContext, require };
-    const getEnvironment = () => Map(Object.keys(template)
-        .map(key => [key, (...args) => template[key](...args)]))
-        .toObject();
-    const event = FileProcess.GeneratedGetEnvironment({ getEnvironment });
-
-    push(event);
-
-    async function getBrowserContext()
-    {
-        return await (await getBrowser(push))
-            .createIncognitoBrowserContext();
-    }
-
-    async function getBrowser()
-    {
-        const browserWSEndpoint = await new Promise((resolve, reject) =>
-            push(FileProcess.GetBrowserCalled({ resolve, reject })));
-
-        return await require("puppeteer").connect({ browserWSEndpoint });
-    }
-}
