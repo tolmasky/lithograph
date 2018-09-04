@@ -2,7 +2,9 @@ const { List, Map } = require("immutable");
 const { Cause, IO, field, event, update } = require("cause");
 const FileExecution = require("./file-execution");
 
+require("magic-ws-puppeteer");
 require("/Users/tolmasky/Development/RunKit/@lithograph/lithograph/test-worker/test-environment.js");
+
 
 const FileProcess = Cause("FileProcess",
 {
