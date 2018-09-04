@@ -5,7 +5,7 @@ const puppeteer = require("puppeteer");
 const Browser = Cause("Browser",
 {
     [field `ready`]: false,
-    [field `launch`]: IO.fromAsync(launch),
+    [field `launch`]: IO.start(launch),
     [field `endpoint`]: -1,
     [field `puppeteerBrowser`]: -1,
 
@@ -22,11 +22,27 @@ const Browser = Cause("Browser",
 
 module.exports = Browser;
 
-async function launch()
+function launch(push)
 {
-    await new Promise(resolve => setImmediate(resolve));
+    const state = { launched: false, cancelled: false, puppeteerBrowser: null };
 
-    const puppeteerBrowser = await puppeteer.launch({ headless: false });
+    setImmediate(async function ()
+    {
+        if (state.cancelled)
+            return;
 
-    return Browser.Launched({ puppeteerBrowser });
+        state.puppeteerBrowser =
+            await puppeteer.launch({ headless: false });
+        state.launched = true;
+
+        push(Browser.Launched({ puppeteerBrowser: state.puppeteerBrowser }));
+    });
+
+    return function ()
+    {
+        if (state.launched)
+            state.puppeteerBrowser.close();
+
+        state.cancelled = true;
+    };
 }
