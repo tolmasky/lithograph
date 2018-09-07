@@ -1,17 +1,11 @@
 const { List, Map } = require("immutable");
-const { Suite, Test } = require("../suite");
+const { Test } = require("../suite");
 const TestPath = require("../test-path");
-const valueToExpression = require("./value-to-expression");
-const { transformFromAst } = require("babel-core");
-
-//console.log(JSON.stringify(suite, null, 2));
-
-//return;
 
 const t = require("babel-types");
-const void0 = t.unaryExpression("void", t.numericLiteral(0));
 const { parse } = require("@babel/parser");
-const parseStatements = (...args) => parse(...args).program.body;
+const { transformFromAst } = require("babel-core");
+const valueToExpression = require("./value-to-expression");
 const { default: generate } = require("babel-generator");
 
 const construct = require("babel-template");
@@ -44,9 +38,12 @@ module.exports = function (root, environment, filename)
 function toModuleSource(root, parameters)
 {
     const { fragment } = fromPath(root).get(0);
-    const { code } = generate(fragment);
+    const { code, map } = generate(fragment, { sourceMaps: true });
+    const mapComment =
+        "//# sourceMappingURL=data:application/json;charset=utf-8;base64," +
+        Buffer.from(JSON.stringify(map), "utf-8").toString("base64");
 
-    return `return (${parameters}) => (${code})`;
+    return `return (${parameters}) => (${code});\n${mapComment}`;
 }
 
 function fromPath(path, wrap)
@@ -70,10 +67,8 @@ const TEST_TEMPLATE = template(function * ()
 function fromTest(path, wrap)
 {
     const { data: { node, id } } = path;
-    const allowAwaitOutsideFunction = true;
     const $statements = node.children
-        .flatMap(({ code }) =>
-            parseStatements(code, { allowAwaitOutsideFunction }))
+        .flatMap(parseBlock)
         .toArray();
     const fragment = wrap ?
         TEST_TEMPLATE({ $id: t.stringLiteral(id), $statements }) :
@@ -156,7 +151,6 @@ function yield(name, value)
     return t.yieldExpression(valueToExpression({ name, value }));
 }
 
-
 const transformStatements = (function ()
 {
     const toVisitor = visitor => () => ({ visitor });
@@ -172,5 +166,12 @@ const transformStatements = (function ()
             .ast.program.body;
 })();
 
+function parseBlock({ code, line, path })
+{
+    const allowAwaitOutsideFunction = true;
+    const sourceFilename = path;
+    const startLine = line;
+    const options = { startLine, allowAwaitOutsideFunction, sourceFilename };
 
-
+    return parse(code, options).program.body;
+}

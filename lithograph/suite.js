@@ -16,7 +16,7 @@ const schedules = ["Concurrent", "Serial"];
 const Metadata = Record({ title:"", disabled:false, schedule:"" }, "Metadata");
 const Suite = Record({ type:"Suite", metadata:-1, children:List() }, "Suite");
 const Test = Record({ type:"Test", metadata:-1, children:List() }, "Test");
-const Block = Record({ type:"Block", code:"" }, "Block");
+const Block = Record({ type:"Block", code:"", line:-1, path:-1 }, "Block");
 const Section = Record({ node:-1, metadata:-1, children:List() }, "Section");
 
 module.exports.Suite = Suite;
@@ -83,14 +83,17 @@ const markdown =
 
         const children = [...node.children, EOF];
         const stack = children.reduce((stack, node) =>
-            (markdown[node.type] || (x => x))(stack, node),
+            (markdown[node.type] || (x => x))(stack, node, filename),
             Stack.of(root));
 
         return toSuiteOrTest(stack.pop().peek());
     },
 
-    code: (stack, { value: code }) =>
-        swaptop(adopt(Block({ code }), stack.peek()), stack),
+    code: (stack, { value: code, position }, path) =>
+        swaptop(
+            adopt(Block({ code, line: position.start.line + 1, path }),
+            stack.peek()),
+            stack),
 
     heading: (stack, heading) => (count =>
         stack
