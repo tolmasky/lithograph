@@ -1,79 +1,53 @@
 const { List, Record, Stack } = require("immutable");
-const { parse } = require("remark");
-
-const Code = Record({ type:"Code", text:"" });
-const types = ["Concurrent", "Serial", "_Atom", "_Before"];
-const SuiteType = type => Object.assign(
-    options => Suite({ ...options, type:Suite[type] }),
-    { toJS: () => type });
-const Suite = Object.assign(
-    Record({ node:-1, type:-1, title:"", disabled:false, children:List() }),
-    ...types.map(type => ({ [type]: SuiteType(type) })));
-const typeRegExp =  
-    (public => new RegExp(`\\s*\\((${public.join("|")})\\)$`))
-    (types.filter(name => name.charAt(0) !== "_"));
 const pushIn = (object, keyPath, child) =>
     object.updateIn(keyPath, list => list.push(child));
-const getInnerText = ({ type, children, value }) =>
-    type === "text" ?
-        value :
-        children.reduce((text, child) => text + getInnerText(child), "");
-const EOF = { type:"heading", depth:0, children:[] };
 
-const markdown =
+const SubtypedRecord = require("./subtyped-record");
+const Suite = require("./suite");
+const Atom = require("./atom");
+
+const identifiers = Suite.subtypes.map(subtype => subtype.identifier);
+const Provisional = SubtypedRecord(
+    [...identifiers, "Before", "Atom"],
+    { node:-1, title:"", disabled:false, children:List() },
+    "Provisional");
+
+Provisional.prototype.adopt = function ()
 {
-    document(node, filename)
-    {
-        const suite = Suite.Concurrent({ node, title: filename });    
-
-        const children = [...node.children, EOF];
-        const stack = children.reduce((stack, node) =>
-            (markdown[node.type] || (x => x))(stack, node),
-            Stack.of(suite));
-
-        return stack.pop().peek();
-    },
-
-    code(stack, node)
-    {
-        const code = Code({ text: node.value });
-        const suite = pushIn(stack.peek(), ["children"], code);
-
-        return stack.pop().push(suite);
-    },
-
-    heading(stack, node)
-    {
-        const { depth, children } = node;
-        const disabled =
-            children.length === 1 && children[0].type === "delete";
-        const innerText = getInnerText(node);
-        const type = (innerText.match(typeRegExp) || [,types[0]])[1];
-        const title = innerText.replace(typeRegExp, "");
-        const suite = Suite({ node, type:Suite[type], title, disabled });
-        const accumulated = stack.reduce(([stack, child], suite) =>
-            (accumulated => depth <= suite.node.depth ?
-                [stack.pop(), finalize(accumulated)] :
-                accumulated !== suite ?
-                    [stack.pop().push(accumulated), null] :
-                    [stack, null])
-            (child ? pushIn(suite, ["children"], child) : suite),
-            [stack, null])[0];
-
-        return accumulated.push(suite);
-    }
+    return this.updateIn(["children"], list => list.push(child));
 }
 
-function finalize(suite)
+Provisional.from = (function ()
 {
-    const suiteChildren = suite.children.reduce((children, child) =>
-        !(child instanceof Code) ?
+    const subtypesRegExp =
+        new RegExp(`\\s*\\((${identifiers.join("|")})\\)$`);
+    const isEntirelyCrossedOut = node =>
+        node.children.length === 1 &&
+        nbode.children[0].type === "delete";
+
+    return function ProvisionalFrom(heading)
+    {
+        const text = getInnerText(heading);
+        const title = text.replace(subtypesRegExp, "");
+        const disabled = isEntirelyCrossedOut(node);
+
+        const match = text.match(subtypesRegExp);
+        const subtype = match ? match[1] : identifiers[0];
+
+        return Provisional({ node, title, subtype, disabled });
+    }
+})();
+
+function finalize(provisional)
+{
+    const children = provisional.children.reduce((children, child) =>
+        !(child instanceof Atom.Block) ?
             children.push(child) :
-            children.last() && children.last().type === Suite._Before ?
+            children.last() && children.last().subtype === Provisional.Before ?
                 pushIn(children,
-                    [children.size - 1, "children"], child) :
+                    [children.size - 1, "blocks"], child) :
                 children.push(
-                    Suite._Before({ children:List.of(child) })),
+                    Interim.Before({ children:List.of(child) })),
         List());
 
     if (suiteChildren.size === 0)
@@ -81,13 +55,11 @@ function finalize(suite)
 
     const [firstChild] = suiteChildren;
 
-    if (firstChild.type !== Suite._Before)
-        return suite.set("children", suiteChildren);
+    if (firstChild.subtype !== Interim.Before)
+        return Suite[interim.subtype.identifier]({ children:suiteChildren });
 
     if (suiteChildren.size === 1)
-        return suite
-            .set("type", Suite._Atom)
-            .set("children", firstChild.children);
+        return Atom({ blocks: firstChild.chilren });
 
     const { disabled, title, type } = suite;
     const beforeSuite = firstChild.set("title", `${title} (Before)`);
@@ -95,8 +67,74 @@ function finalize(suite)
 
     const children = List.of(beforeSuite, contentSuite);
 
-    return Suite.Serial({ node:suite.node, disabled, title, children });
+    return Suite.Serial({ disabled, title, children });
 }
+
+const markdown =
+{
+    document(node, filename)
+    {
+        const root = Provisional.Concurrent({ node, title: filename });
+        const EOF = { type:"heading", depth:0, children:[] };
+
+        const children = [...node.children, EOF];
+        const stack = children.reduce((stack, node) =>
+            (markdown[node.type] || (x => x))(stack, node),
+            Stack.of(root));
+
+        return stack.pop().peek();
+    },
+
+    code: (stack, { value: text }) =>
+        stack.swaptop(stack.peek().adopt(Atom.Block({ text }))),
+
+    heading: (stack, heading) =>
+        stack.reduce(([stack, child], parent) =>
+            (parent => heading.depth <= parent.node.depth ?
+                [stack.pop(), finalize(parent)] :
+                [stack.swaptop(parent), null])
+            (child ? parent.adopt(child) : parent),
+            [stack, null])[0].push(Provisional.from(heading))
+}
+
+function finalize({ suite })
+{
+    if (suite.children.size === 0)
+        return false;
+
+    const blocks = suite.children.takeWhile(Atom.Block.is);
+
+    if (blocks.size === 0)
+        return suite;
+
+    const atomAsChildren = List.of(Atom({ blocks }));
+
+    if (blocks.size === suite.children.size)
+        return suite.set("children", atomAsChildren);
+
+    const { disabled, title, subtype } = suite;
+    const before = Suite.Serial({ title: `${title} (Before)`, children: atomAsChildren });
+    const children = suite.children.skip(blocks.size).unshift(atom);
+    
+
+    return Suite.Serial()
+
+    return Suite.Serial({ title, disabled })
+    
+    const { disabled, title, type } = suite;
+    const beforeSuite = firstChild.set("title", `${title} (Before)`);
+    const contentSuite = Suite({ type, children: suiteChildren.skip(1) });
+
+    const children = List.of(beforeSuite, contentSuite);
+
+    return Suite.Serial({ disabled, title, children });
+}
+
+Stack.prototype.swaptop = function (item)
+{
+    return this.peek() === item ? this : this.pop().push(item);
+}
+
 
 
 markdown.document(parse(`
@@ -110,4 +148,4 @@ markdown.document(parse(`
  \`\`\`javascript
 5+5
 \`\`\`
-`), "blah.md").toJS()
+`), "blah.md").toJS()*/
