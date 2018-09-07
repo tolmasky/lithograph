@@ -5,7 +5,7 @@ const fetch = require("node-fetch");
 const delay = timeout => new Promise(resolve => setTimeout(resolve, timeout));
 require("./magic-ws-puppeteer");
 global.fetch = fetch;
-require("../test-worker/static");
+require("./test-worker/static");
 
 module.exports = function generateGetEnvironment(push)
 {
