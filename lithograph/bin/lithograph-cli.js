@@ -1,4 +1,4 @@
-const main = require("../test/main");
+const main = require("../main");
 const { List } = require("immutable");
 
 const glob = require("fast-glob");
