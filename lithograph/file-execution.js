@@ -81,18 +81,18 @@ module.exports = FileExecution;
 
 async function testRun({ functions, path, index })
 {
-    console.log("ABOUT TO " + path.data.id);
-
     const start = Date.now();
     const { id, node: test } = path.data;
     const f = functions.get(id);
 
     console.log("RUN " + path.data.id + " -> " + test.metadata.title); 
-    await f();
-    console.log("finished " + path.data.id + " -> " + test.metadata.title + " " + (Date.now() - start));
 
-    const outcome = Report.Success();
-    const report = { duration: Date.now() - start , outcome };
+    const outcome = await f()
+        .then(() => Report.Success())
+        .catch(reason => Report.Failure({ reason }));
+    const report = Report({ duration: Date.now() - start , outcome });
+
+    console.log("finished " + path.data.id + " -> " + test.metadata.title + " " + report);
 
     return FileExecution.TestFinished({ path, index, report });
 }
@@ -119,11 +119,50 @@ function updateReports(inReports, path, report)
             parent,
             getSuiteReport(parent, outReports));
 
+    if (isSerial &&
+        report.outcome instanceof Report.Failure)
+    {
+        const failure = getDescendentFailure(report);
+        const completed = data.index + 1;
+        const descendentReports = Map(siblings
+            .skip(completed)
+            .flatMap((_, index) => getDescendents(
+                TestPath.child(parent, index + completed)))
+            .map(path => [path.data.id, failure]));
+        const mergedReports = outReports.merge(descendentReports);
+
+        return updateReports(
+            mergedReports,
+            parent,
+            getSuiteReport(parent, mergedReports));
+    }
+
     const unblockedTestPaths = isSerial ?
         getPostOrderLeaves(TestPath.child(parent, data.index + 1)) :
         List();
 
     return [outReports, unblockedTestPaths];
+}
+
+function getDescendents(path)
+{
+    return path.data.node instanceof Test ?
+        List.of(path) :
+        path.data.node.children
+            .flatMap((_, index) =>
+                getDescendents(TestPath.child(path, index)))
+            .push(path);
+}
+
+function getDescendentFailure(report)
+{
+    const reason = Error(
+        "Test skipped due to previous failure: " +
+        report.outcome.reason);
+    const outcome = Report.Failure({ reason });
+    const failure = Report({ outcome, duration: 0 });
+
+    return failure;
 }
 
 function getSuiteReport(path, reports)
