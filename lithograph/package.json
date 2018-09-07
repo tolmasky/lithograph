@@ -32,7 +32,8 @@
     "moment": "^2.22.2",
     "node-fetch": "^2.1.2",
     "puppeteer": "^1.5.0",
-    "remark": "^9.0.0"
+    "remark": "^9.0.0",
+    "source-map-support": "^0.5.9"
   },
   "devDependencies": {
     "browserify": "^16.2.2"
