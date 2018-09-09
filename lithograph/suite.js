@@ -1,4 +1,4 @@
-const { Record, List, Stack } = require("immutable");
+const { Record, List, Map, Stack } = require("immutable");
 const swaptop = (item, stack) =>
     stack.peek() === item ? stack : stack.pop().push(item);
 
@@ -13,7 +13,7 @@ const getInnerText = node => node.type === "text" ?
 
 const schedules = ["Concurrent", "Serial"];
 
-const Metadata = Record({ title:"", disabled:false, schedule:"" }, "Metadata");
+const Metadata = Record({ title:"", disabled:false, schedule:"", resources:Map() }, "Metadata");
 const Suite = Record({ type:"Suite", metadata:-1, children:List() }, "Suite");
 const Test = Record({ type:"Test", metadata:-1, children:List() }, "Test");
 const Block = Record({ type:"Block", code:"", line:-1, path:-1 }, "Block");
@@ -92,7 +92,7 @@ const markdown =
     code: (stack, { value: code, position }, path) =>
         swaptop(
             adopt(Block({ code, line: position.start.line + 1, path }),
-            stack.peek()),
+                stack.peek()),
             stack),
 
     heading: (stack, heading) => (count =>
@@ -102,7 +102,25 @@ const markdown =
                 .reduce((child, parent) =>
                     adopt(toSuiteOrTest(child), parent)))
             .push(toSection(heading)))
-        (stack.takeWhile(parent => heading.depth <= parent.node.depth).size)
+        (stack.takeWhile(parent => heading.depth <= parent.node.depth).size),
+
+    blockquote: (stack, quote) =>
+    {
+        const { children } = quote;
+
+        if (children.length !== 2 ||
+            children[1].type !== "code")
+            return stack;
+
+        const name = getInnerText(children[0]);
+        const contents = children[1].value;
+        const section = stack.peek();
+        const metadata = section.metadata
+            .update("resources",
+                resources => resources.set(name, contents));
+
+        return swaptop(section.set("metadata", metadata), stack);
+    }
 }
 
 module.exports.fromMarkdown = function (filename)

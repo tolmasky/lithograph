@@ -4,7 +4,8 @@ const TestPath = require("../test-path");
 
 const t = require("babel-types");
 const { parse } = require("@babel/parser");
-const { transformFromAst } = require("babel-core");
+const transformStatements = require("./transform-statements");
+const getTopLevelAwaitReplacement = argument => yield("await", argument);
 const valueToExpression = require("./value-to-expression");
 const { default: generate } = require("babel-generator");
 
@@ -67,9 +68,14 @@ const TEST_TEMPLATE = template(function * ()
 function fromTest(path, wrap)
 {
     const { data: { node, id } } = path;
-    const $statements = node.children
+    const concatenated = node.children
         .flatMap(parseBlock)
         .toArray();
+    const $statements = transformStatements(concatenated,
+    {
+        getResource: getResource(path, false),
+        getTopLevelAwaitReplacement: !wrap && getTopLevelAwaitReplacement
+    });
     const fragment = wrap ?
         TEST_TEMPLATE({ $id: t.stringLiteral(id), $statements }) :
         $statements;
@@ -136,35 +142,34 @@ function fromSerial(path, wrap)
 
     const $statements = tests
         .flatMap(({ path: { data: { id } }, fragment }) =>
-        [
-            yield("start", id),
-            ...transformStatements(fragment)
-        ]).toArray();
+            [ yield("start", id), ...fragment ])
+        .toArray();
     const $children = valueToExpression([concurrent, serial]);
     const fragment = SERIAL_TEMPLATE({ $statements, $children });
 
     return List.of(SourceEntry({ path, fragment }));
 }
 
+function getResource(path, URL)
+{
+    if (URL === false)
+        return URL => getResource(path, URL);
+
+    const { resources } = path.data.node.metadata;
+
+    if (resources.has(URL))
+        return resources.get(URL);
+
+    if (!path.parent)
+        throw ReferenceError(`Resource "${URL}" is not defined.`);
+
+    return getResource(path.parent, URL);
+}
+
 function yield(name, value)
 {
     return t.yieldExpression(valueToExpression({ name, value }));
 }
-
-const transformStatements = (function ()
-{
-    const toVisitor = visitor => () => ({ visitor });
-    const AwaitExpression = path =>
-        path.replaceWith(yield("await", path.node.argument));
-    const Function = path =>
-        t.isProgram(path.getFunctionParent().node) && path.skip()
-    const awaitToYield = toVisitor({ AwaitExpression, Function }) ;
-    const options = { plugins: [awaitToYield] };
-
-    return statements =>
-        transformFromAst(t.program(statements), "", options)
-            .ast.program.body;
-})();
 
 function parseBlock({ code, line, path })
 {
