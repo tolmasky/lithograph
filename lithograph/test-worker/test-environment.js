@@ -1,12 +1,11 @@
 const mock = require("jest-mock");
 const jestExpect = require("expect");
 const delay = timeout => new Promise(resolve => setTimeout(resolve, timeout));
-console.log("here???");
 
 module.exports.fetch = require("node-fetch");
-global.fetch = require("node-fetch");
+
 module.exports.mock = mock;
-global.mock = mock;
+
 module.exports.expect = function expect(expected)
 {/*
     Object.assign(jestExpect(expected),
@@ -31,7 +30,7 @@ module.exports.expect = function expect(expected)
 
                         return await expectation[key](received);
                     }
-                    catch (error) { }
+                    catch (error) { console.log(error); }
 
                     await delay(50);
                 }
@@ -40,6 +39,3 @@ module.exports.expect = function expect(expected)
 
     return expectation;
 }
-global.expect = module.exports.expect;
-console.log(global.expect);
-console.log("!!!!!!!!!!!!");

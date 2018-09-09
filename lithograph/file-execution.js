@@ -25,7 +25,7 @@ const FileExecution = Cause("FileExecution",
 {
     [field `path`]: -1,
     [field `root`]: -1,
-    [field `pool`]: Pool.create({ count: 2 }),
+    [field `pool`]: Pool.create({ count: 100 }),
     [field `running`]: Map(),
     [field `reports`]: Map(),
     [field `functions`]: Map(),
