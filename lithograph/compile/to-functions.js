@@ -2,13 +2,16 @@ const { List, Map, Record } = require("immutable");
 const toGenerator = require("./to-generator");
 const FunctionEntry = Record({ id: -1, function:-1 });
 const { dirname } = require("path");
+const combine = (lhs, rhs) =>
+    lhs.map((lhs, index) => lhs.concat(rhs[index]));
 
 
 module.exports = function(root, environment, filename)
 {
     const generator = toGenerator(root, environment, filename);
+    const [functions, ranges] = toPairs(generator);
 
-    return Map(toPairs(generator));
+    return { functions: Map(functions), ranges: List(ranges) };
 }
 
 function toPairs(generator)
@@ -21,33 +24,33 @@ function toPairs(generator)
 
 const builders =
 {
-    "concurrent": (children) =>
-        [].concat(...children.map(
-            generator => toPairs(generator))),
+    "concurrent": children =>
+        children.map(toPairs).reduce(combine, [[], []]),
 
-    "serial": iterator => (function ([concurrent, serial])
+    "serial": function (key, range, serial, iterator)
     {
+        const concurrentGenerators = iterator.next().value;
+        const concurrentPairs = builders["concurrent"](concurrentGenerators);
+
         if (serial.length > 0)
         {
             iterator.next();
             iterator.waiting = serial[0];
         }
 
-        const pairs =
+        return combine(
         [
-            ...[].concat(...concurrent.map(toPairs)),
-            ...serial.map(key => List.of(key, toAsync(key, iterator)))
-        ];
-     
-        return pairs;   
-    })(iterator.next().value),
+            serial.map(toAsyncPair(iterator)),
+            [List.of(key, range)]
+        ], concurrentPairs);
+    },
 
-    "test": (key, f) => [List.of(key, f)]
+    "test": (key, range, f) => [[List.of(key, f)], [List.of(key, range)]]
 }
 
-function toAsync(key, iterator)
+function toAsyncPair(iterator)
 {
-    return () => new Promise(function (resolve, reject)
+    return key => List.of(key, () => new Promise(function (resolve, reject)
     {
         if (iterator.waiting !== key)
             throw Error(`Attempted to run test ${key} before it was ready.`);
@@ -67,5 +70,5 @@ function toAsync(key, iterator)
                 .then(value => step("next", value))
                 .catch(value => step("throw", value));
         })("next", void 0);
-    });   
+    }));
 }

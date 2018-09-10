@@ -1,8 +1,10 @@
 const t = require("babel-types");
 const { isArray } = Array;
+const { isList } = require("immutable").List;
 const { hasOwnProperty } = Object;
 const void0 = t.unaryExpression("void", t.numericLiteral(0));
 const nullLiteral = t.nullLiteral();
+const { parseExpression } = require("@babel/parser");
 
 
 module.exports = function valueToExpression(value)
@@ -18,6 +20,9 @@ module.exports = function valueToExpression(value)
 
     if (isArray(value))
         return t.arrayExpression(value.map(valueToExpression));
+
+    if (isList(value))
+        return valueToExpression(value.toArray());
 
     if (typeof value === "number")
         return t.numericLiteral(value);
@@ -41,6 +46,9 @@ module.exports = function valueToExpression(value)
                 t.objectProperty(
                     t.stringLiteral(key),
                     valueToExpression(value[key]))));
+
+    if (typeof value === "function")
+        return parseExpression(value + "");
 
     throw new Error("Converting object to object expression failed");
 }

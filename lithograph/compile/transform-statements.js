@@ -41,6 +41,5 @@ function AwaitExpression (path, state)
     if (!t.isProgram(path.getFunctionParent().node))
         return;
 
-console.log("AWAIT");
     path.replaceWith(getTopLevelAwaitReplacement(path.node.argument));
 }

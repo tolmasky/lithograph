@@ -4,6 +4,7 @@ const LNode = require("cause/lnode");
 const Pool = require("@cause/pool");
 const toFunctions = require("./compile/to-functions");
 
+
 const { Suite, Test, Block, fromMarkdown } = require("./suite");
 const TestPath =
 {
@@ -29,13 +30,18 @@ const FileExecution = Cause("FileExecution",
     [field `running`]: Map(),
     [field `reports`]: Map(),
     [field `functions`]: Map(),
+    [field `ranges`]: List(),
 
     init: ({ path, environment }) =>
     {
+    const start = Date.now();
         const root = TestPath.root(fromMarkdown(path));
-        const functions = toFunctions(root, environment, path);
+        console.log("TOOK: " + (Date.now() - start));
+        const { functions, ranges } = toFunctions(root, environment, path);
+        console.log(functions);
+        console.log("TOOK  : " + (Date.now() - start));
 
-        return { path, root, functions };
+        return { path, root, functions, ranges };
     },
 
     [event.on (Cause.Start)]: fileExecution =>
@@ -85,7 +91,7 @@ async function testRun({ functions, path, index })
     const { id, node: test } = path.data;
     const f = functions.get(id);
 
-    console.log("RUN " + path.data.id + " -> " + test.metadata.title); 
+    console.log("RUN " + path.data.id + " -> " + test.metadata.title + " " + Date.now());
 
     const outcome = await f()
         .then(() => Report.Success())
