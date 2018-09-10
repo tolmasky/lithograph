@@ -1,4 +1,4 @@
-const { List, Map } = require("immutable");
+const { Seq, List, Map } = require("immutable");
 const { Test } = require("../suite");
 const TestPath = require("../test-path");
 
@@ -25,7 +25,8 @@ module.exports = function (root, environment, filename)
     const parameters = Object.keys(environment);
     const source = toModuleSource(root, parameters);
     const module = new Module(filename);
-
+console.log(source);
+//process.exit(1);
     module.filename = filename;
     module.paths = Module._nodeModulePaths(dirname(filename));
 
@@ -62,7 +63,7 @@ function fromPath(path, wrap)
 
 const TEST_TEMPLATE = template(function * ()
 {
-    return (yield "test")($id, async () => { $statements })
+    return (yield "test")($id, $range, async () => { $statements });
 });
 
 function fromTest(path, wrap)
@@ -76,9 +77,14 @@ function fromTest(path, wrap)
         getResource: getResource(path, false),
         getTopLevelAwaitReplacement: !wrap && getTopLevelAwaitReplacement
     });
-    const fragment = wrap ?
-        TEST_TEMPLATE({ $id: t.stringLiteral(id), $statements }) :
-        $statements;
+    const fragment = !wrap ?
+        $statements :
+        TEST_TEMPLATE(
+        {
+            $range: getSourceRange($statements),
+            $id: t.stringLiteral(id),
+            $statements
+        });
 
     return List.of(SourceEntry({ path, fragment }));
 }
@@ -109,9 +115,9 @@ function fromConcurrent(path)
 
 const SERIAL_TEMPLATE = template(function * ()
 {
-    return (yield "serial")(function * ()
+    return (yield "serial")($id, $range, $serial, function * ()
     {
-        yield $children;
+        yield $concurrent;
         $statements;
     }());
 });
@@ -131,23 +137,41 @@ function fromSerial(path, wrap)
 
     const groups = children.groupBy(({ path }) =>
         path.data.node instanceof Test ? "test" : "suite");
+
+    // The flattened tests will be merged into one set of statements in a
+    // single function so that they can share scope.
     const tests = groups.get("test", List());
-
-    const serial = tests
-        .map(({ path }) => path.data.id)
-        .toArray();
-    const concurrent = groups.get("suite", List())
-        .map(({ path, fragment }) => fragment)
-        .toArray();
-
+    const $serial = valueToExpression(tests.map(test => test.path.data.id).toArray());
     const $statements = tests
         .flatMap(({ path: { data: { id } }, fragment }) =>
             [ yield("start", id), ...fragment ])
         .toArray();
-    const $children = valueToExpression([concurrent, serial]);
-    const fragment = SERIAL_TEMPLATE({ $statements, $children });
+
+    // We know we can make this distinction because all serial children have
+    // been flattened, so any suite children must be concurrent.
+    const suites = groups.get("suite", List());
+    const $concurrent = valueToExpression(suites.map(suite => suite.fragment).toArray());
+
+    // The scope range is the union of all the the ranges of statements.
+    const $range = getSourceRange($statements);
+    const $id = t.stringLiteral(path.data.id);
+    const fragment = SERIAL_TEMPLATE(
+        { $id, $serial, $range, $statements, $concurrent });
 
     return List.of(SourceEntry({ path, fragment }));
+}
+
+function getSourceRange(statements)
+{
+    const statementSeq = Seq(statements);
+    const hasLocation = statement => !!statement.loc;
+    const noPosition = { line:-1, column:-1 };
+    const noStatement = { loc: { start: noPosition, end: noPosition } };
+
+    const { loc: { start } } = statementSeq.find(hasLocation) || noStatement;
+    const { loc: { end } } = statementSeq.findLast(hasLocation) || noStatement;
+
+    return valueToExpression({ start, end });
 }
 
 function getResource(path, URL)
