@@ -71,8 +71,8 @@ function toConcrete(node)
     const subtitled = (type, subtitle, dx, children) =>
     {
         const title = `${block.title} (${subtitle})`;
-        const block = Block({ id: id + dx, title, children });
-        const contents = type({ block });
+        const internal = Block({ id: block.id + dx, title, children });
+        const contents = type({ block: internal });
         
         return Node({ source: Source.spanning(children), contents });
     };
@@ -80,7 +80,7 @@ function toConcrete(node)
     const before = subtitled(Test, "Before", 0.1, snippets);
     const nested = children.skip(snippets.size);
     const content = subtitled(schedule, "Content", 0.2, nested);
-    const serialized = block.set("children", List.of(before, contents));
+    const serialized = block.set("children", List.of(before, content));
 
     return updated.set("contents", Serial({ block: serialized }));
 }
