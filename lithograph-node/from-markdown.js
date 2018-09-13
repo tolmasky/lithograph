@@ -1,113 +1,105 @@
 const { Record, Seq, List, Map, Stack } = require("immutable");
-const Node = require("./node");
-const { Block, Concurrent, Serial, Source, Code, Test } = Node;
-
-
-const Placeholder = Record(
-{
-    schedule: Concurrent,
-    block: Block(),
-    depth: -1000,
-}, "Placeholder");
-
-const State = Record({ stack: Stack(), id: 1, filename: -1 });
+const { Suite, Metadata, Source, Test, Fragment } = require("./node");
+const { Serial, Concurrent } = Suite;
+const State = Record({ stack:Stack(), id:1, filename:-1 }, "State");
 
 const swaptop = (item, stack) =>
     stack.peek() === item ? stack : stack.pop().push(item);
-const adopt = (child, parent) => parent.updateIn(
-    ["contents", "block", "children"],
-    list => list.push(child));
+const adopt = (child, parent) =>
+    parent.update("children", list => list.push(child));
 
-const { parse } = require("remark");
+const addf = f => (x, y) => x + f(y);
 const getInnerText = node => node.type === "text" ?
-    node.value :
-    node.children.reduce((text, child) => text + getInnerText(child), "");
+    node.value : node.children.reduce(addf(getInnerText), "");
 
-const toPlaceholderNode = (function ()
+
+const toPlaceholder = (function ()
 {
-    const schedules = { Serial, Concurrent };
-    const scheduleRegExp =
-        new RegExp(`\\s*\\((${Object.keys(schedules).join("|")})\\)$`);
+    const modes = { Serial, Concurrent };
+    const union = Object.keys(modes).join("|");
+    const modeRegExp = new RegExp(`\\s*\\((${union})\\)$`);
+    const parse = text =>
+        (([title, key = "Concurrent"]) => [title, modes[key]])
+        (text.split(modeRegExp));
     const isEntirelyCrossedOut = heading =>
         heading.children.length === 1 &&
         heading.children[0].type === "delete";
 
-    return function toPlaceholderNode(state, heading)
+    return function toPlaceholder(state, heading)
     {
         const id = state.id;
-        const text = getInnerText(heading);
-        const title = text.replace(scheduleRegExp, "");
-        const block = Block({ id, title });
-        const depth = heading.depth;
-        const match = text.match(scheduleRegExp);
-        const schedule = match ? schedules[match[1]] : Concurrent;
-        const contents = Placeholder({ block, schedule, depth });
         const source = Source.fromSyntaxNode(heading, state.filename);
         const disabled = isEntirelyCrossedOut(heading);
-        const node = Node({ source, contents, disabled });
+        const [title, mode] = parse(getInnerText(heading));
+        const depth = heading.depth;
+        const metadata = Metadata({ id, title, disabled, depth });
 
-        return [state.set("id", id + 1), node];
+        return [state.set("id", id + 1), Suite({ source, mode, metadata })];
     }
 })();
 
-function toConcrete(node)
-{
-    const { block, schedule } = node.contents;
-    const { children } = block;
+function toConcrete(suite)
+{console.log("IN: ", suite);
+    const { children, mode, metadata } = suite;
 
-    if (children.size === 0)
+    if (children.size <= 0)
         return false;
 
-    const source = Source.spanning([node, children.last()]);
-    const updated = node.set("source", source);
-    const snippets = children.takeWhile(Node.contains(Code));
+    const source = Source.spanning([suite, children.last()]);
+    const division = children.findIndex(node => !(node instanceof Fragment));
 
-    if (snippets.size === 0)
-        return updated.set("contents", schedule({ block }));
+    if (division === 0)
+        return suite.set("source", source);
 
-    if (snippets.size === children.size)
-        return updated.set("contents", Test({ block }));
+    if (division === -1)
+        return Test({ source, metadata, fragments: children });
 
-    const subtitled = (type, subtitle, dx, children) =>
+    const { id } = metadata;
+    const subtitled = (subtitle, dx, amount) =>
     {
-        const title = `${block.title} (${subtitle})`;
-        const internal = Block({ id: block.id + dx, title, children });
-        const contents = type({ block: internal });
-        
-        return Node({ source: Source.spanning(children), contents });
+        const title = `${metadata.title} (${subtitle})`;
+        const subset = children.slice(amount);
+        const source = Source.spanning(subset);
+
+        return [source, Metadata({ id: id + dx, title }), subset];
     };
 
-    const before = subtitled(Test, "Before", 0.1, snippets);
-    const nested = children.skip(snippets.size);
-    const content = subtitled(schedule, "Content", 0.2, nested);
-    const serialized = block.set("children", List.of(before, content));
+    const before =
+        ((source, metadata, fragments) =>
+            Test({ source, metadata, fragments }))
+        (...subtitled("Before", 0.1, division));
+    const content =
+        ((source, metadata, children) =>
+            Suite({ source, metadata, mode, children }))
+        (...subtitled("Content", 0.2, children.size - division));
+    const nested = List.of(before, content);
 
-    return updated.set("contents", Serial({ block: serialized }));
+    return Suite({ source, metadata, mode:Serial, children:nested });
 }
 
 const markdown =
 {
     code(state, code)
     {
-        const contents = Code({ value: code.value });
         const source = Source.fromSyntaxNode(code, state.filename);
-        const node = Node({ contents, source });
+        const fragment = Fragment({ source, value: code.value });
+        const parent = adopt(fragment, state.stack.peek());
 
-        return state.update("stack", stack =>
-            swaptop(adopt(node, stack.peek()), stack));
+        return state.update("stack", stack => swaptop(parent, stack));
     },
 
     heading(state, heading)
     {
         const { stack } = state;
-        const shallower = node => heading.depth > node.contents.depth;
+        const shallower = ({ metadata }) => heading.depth > metadata.depth;
         const count = stack.findIndex(shallower) + 1;
         const remaining = stack.skip(count);
-        const collapsed = stack.take(count)
-            .reduce((child, parent) => adopt(toConcrete(child), parent));
-        const [updated, node] = toPlaceholderNode(state, heading);
+        const collapsed = stack.take(count).reduce(
+            (child, parent) => adopt(toConcrete(child), parent));
+        const [updated, placeholder] = toPlaceholder(state, heading);
+        const appended = remaining.push(collapsed).push(placeholder);
 
-        return updated.set("stack", remaining.push(collapsed).push(node));
+        return updated.set("stack", appended);
     },
 
     blockquote(state, { children })
@@ -118,7 +110,7 @@ const markdown =
         const name = getInnerText(children[0]);
         const contents = children[1].value;
         const owner = state.stack.peek().updateIn(
-            ["block", "resources"],
+            ["metadata", "resources"],
             resources => resources.set(name, contents));
 
         return state.update("stack", stack => swaptop(owner, stack));
@@ -128,24 +120,28 @@ const markdown =
 function fromDocument(document, filename)
 {
     const source = Source.fromSyntaxNode(document, filename);
-    const block = Block({ id: 0, title: filename });
-    const contents = Placeholder({ block, depth: -10 });
-    const node = Node({ contents, source });
+    const metadata = Metadata({ id:0, title: filename, depth:0 });
+    const suite = Suite({ source, metadata });
 
     const position = { start: { line:1, column:1 } };
-    const EOF = { type:"heading", position, depth: -9, children:[] };
+    const EOF = { type:"heading", position, depth:1, children:[] };
     const state = [...document.children, EOF].reduce(
         (state, node) => (markdown[node.type] || (x => x))(state, node),
-        State({ id: 1, stack: Stack.of(node), filename }));
+        State({ id: 1, stack: Stack.of(suite), filename }));
 
     return toConcrete(state.stack.pop().peek());
 }
 
-module.exports = function fromMarkdown(filename)
+module.exports = (function ()
 {
-    const contents = require("fs").readFileSync(filename, "utf-8");
-    const document = parse(contents);
+    const { parse } = require("remark");
+    const { readFileSync } = require("fs");
 
-    return fromDocument(document, filename);
-}
+    return function fromMarkdown(filename)
+    {
+        const contents = readFileSync(filename, "utf-8");
+        const document = parse(contents);
 
+        return fromDocument(document, filename);
+    }
+})();
