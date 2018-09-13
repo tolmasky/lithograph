@@ -1,36 +1,37 @@
 const { List, Map, Record } = require("immutable");
+const { inspect } = require("util");
+const Constant = name => ({ [inspect.custom]: () => name });
 
-const Node = Record(
-{
-    source: -1,
-    contents: -1,
-    disabled: false
-}, "Node");
+const Source = require("./source");
 
-Node.Source = require("./source");
-Node.Node = Node;
-
-Node.Block = Record(
+const Metadata = Record(
 {
     id: "",
     title:"",
-    children: List(),
+    depth: -1,
+    disabled: false,
     resources: Map()
-}, "Block");
+}, "Metadata");
 
-Node.Serial = Record({ type: "Serial", block: Node.Block() }, "Serial");
-Node.Concurrent = Record({ type:"Concurrent", block: Node.Block() }, "Concurrent");
-Node.Test = Record({ type: "Test", block: Node.Block() }, "Test");
-Node.Code = Record({ value: "" }, "Code");
-
-Node.contains = function (type)
+const Concurrent = Constant("Concurrent");
+const Serial = Constant("Serial");
+const Suite = Record(
 {
-    return node => node.contents instanceof type;
-}
+    mode:Concurrent,
+    source: Source(),
+    metadata:-1,
+    children:List()
+}, "Suite");
 
-Node.fromMarkdown = function fromMarkdown (filename)
+Suite.Concurrent = Concurrent;
+Suite.Serial = Serial;
+
+const Fragment = Record({ source:-1, value:"" }, "Fragment");
+const Test = Record({ source:-1, metadata:-1, fragments:List() }, "Test");
+
+module.exports = { Metadata, Suite, Test, Fragment, Source };
+
+module.exports.fromMarkdown = function fromMarkdown (filename)
 {
     return require("./from-markdown")(filename);
 }
-
-module.exports = Node;

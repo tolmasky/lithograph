@@ -9,8 +9,8 @@ const Position = Record(
 const Source = Record(
 {
     filename: "",
-    start: Position,
-    end: Position
+    start: Position(),
+    end: Position()
 }, "Source");
 
 module.exports = Source;

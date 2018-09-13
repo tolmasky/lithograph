@@ -1,86 +1,76 @@
-const { Record, List, Map } = require("immutable");
+const { Seq, Record, List, Map } = require("immutable");
 const { Cause, IO, field, event, update } = require("cause");
+const findShallowestScope = require("@lithograph/node/find-shallowest-scope");
 const getBacktrace = require("./get-frames");
+
+const Request = Record({ id:-1, resolve:-1 }, "Request");
+const Allocation = Record({ id:-1, type:-1 }, "Allocation");
 
 
 const GarbageCollector = Cause("GarbageCollector",
 {
     [field `ready`]: false,
     [field `allocate`]: -1,
-    [field `generateAllocate`]: IO.start(generateAllocate),
+    [field `allocateIO`]: -1,
+
+    init: ({ node }) => ({ allocateIO: toAllocateIO(node) }),
 
     [event.in `AllocateReady`]: { allocate: -1 },
-    [event.on `AllocateReady`]: (endpoints, { allocate }) =>
-    [
+    [event.on `AllocateReady`]: (endpoints, { allocate }) => {
+    console.log(allocate);
+return    [
         endpoints
             .set("allocate", allocate)
             .set("ready", true),
         [Cause.Ready()]
-    ],
+    ] },
 
-    [event.on `Request`](collector, { backtrace, type, resolve })
+    [event.in `Request`]: { scope: -1, type: -1, resolve: -1 },
+    [event.on `Request`](collector, request)
     {
-        // We start by determining where the request for allocation came from
-        // by backtracking up the stack trace until we find a frame that exists
-        // in one of our known scopes.
-        //
-        // Note: Seq.map is lazy, so although this appears like it will perform
-        // the initial search on every frame in the backtrace due to the `map`,
-        // we'll actually exit early as soon as we find a match.
-        const scope = Seq(backtrace)
-            .map(frame => findIn(inRange, frame, collector.scope))
-            .findLast(scope => !!scope);
-
-        // If for whatever reason we don't find a matching scope, we'll have to
-        // return an error immediately.
-        if (!scope)
-            return collector.updateIn("resolutions",
-                list => list.push(IO.fromAsync(() =>
-                    void(resolve({ error: Error.OutOfBounds })))));
-
         const id = collector.allocating.get("id");
-        const allocation = Allocation({ id, type, scope: scope.id });
-        const allocating = collector.allocating
-            .concat([["id", id + 1], [id, allocation]]);
+        const updated = collector.update("requests",
+            requests => requests.concat([["id", id + 1], [id, request]]));
+        const allocate = GarbageCollector.Allocate({ id, type: request.type });
 
-        const outCollector = collector.setIn("allocating", allocating);
-        const outEvent = GarbageCollector.Allocate({ allocation });
-
-        return [outCollector, [outEvent]];
+        return [updated, [allocate]];
     },
 
-    [field `scope`]: -1,
-    [field `allocating`]: Map({ id: 0 }),
+    [field `node`]: -1,
+    [field `requests`]: Map({ id: 0 }),
     [field `allocations`]: Map(),
     [field `resolutions`]: List(),
 
-    [event.in `Allocated`]: { allocation: -1, resource:-1 },
-    [event.on `Allocated`](collector, { allocation, resource })
+    [event.in `Allocated`]: { id: -1, resource:-1 },
+    [event.on `Allocated`](collector, allocation)
     {
-        const { owner, resolve } = collector.allocating.get(allocation.id);
-        const resolution = IO.fromAsync(() =>
-            void(resolve({ value: resource })));
+        const { id, resource } = allocation;
+        const { scope, resolve } = collector.requests.get(id);
+        const resolution = IO.fromAsync(() => resolve({ resource }));
 
         return collector
-            .setIn(["living", owner.scope.id, allocation.id])
+            .setIn(["allocations", scope, id])
             .updateIn("resolutions", list => list.push(resolution));
     },
 
     [event.out `Deallocate`]: { allocations:List() },
 
-    [event.in `ScopeExited`]: { id: -1 },
-    [event.on `ScopeExited`]: (collector, { id }) =>
+    [event.in `ScopeExited`]: { scope: -1 },
+    [event.on `ScopeExited`]: (collector, { scope }) =>
     [
-        collector.removeIn(["allocations", id]),
+        collector.removeIn(["allocations", scope]),
         [GarbageCollector
-            .Release({ allocations: collector.allocations.get(id) })]
+            .Release({ allocations: collector.allocations.get(scope) })]
     ]
 });
 
 module.exports = GarbageCollector;
 
-function generateAllocate(push)
+function toAllocateIO(node, push)
 {
+    if (!push)
+        return IO.start(() => toAllocateIO(node, push));
+
     push(GarbageCollector.AllocateReady({ allocate }));
 
     function allocate(type)
@@ -88,12 +78,19 @@ function generateAllocate(push)
         return new Promise(function (resolve, reject)
         {
             const backtrace = getBacktrace();
-            const sanitize = ({ error, value }) =>
-                typeof error === "function" ?
-                    reject(error()) : resolve(value);
+            const scope = findShallowestScope(node, backtrace);
 
-            push(GarbageCollector
-                .Request({ backtrace, resolve: sanitize, type }));
+            // If for whatever reason we don't find a matching scope, we'll have
+            // to return an error immediately.
+            if (!scope)
+                return reject(
+                    Error("A browser was attempting to be created out of scope"));
+
+            const sanitize = ({ error, resource }) =>
+                void(typeof error === "function" ?
+                    reject(error()) : resolve(resource));
+
+            push(GarbageCollector.Allocate({ scope, resolve: sanitize, type }));
         });
     }
 }
