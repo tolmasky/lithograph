@@ -1,6 +1,8 @@
 const { List, Map, Record } = require("immutable");
 const { inspect } = require("util");
-const Constant = name => ({ [inspect.custom]: () => name });
+const Constant = name =>
+    (s => ({ [inspect.custom]: s, toString: s, toJSON: s }))
+    (() => name);
 
 const Source = require("./source");
 

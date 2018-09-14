@@ -1,4 +1,29 @@
 
+module.exports = class NodePath
+{
+    constructor(node, parent)
+    {
+        this.node = node;
+        this.parent = parent;
+    }
+
+    child(index)
+    {
+        return new NodePath(this.node.children.get(index), this.parent);
+    }
+
+    toString()
+    {
+        return `@[${Array.from(this, node => node.id).join(", ")}]`;
+    }
+
+    *[Symbol.iterator]()
+    {
+        yield this.node;
+        this.parent && (yield * this.parent);
+    }
+}
+/*
 function NodePath(node, parent)
 {
     this.node = node;
@@ -7,12 +32,7 @@ function NodePath(node, parent)
 
 NodePath.prototype.child = function (index)
 {
-    return NodePath(this.node.block.children[index], this);
-}
-
-NodePath.prototype.mapChildren = function (f)
-{
-    return this.node.block.children[index], this);
+    return new NodePath(this.node.children[index], this);
 }
 
 NodePath.prototype[Symbol.iterator] = function * ()
@@ -24,9 +44,9 @@ NodePath.prototype[Symbol.iterator] = function * ()
     while (path = path.parent)
 }
 
-LNode.prototype.toString = function ()
+NodePath.prototype.toString = function ()
 {
     return `@[${Array.from(this, node => node.id).join(", ")}]`;
 }
 
-module.exports = NodePath;
+module.exports = NodePath;*/
