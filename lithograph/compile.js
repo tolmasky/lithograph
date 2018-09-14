@@ -20,12 +20,12 @@ module.exports = (function()
         const source = `return (${parameters}) => (${code});\n${mapComment}`;
         const { filename } = node.source;
         const module = new Module(filename);
-    
+
         module.filename = filename;
         module.paths = Module._nodeModulePaths(dirname(filename));
         module.loaded = true;
-    
-        return module._compile(source, filename);
+
+        return Map(toPairs(module._compile(source, filename)()));
     }
 })();
 
@@ -34,7 +34,7 @@ function fromPath(path, wrap)
     return path.node instanceof Test ?
         fromTest(path, wrap) :
         path.node.mode === Suite.Serial ?
-            fromSerial(path, 0) : 
+            fromSerial(path, 0) :
             fromConcurrent(path);
 }
 
@@ -90,7 +90,7 @@ function fromSerial(path, index)
     const current = isTest ?
         toExpression(child.node.metadata.id) :
         fromPath(child);
-    const $children = toExpression([current, next]);
+    const $children = toExpression([next, current]);
 
     return SERIAL_TEMPLATE({ $statements, $children });
 }
@@ -147,6 +147,57 @@ const parseBlock = (function ()
         return parse(value, options).program.body;
     }
 })();
+
+function toPairs(generator)
+{
+    const iterator = generator();
+    const type = iterator.next().value;
+
+    return iterator.next(builders[type]).value;
+}
+
+const builders =
+{
+    concurrent: children =>
+        [].concat(...children.map(toPairs)),
+
+    serial(iterator)
+    {
+        const children = iterator.next().value;
+        const next = toPairs(children[0]);
+
+        if (children.length === 1)
+            return next;
+
+        const current = children[1];
+        const pairs = typeof current === "number" ?
+            [List.of(current, toAsync(iterator))] :
+            toPairs(current);
+
+        return pairs.concat(next);
+    },
+
+    test: (key, f) => [List.of(key, f)]
+}
+
+function toAsync(key, iterator)
+{
+    return () => new Promise(function (resolve, reject)
+    {
+        (function step(method, input)
+        {
+            const { done, value } = iterator[method](input);
+
+            if (done)
+                return resolve();
+
+            Promise.resolve(value.value)
+                .then(value => step("next", value))
+                .catch(value => step("throw", value));
+        })("next", void 0);
+    });
+}
+
 
 /*
 function * ()

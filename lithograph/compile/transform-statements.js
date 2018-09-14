@@ -3,12 +3,16 @@ const { transformFromAst } = require("babel-core");
 const plugin = { visitor: { AwaitExpression, TaggedTemplateExpression } };
 const options = { plugins: [plugin] };
 const valueToExpression = require("./value-to-expression");
+const { isArray } = Array;
 
 
 module.exports = function (statements, callbacks)
 {
+    const statementArray = isArray(statements) ?
+        statements : Array.from(statements);
+
     return transformFromAst(
-        Object.assign(t.program(statements), callbacks),
+        Object.assign(t.program(statementArray), callbacks),
         "",
         options).ast.program.body;
 }
@@ -33,13 +37,13 @@ function TaggedTemplateExpression (path, state)
 
 function AwaitExpression (path, state)
 {
-    const { getTopLevelAwaitReplacement } = state.file.ast.program;
+    const { fromTopLevelAwait } = state.file.ast.program;
 
-    if (!getTopLevelAwaitReplacement)
+    if (!fromTopLevelAwait)
         return;
 
     if (!t.isProgram(path.getFunctionParent().node))
         return;
 
-    path.replaceWith(getTopLevelAwaitReplacement(path.node.argument));
+    path.replaceWith(fromTopLevelAwait(path.node.argument));
 }
