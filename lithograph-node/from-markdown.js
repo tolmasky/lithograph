@@ -39,7 +39,7 @@ const toPlaceholder = (function ()
 })();
 
 function toConcrete(suite)
-{console.log("IN: ", suite);
+{
     const { children, mode, metadata } = suite;
 
     if (children.size <= 0)
@@ -55,10 +55,10 @@ function toConcrete(suite)
         return Test({ source, metadata, fragments: children });
 
     const { id } = metadata;
-    const subtitled = (subtitle, dx, amount) =>
+    const subtitled = (subtitle, dx, start, stop) =>
     {
         const title = `${metadata.title} (${subtitle})`;
-        const subset = children.slice(amount);
+        const subset = children.slice(start, stop);
         const source = Source.spanning(subset);
 
         return [source, Metadata({ id: id + dx, title }), subset];
@@ -67,11 +67,11 @@ function toConcrete(suite)
     const before =
         ((source, metadata, fragments) =>
             Test({ source, metadata, fragments }))
-        (...subtitled("Before", 0.1, division));
+        (...subtitled("Before", 0.1, 0, division));
     const content =
         ((source, metadata, children) =>
             Suite({ source, metadata, mode, children }))
-        (...subtitled("Content", 0.2, children.size - division));
+        (...subtitled("Content", 0.2, division, children.size - division + 1));
     const nested = List.of(before, content);
 
     return Suite({ source, metadata, mode:Serial, children:nested });
