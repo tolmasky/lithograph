@@ -50,19 +50,29 @@ return    [
         const resolution = IO.start(() => resolve({ resource }));
 
         return collector
-            .setIn(["allocations", scope, id])
+            .updateIn(["allocations", scope], List(), list => list.push(id))
             .update("resolutions", list => list.push(resolution));
     },
 
-    [event.out `Deallocate`]: { allocations:List() },
+    [event.out `Deallocate`]: { ids:List() },
 
-    [event.in `ScopeExited`]: { scope: -1 },
-    [event.on `ScopeExited`]: (collector, { scope }) =>
-    [
-        collector.removeIn(["allocations", scope]),
-        [GarbageCollector
-            .Release({ allocations: collector.allocations.get(scope) })]
-    ]
+    [event.in `ScopesExited`]: { scopes: -1 },
+    [event.on `ScopesExited`](collector, { scopes })
+    {console.log("SCOPES EXITED: ", scopes);
+        const updated = collector.update("allocations",
+            allocations => scopes.reduce(
+                (allocations, scope) => allocations.delete(scope),
+                allocations));
+        const allocations = scopes
+            .map(scope => collector.allocations.get(scope, List()))
+            .flatten();console.log(allocations);
+        console.log("DEALLOCATE:", allocations);
+        const events =
+            allocations.size > 0 &&
+            [GarbageCollector.Deallocate({ ids:allocations.toList() })];
+
+        return [updated, events || []];
+    }
 });
 
 module.exports = GarbageCollector;
