@@ -5,10 +5,14 @@ const puppeteer = require("puppeteer");
 const Browser = Cause("Browser",
 {
     [field `ready`]: false,
-    [field `launch`]: IO.start(launch),
+    [field `launch`]: false,
     [field `reset`]: -1,
     [field `endpoint`]: -1,
     [field `puppeteerBrowser`]: -1,
+    [field `headless`]: true,
+
+    init: ({ headless }) =>
+        ({ launch: IO.start(push => launch({ headless }, push)) }),
 
     [event.in `Launched`]: { puppeteerBrowser: -1 },
     [event.on `Launched`]: (browser, { puppeteerBrowser }) =>
@@ -40,7 +44,7 @@ async function reset(browser)
     return Browser.ClosedAllPages();
 }
 
-function launch(push)
+function launch({ headless }, push)
 {
     const state = { launched: false, cancelled: false, puppeteerBrowser: null };
 
@@ -50,7 +54,7 @@ function launch(push)
             return;
 
         state.puppeteerBrowser =
-            await puppeteer.launch({ headless: false });
+            await puppeteer.launch({ headless });
         state.launched = true;
 
         push(Browser.Launched({ puppeteerBrowser: state.puppeteerBrowser }));
