@@ -1,15 +1,16 @@
 
 module.exports = class NodePath
 {
-    constructor(node, parent)
+    constructor(node, parent, index = 0)
     {
         this.node = node;
+        this.index = index;
         this.parent = parent;
     }
 
     child(index)
     {
-        return new NodePath(this.node.children.get(index), this.parent);
+        return new NodePath(this.node.children.get(index), this, index);
     }
 
     toString()

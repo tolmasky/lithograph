@@ -1,19 +1,11 @@
 const { Record, List, Map, Range } = require("immutable");
 const { Cause, IO, field, event, update } = require("cause");
-const LNode = require("cause/lnode");
+const { Test, Suite, fromMarkdown } = require("@lithograph/node");
+const NodePath = require("@lithograph/node/path");
 const Pool = require("@cause/pool");
-const toFunctions = require("./compile/to-functions");
-
-
-const { Suite, Test, Block, fromMarkdown } = require("./suite");
-const TestPath =
-{
-    root: node =>
-        new LNode({ index:0, node, id:"0" }),
-    child: (parent, index, child) => ((data, node) =>
-        new LNode({ index, id: `${data.id},${index}`, node }, parent))
-        (parent.data, child || parent.data.node.children.get(index))
-};
+const compile = require("./compile");
+const GarbageCollector = require("./garbage-collector");
+const toEnvironment = require("./file-execution/to-environment");
 
 const Report = Object.assign(
     Record({ duration:-1, outcome:-1 }, "Report"),
@@ -30,23 +22,37 @@ const FileExecution = Cause("FileExecution",
     [field `running`]: Map(),
     [field `reports`]: Map(),
     [field `functions`]: Map(),
-    [field `ranges`]: List(),
+    [field `garbageCollector`]: -1,
 
-    init: ({ path, environment }) =>
+    init: ({ path }) =>
     {
-    const start = Date.now();
-        const root = TestPath.root(fromMarkdown(path));
-        console.log("TOOK: " + (Date.now() - start));
-        const { functions, ranges } = toFunctions(root, environment, path);
-        console.log(functions);
-        console.log("TOOK  : " + (Date.now() - start));
+        const node = fromMarkdown(path);
+        const root = new NodePath(node);
+        const garbageCollector = GarbageCollector.create({ node });
 
-        return { path, root, functions, ranges };
+        return { path, root, garbageCollector };
     },
 
-    [event.on (Cause.Start)]: fileExecution =>
-        update.in(fileExecution, ["pool"], Pool.Enqueue(
-            { requests: getPostOrderLeaves(fileExecution.root) })),
+    [event.on (Cause.Ready) .from `garbageCollector`](fileExecution)
+    {
+        const { root, garbageCollector } = fileExecution;
+        const { allocate } = garbageCollector;
+        const start = Date.now();
+        const functions = compile(toEnvironment(allocate), root.node);
+        console.log("TOOK: " + (Date.now() - start));
+        const requests = getPostOrderLeaves(fileExecution.root);
+
+        return update.in(
+            fileExecution.set("functions", functions),
+            ["pool"],
+            Pool.Enqueue({ requests }));
+    },
+
+    [event.on (Cause.Start)]: event.ignore,/*fileExecution =>
+        !fileExecution.browserEndpoints.ready ?
+            fileExecution :
+            update.in(fileExecution, ["pool"], Pool.Enqueue(
+                { requests: getPostOrderLeaves(fileExecution.root) })),*/
 
     [event.on (Pool.Retained)]: (fileExecution, { index, request }) =>
     {
@@ -54,7 +60,7 @@ const FileExecution = Cause("FileExecution",
         const functions = fileExecution.functions;
 
         return fileExecution.setIn(
-            ["running", request.data.id],
+            ["running", request.node.metadata.id],
             IO.fromAsync(() => testRun({ functions, path, index })));
     },
 
@@ -65,11 +71,11 @@ const FileExecution = Cause("FileExecution",
     {
         const [reports, requests] =
             updateReports(fileExecution.reports, path, report);
-        const finished = reports.has(fileExecution.root.data.id);
+        const finished = reports.has(fileExecution.root.node.metadata.id);
         const [released, fromReleaseEvents] = update.in(
             fileExecution
                 .set("reports", reports)
-                .removeIn(["running", path.data.id]),
+                .removeIn(["running", path.node.metadata.id]),
             "pool",
             Pool.Release({ indexes: [index] }));
 
@@ -88,36 +94,35 @@ module.exports = FileExecution;
 async function testRun({ functions, path, index })
 {
     const start = Date.now();
-    const { id, node: test } = path.data;
+    const { id, title } = path.node.metadata;
     const f = functions.get(id);
 
-    console.log("RUN " + path.data.id + " -> " + test.metadata.title + " " + Date.now());
+    console.log("RUN " + path.node.metadata.id + " -> " + title + " " + Date.now());
 
     const outcome = await f()
         .then(() => Report.Success())
         .catch(reason => Report.Failure({ reason }));
     const report = Report({ duration: Date.now() - start , outcome });
 
-    console.log("finished " + path.data.id + " -> " + test.metadata.title + " " + report);
+    console.log("finished " + id + " -> " + title + " " + report);
 
     return FileExecution.TestFinished({ path, index, report });
 }
 
 function updateReports(inReports, path, report)
 {
-    const { next: parent, data } = path;
-    const outReports = inReports.set(data.id, report);
+    const { parent, node } = path;
+    const outReports = inReports.set(node.metadata.id, report);
 
     if (!parent)
         return [outReports, List()];
 
-    const { node: suite, id } = parent.data;
-    const isSerial = suite.metadata.schedule === "Serial";
-    const siblings = suite.children;
+    const { children: siblings, mode } = parent.node;
+    const isSerial = mode === Suite.Serial;
     const siblingsComplete = isSerial ?
-        data.index === siblings.size - 1 :
-        siblings.every((_, index) =>
-            outReports.has(`${id},${index}`));
+        path.index === siblings.size - 1 :
+        siblings.every(sibling =>
+            outReports.has(sibling.metadata.id));
 
     if (siblingsComplete)
         return updateReports(
@@ -125,16 +130,15 @@ function updateReports(inReports, path, report)
             parent,
             getSuiteReport(parent, outReports));
 
-    if (isSerial &&
-        report.outcome instanceof Report.Failure)
+    if (isSerial && report.outcome instanceof Report.Failure)
     {
         const failure = getDescendentFailure(report);
-        const completed = data.index + 1;
+        const completed = path.index + 1;
         const descendentReports = Map(siblings
             .skip(completed)
-            .flatMap((_, index) => getDescendents(
-                TestPath.child(parent, index + completed)))
-            .map(path => [path.data.id, failure]));
+            .flatMap((_, index) =>
+                getDescendents(parent.child(index + completed)))
+            .map(path => [path.node.metadata.id, failure]));
         const mergedReports = outReports.merge(descendentReports);
 
         return updateReports(
@@ -144,7 +148,7 @@ function updateReports(inReports, path, report)
     }
 
     const unblockedTestPaths = isSerial ?
-        getPostOrderLeaves(TestPath.child(parent, data.index + 1)) :
+        getPostOrderLeaves(parent.child(path.index + 1)) :
         List();
 
     return [outReports, unblockedTestPaths];
@@ -152,11 +156,11 @@ function updateReports(inReports, path, report)
 
 function getDescendents(path)
 {
-    return path.data.node instanceof Test ?
+    return path.node instanceof Test ?
         List.of(path) :
-        path.data.node.children
+        path.node.children
             .flatMap((_, index) =>
-                getDescendents(TestPath.child(path, index)))
+                getDescendents(path.child(index)))
             .push(path);
 }
 
@@ -173,9 +177,8 @@ function getDescendentFailure(report)
 
 function getSuiteReport(path, reports)
 {
-    const { data: { id, node: suite } } = path;
-    const childReports = suite.children
-        .map((_, index) => reports.get(`${id},${index}`));
+    const childReports = path.node.children
+        .map(child => reports.get(child.metadata.id));
     const failures = childReports.filter(report =>
         report.outcome instanceof Report.Failure);
     const duration = childReports.reduce(
@@ -189,19 +192,43 @@ function getSuiteReport(path, reports)
 
 function getPostOrderLeaves(path)
 {
-    const { data: { node } } = path;
+    const { node } = path;
 
     if (node instanceof Test)
         return List.of(path);
 
-    const { children } = node;
-
     if (node.children.size <= 0)
         return List();
 
-    if (node.metadata.schedule === "Serial")
-        return getPostOrderLeaves(TestPath.child(path, 0));
+    if (node.mode === Suite.Serial)
+        return getPostOrderLeaves(path.child(0));
 
-    return node.children.flatMap((node, index) =>
-        getPostOrderLeaves(TestPath.child(path, index, node)));
+    return node.children.flatMap((_, index) =>
+        getPostOrderLeaves(path.child(index)));
+}
+
+function getBrowser(ranges)
+{
+    console.log("GET BROWSER CALLED", ranges, getFrames());
+    /*
+    const frames = getFrames();
+    let index = frames.length - 1;
+
+    while (index-- > 0)
+    {
+        const range = ranges.find(([id, range]) => inRange(frames[index], range));
+
+        if (range)
+            console.log("FOUND IT: ", JSON.stringify(range, null, 2), frames[index], " belonging to " + range.get(0));
+    }
+    
+    
+    process.exit(1);*/
+}
+
+function inRange({ line, column }, { start, end })
+{
+    return  line > start.line && line < end.line ||
+            line === start.line && column > start.column ||
+            line === end.line && column < end.column;
 }
