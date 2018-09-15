@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@babel/parser": "^7.0.0",
+    "@babel/template": "^7.0.0",
     "babel-core": "^6.26.3",
     "babel-template": "^6.26.0",
     "commander": "^2.15.1",
