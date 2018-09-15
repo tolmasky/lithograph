@@ -5,8 +5,8 @@ const { Serial, Concurrent } = Suite;
 const isTest = node => node instanceof Test;
 const isSuite = node => node instanceof Suite;
 const hasMode = (mode, node) => node.mode === mode;
-const isSerial = node => isSuite(node) && hasMode(node, Serial);
-const isConcurrent = node => isSuite(node) && hasMode(node, Concurrent);
+const isSerial = node => isSuite(node) && hasMode(Serial, node);
+const isConcurrent = node => isSuite(node) && hasMode(Concurrent, node);
 const hasBlock = node =>
     isTest(node) || isSerial(node) || isConcurrent(node);
 
@@ -20,34 +20,39 @@ module.exports = function findShallowestScope(backtrace, node)
     // initial search on every frame in the backtrace due to the `map`, we'll
     // actually exit early as soon as we find a match.
     return Seq(backtrace)
-        .map(item => findScope(item))
-        .findLast(node => !!node);
+        .map(frame => findScope(frame, node))
+        .findLast(scope => !!scope);
 }
 
-function findScope(position, node, parent)
+function findScope(frame, node, parent)
 {
-    if (!hasBlock(node))
-        return false;
-
     if (isTest(node) && parent && isSerial(parent))
         return false;
 
-    if (!inSource(position, node.source))
+    if (!inSource(frame, node.source))
         return false;
 
     // Note: Seq.map is lazy, so although this appears like it will perform the
     // initial search on every child due to the `map`, we'll actually exit early
     // as soon as we find a match.
-    const child = Seq(node.contents.block.children)
-        .map(node => findScope(position, node))
-        .find(node => !!node);
+    const child = Seq(node.children)
+        .map(child => findScope(frame, child, node))
+        .find(scope => !!scope);
 
-    return child || node && node.contents.block.id;
+    return child || node && node.metadata.id;
 }
 
-function inSource({ line, column }, { start, end })
+function inSource(frame, source)
 {
+    if (frame.filename !== source.filename)
+        return false;
+
+    console.log("SAME FILE!");
+
+    const { line, column } = frame;
+    const { start, end } = source;
+
     return  line > start.line && line < end.line ||
-            line === start.line && column > start.column ||
-            line === end.line && column < end.column;
+            line === start.line && column >= start.column ||
+            line === end.line && column <= end.column;
 }
