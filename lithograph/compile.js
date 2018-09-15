@@ -10,13 +10,14 @@ module.exports = (function()
     const { dirname } = require("path");
     const generate = require("babel-generator").default;
 
-    return function (parameters, node)
+    return function (environment, node)
     {
         const fragment = fromPath(new NodePath(node));
         const { code, map } = generate(fragment, { sourceMaps: true });
         const mapComment =
             "//# sourceMappingURL=data:application/json;charset=utf-8;base64," +
             Buffer.from(JSON.stringify(map), "utf-8").toString("base64");
+        const parameters = Object.keys(environment);
         const source = `return (${parameters}) => (${code});\n${mapComment}`;
         const { filename } = node.source;
         const module = new Module(filename);
@@ -25,7 +26,10 @@ module.exports = (function()
         module.paths = Module._nodeModulePaths(dirname(filename));
         module.loaded = true;
 
-        return Map(toPairs(module._compile(source, filename)()));
+        const toGenerator = module._compile(source, filename);
+        const args = parameters.map(key => environment[key]);
+
+        return Map(toPairs(toGenerator(...args)));
     }
 })();
 
@@ -180,7 +184,7 @@ const builders =
     test: (key, f) => [List.of(key, f)]
 }
 
-function toAsync(key, iterator)
+function toAsync(iterator)
 {
     return () => new Promise(function (resolve, reject)
     {
@@ -190,8 +194,8 @@ function toAsync(key, iterator)
 
             if (done)
                 return resolve();
-
-            Promise.resolve(value.value)
+console.log("GOT ", done, value);
+            Promise.resolve(value)
                 .then(value => step("next", value))
                 .catch(value => step("throw", value));
         })("next", void 0);

@@ -1,9 +1,12 @@
 const { Seq } = require("immutable");
-const { Node, Test, Serial, Concurrent } = require("./node");
+const { Test, Suite } = require("./node");
+const { Serial, Concurrent } = Suite;
 
-const isTest = Node.contains(Test);
-const isSerial = Node.contains(Serial);
-const isConcurrent = Node.contains(Concurrent);
+const isTest = node => node instanceof Test;
+const isSuite = node => node instanceof Suite;
+const hasMode = (mode, node) => node.mode === mode;
+const isSerial = node => isSuite(node) && hasMode(node, Serial);
+const isConcurrent = node => isSuite(node) && hasMode(node, Concurrent);
 const hasBlock = node =>
     isTest(node) || isSerial(node) || isConcurrent(node);
 
@@ -17,7 +20,7 @@ module.exports = function findShallowestScope(backtrace, node)
     // initial search on every frame in the backtrace due to the `map`, we'll
     // actually exit early as soon as we find a match.
     return Seq(backtrace)
-        .map(item => f(item))
+        .map(item => findScope(item))
         .findLast(node => !!node);
 }
 

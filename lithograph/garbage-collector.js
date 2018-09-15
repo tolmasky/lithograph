@@ -69,7 +69,7 @@ module.exports = GarbageCollector;
 function toAllocateIO(node, push)
 {
     if (!push)
-        return IO.start(() => toAllocateIO(node, push));
+        return IO.start(push => toAllocateIO(node, push));
 
     push(GarbageCollector.AllocateReady({ allocate }));
 
