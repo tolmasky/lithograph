@@ -194,7 +194,7 @@ function toAsync(iterator)
 
             if (done)
                 return resolve();
-console.log("GOT ", done, value);
+
             Promise.resolve(value)
                 .then(value => step("next", value))
                 .catch(value => step("throw", value));
