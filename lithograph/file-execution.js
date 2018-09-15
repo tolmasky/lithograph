@@ -64,6 +64,12 @@ const FileExecution = Cause("FileExecution",
             IO.fromAsync(() => testRun({ functions, path, index })));
     },
 
+    // FIXME: Shouldn't need to do this with keyPath. Right?
+    [event.on (GarbageCollector.Allocate)]: (fileExecution, event) => {
+    //console.log(event, event.update("fromKeyPath", fromKeyPath => fromKeyPath.next));
+        return [fileExecution, [event.update("fromKeyPath", fromKeyPath => fromKeyPath.next)]]
+    },
+
     [event.out `Finished`]: { },
 
     [event.in `TestFinished`]: { path:-1, index:-1, report:-1 },
@@ -205,30 +211,4 @@ function getPostOrderLeaves(path)
 
     return node.children.flatMap((_, index) =>
         getPostOrderLeaves(path.child(index)));
-}
-
-function getBrowser(ranges)
-{
-    console.log("GET BROWSER CALLED", ranges, getFrames());
-    /*
-    const frames = getFrames();
-    let index = frames.length - 1;
-
-    while (index-- > 0)
-    {
-        const range = ranges.find(([id, range]) => inRange(frames[index], range));
-
-        if (range)
-            console.log("FOUND IT: ", JSON.stringify(range, null, 2), frames[index], " belonging to " + range.get(0));
-    }
-    
-    
-    process.exit(1);*/
-}
-
-function inRange({ line, column }, { start, end })
-{
-    return  line > start.line && line < end.line ||
-            line === start.line && column > start.column ||
-            line === end.line && column < end.column;
 }
