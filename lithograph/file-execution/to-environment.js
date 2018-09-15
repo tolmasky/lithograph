@@ -1,5 +1,7 @@
 const testEnvironment = require("../test-worker/test-environment");
 
+global.fetch = testEnvironment.fetch;
+
 module.exports = function toEnvironment(allocate)
 {
     return { getBrowser, getBrowserContext, ...testEnvironment };

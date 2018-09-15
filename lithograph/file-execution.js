@@ -7,6 +7,9 @@ const compile = require("./compile");
 const GarbageCollector = require("./garbage-collector");
 const toEnvironment = require("./file-execution/to-environment");
 
+require("./magic-ws-puppeteer");
+
+
 const Report = Object.assign(
     Record({ duration:-1, outcome:-1 }, "Report"),
 {

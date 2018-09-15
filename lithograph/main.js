@@ -61,18 +61,17 @@ const Main = Cause("Main",
             FileProcess.Execute({ path }));
     },
 
-    [event.on (Cause.Start)]: main => {
-    console.log("JUST GOT START...");
-        return update.in(main,
+    [event.on (Cause.Start)]: main =>
+        update.in(main,
             "fileProcessPool",
-            Pool.Enqueue({ requests: main.paths })) },
+            Pool.Enqueue({ requests: main.paths })),
 
 
     [event.on (FileProcess.EndpointRequest)](main, { id, fromKeyPath })
     {
         const [,, fromFileProcess] = fromKeyPath;
         const requests = [List.of(id, fromFileProcess)];
-console.log("REQUEST", fromKeyPath);
+
         return update.in(main, "browserPool", Pool.Enqueue({ requests }));
     },
 
@@ -103,16 +102,6 @@ console.log("REQUEST", fromKeyPath);
             ["fileProcessPool", "items", fromFileProcess],
             FileProcess.EndpointResponse({ id, endpoint }));
     }
-/*
-    [event.on (Pool.Retained) .from `browserPool`](main, { request, index })
-    {
-        const { endpoint } = main.browserPool.items.get(index);
-        const { key, id } = request;
-
-        return update.in(main,
-            ["fileProcesses", key],
-            FileExecution.BrowserResponse({ id, endpoint }));
-    }*/
 });
 
 
