@@ -25,12 +25,12 @@ const Main = Cause("Main",
     [field `browserPool`]: -1,
     [field `fileProcessPool`]: -1,
 
-    init({ paths: iterable, concurrency, requires })
+    init({ paths: iterable, concurrency, requires, headless })
     {
         const paths = List(iterable);
 
         const browserPool = Pool.create(
-            { items: Repeat(Browser(), concurrency) });
+            { items: Repeat(Browser.create({ headless }), concurrency) });
         const fork = Fork.create({ type: FileProcess, fields: { requires } });
         const fileProcessPool = Pool.create(
             { items: Repeat(fork, concurrency) });
