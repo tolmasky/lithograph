@@ -84,11 +84,16 @@ console.log("REQUEST", fromKeyPath);
         const indexes = requests
             .map(request => occupied.keyOf(request));
 
-        return update.in(main, "browserPool", Pool.Release({ indexes }));
+        return update.in.reduce(
+            main,
+            indexes.map(index => [["browserPool", "items", index], Browser.Reset()]));
     },
 
+    [event.on (Browser.DidReset)]: (main, { fromKeyPath: [,,index] }) =>
+        update.in(main, "browserPool", Pool.Release({ indexes: [index] })),
+
     [event.on (Pool.Retained) .from `browserPool`](main, event)
-    {console.log("BROWSER!!!");
+    {
         const { request, index } = event;
         const [id, fromFileProcess] = request;
         const { endpoint } = main.browserPool.items.get(index);

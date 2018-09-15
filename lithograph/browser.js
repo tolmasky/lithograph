@@ -6,6 +6,7 @@ const Browser = Cause("Browser",
 {
     [field `ready`]: false,
     [field `launch`]: IO.start(launch),
+    [field `reset`]: -1,
     [field `endpoint`]: -1,
     [field `puppeteerBrowser`]: -1,
 
@@ -17,10 +18,27 @@ const Browser = Cause("Browser",
             .set("puppeteerBrowser", puppeteerBrowser)
             .set("endpoint", puppeteerBrowser.wsEndpoint()),
         [Cause.Ready()]
-    ]
+    ],
+
+    [event.in `Reset`]: { },
+    [event.on `Reset`]: browser => browser.set("reset",
+        IO.fromAsync(() => reset(browser.get("puppeteerBrowser")))),
+
+    [event.out `DidReset`]: { },
+    [event.in `ClosedAllPages`]: { },
+    [event.on `ClosedAllPages`]: browser => [browser, [Browser.DidReset()]],
 });
 
 module.exports = Browser;
+
+async function reset(browser)
+{
+    await Promise.all(
+        (await browser.pages())
+            .map(page => page.close()));
+
+    return Browser.ClosedAllPages();
+}
 
 function launch(push)
 {
