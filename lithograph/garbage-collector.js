@@ -25,10 +25,11 @@ return    [
         [Cause.Ready()]
     ] },
 
+    [event.out `Allocate`]: { id:-1, type: -1 },
     [event.in `Request`]: { scope: -1, type: -1, resolve: -1 },
     [event.on `Request`](collector, request)
     {
-        const id = collector.allocating.get("id");
+        const id = collector.requests.get("id");
         const updated = collector.update("requests",
             requests => requests.concat([["id", id + 1], [id, request]]));
         const allocate = GarbageCollector.Allocate({ id, type: request.type });
@@ -46,11 +47,11 @@ return    [
     {
         const { id, resource } = allocation;
         const { scope, resolve } = collector.requests.get(id);
-        const resolution = IO.fromAsync(() => resolve({ resource }));
+        const resolution = IO.start(() => resolve({ resource }));
 
         return collector
             .setIn(["allocations", scope, id])
-            .updateIn("resolutions", list => list.push(resolution));
+            .update("resolutions", list => list.push(resolution));
     },
 
     [event.out `Deallocate`]: { allocations:List() },
@@ -78,19 +79,19 @@ function toAllocateIO(node, push)
         return new Promise(function (resolve, reject)
         {
             const backtrace = getBacktrace();
-            const scope = findShallowestScope(node, backtrace);
+            const scope = findShallowestScope(backtrace, node);
 
             // If for whatever reason we don't find a matching scope, we'll have
             // to return an error immediately.
             if (!scope)
                 return reject(
-                    Error("A browser was attempting to be created out of scope"));
+                    Error("A browser was attempted to be created out of scope"));
 
             const sanitize = ({ error, resource }) =>
                 void(typeof error === "function" ?
                     reject(error()) : resolve(resource));
 
-            push(GarbageCollector.Allocate({ scope, resolve: sanitize, type }));
+            push(GarbageCollector.Request({ scope, resolve: sanitize, type }));
         });
     }
 }

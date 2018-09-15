@@ -13,8 +13,8 @@ module.exports = function getFrames(name)
     const frames = Error().stack.split(ErrorRegExp)
         .map(frame => frame.match(FrameRegExp))
         .filter(frame => !!frame)
-        .map(([, path, line, column]) =>
-            ({ path, line: toInt(line), column: toInt(column) }))
+        .map(([, filename, line, column]) =>
+            ({ filename, line: toInt(line), column: toInt(column) }))
         .slice(1);
     Error.stackTraceLimit = stackTraceLimit;
 
