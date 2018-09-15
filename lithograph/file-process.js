@@ -36,10 +36,14 @@ const FileProcess = Cause("FileProcess",
         (path => [fileProcess, [FileProcess.Executed({ path })]])
         (fileProcess.fileExecution.path),
 
+    [event.out `EndpointRequest`]: { id: -1 },
     [event.on (GarbageCollector.Allocate)]: (fileProcess, { id }) =>
         [fileProcess, [FileProcess.EndpointRequest({ id })]],
 
-    [event.out `EndpointRequest`]: { id: -1 },
+    [event.out `EndpointRelease`]: { ids: -1 },
+    [event.on (GarbageCollector.Deallocate)]: (fileProcess, { ids }) =>
+        [fileProcess, [FileProcess.EndpointRelease({ ids })]],
+
     [event.in `EndpointResponse`]: { id: -1, endpoint: -1 },
     [event.on `EndpointResponse`]: (fileProcess, { id, endpoint }) =>
         update.in(fileProcess,

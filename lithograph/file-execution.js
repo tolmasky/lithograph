@@ -1,4 +1,4 @@
-const { Record, List, Map, Range } = require("immutable");
+const { Record, List, Map, Range, Set } = require("immutable");
 const { Cause, IO, field, event, update } = require("cause");
 const { Test, Suite, fromMarkdown } = require("@lithograph/node");
 const NodePath = require("@lithograph/node/path");
@@ -70,6 +70,12 @@ const FileExecution = Cause("FileExecution",
         return [fileExecution, [event.update("fromKeyPath", fromKeyPath => fromKeyPath.next)]]
     },
 
+    // FIXME: Shouldn't need to do this with keyPath. Right?
+    [event.on (GarbageCollector.Deallocate)]: (fileExecution, event) => {
+    //console.log(event, event.update("fromKeyPath", fromKeyPath => fromKeyPath.next));
+        return [fileExecution, [event.update("fromKeyPath", fromKeyPath => fromKeyPath.next)]]
+    },
+
     [event.out `Finished`]: { },
 
     [event.in `TestFinished`]: { path:-1, index:-1, report:-1 },
@@ -77,21 +83,27 @@ const FileExecution = Cause("FileExecution",
     {
         const [reports, requests] =
             updateReports(fileExecution.reports, path, report);
+        const scopes = Set(reports.keys())
+            .subtract(fileExecution.reports.keys());
         const finished = reports.has(fileExecution.root.node.metadata.id);
-        const [released, fromReleaseEvents] = update.in(
+        const { id } = path.node.metadata;
+
+        const [updated, events] = update.in.reduce(
             fileExecution
                 .set("reports", reports)
-                .removeIn(["running", path.node.metadata.id]),
-            "pool",
-            Pool.Release({ indexes: [index] }));
+                .removeIn(["running", id]),
+            [
+                ["garbageCollector", GarbageCollector.ScopesExited({ scopes })],
+                ["pool", Pool.Release({ indexes: [index] })]
+            ]);
 
         if (finished)
-            return [released, [FileExecution.Finished(), ...fromReleaseEvents]];
+            return [updated, [FileExecution.Finished(), ...events]];
 
         const [enqueued, fromEnqueueEvents] =
-            update.in(released, "pool", Pool.Enqueue({ requests }));
+            update.in(updated, "pool", Pool.Enqueue({ requests }));
 
-        return [enqueued, [...fromReleaseEvents, ...fromEnqueueEvents]];
+        return [enqueued, [...events, ...fromEnqueueEvents]];
     },
 });
 
