@@ -33,15 +33,21 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 
     options.requires = options.require.map(path => resolve(path));
 
+    const start = Date.now();
     const children = (await main(paths, options)).toJSON();
+
     const title = `${moment().format("YYYY-MM-DD-HH.mm.ss")}`;
-    const output = `/tmp/lithograph-results/${title}`;
+    const output = options.output || `/tmp/lithograph-results/${title}`;
     const node = { title, children };
 
     print(node);
 
     console.log("writing file...");
     toJUnitXML(`${output}/junit.xml`, node);
+
+    const duration = Date.now() - start;
+
+    console.log("Total Time: " + duration + "ms");
 
 /*
     if (states.get(List()).aggregate === 2)
