@@ -3,7 +3,8 @@ const { spawnSync } = require("child_process");
 
 const { List } = require("immutable");
 
-const { openSync: open, writeSync: write, closeSync: close } = require("fs");
+const { openSync: open, writeSync: write_, closeSync: close } = require("fs");
+const write = (fd, s) => (console.log(s), write_(fd, s));
 const escape = (map =>
     (regexp =>
         string => string.replace(regexp, item => map[item]))
@@ -11,7 +12,7 @@ const escape = (map =>
     ({ ">": "&gt;", "<": "&lt;", "'": "&apos;", "\"": "&quot;", "&": "&amp;" });
 
 
-module.exports = function (path, root, states, time)
+module.exports = function (path, node)
 {
     spawnSync("mkdir", ["-p", dirname(path)]);
 
@@ -19,18 +20,17 @@ module.exports = function (path, root, states, time)
 
     write(fd, `<?xml version = "1.0" encoding = "UTF-8" ?>\n`);
 
-    toXML(fd, root, states, List());
+    toXML(fd, node);
 
     close(fd);
 }
 
-function toXML(fd, node, states, keyPath, tabs = 0)
+function toXML(fd, node, tabs = 0)
 {
-    const toChildrenXML = () => node.children.map((node, index) =>
-        toXML(  fd, node, states,
-                keyPath.push("children", index), tabs + 1));
+    const toChildrenXML = () => node.children
+        .map((node, index) => toXML(fd, node, tabs + 1));
 
-    if (keyPath.size <= 0)
+    if (tabs === 0)
     {
         const id = "0";
         const name = node.title;
@@ -43,25 +43,22 @@ function toXML(fd, node, states, keyPath, tabs = 0)
             toChildrenXML);
     }
 
-    if (node.children.size > 0)
+    if (node.type === "suite")
         return tag(fd, tabs, "testsuite",
             { name: node.title }, toChildrenXML);
 
-    if (node.blocks.size > 0 && node.children.size <= 0)
-    {
-        const { individual, value } = states.get(keyPath);
-        const success = individual === 3;
-        const children = success ?
-            null :
-            individual === 5 ?
-                () => tag(fd, tabs + 1, "skipped") :
-                () => tag(fd, tabs + 1, "failure",
-                    { message: value.message, type: "FATAL" },
-                    () => write(fd, escape(value.stack) + "\n"));
+    const { title, report } = node;
+    const success = report.outcome.type === "success";
+    const children = success ?
+        null :
+        false ?
+            () => tag(fd, tabs + 1, "skipped") :
+            () => tag(fd, tabs + 1, "failure",
+                { message: value.message, type: "FATAL" },
+                () => write(fd, escape(value.stack) + "\n"));
 
-        return tag(fd, tabs, "testcase",
-            { name: node.title }, children);
-    }
+    return tag(fd, tabs, "testcase",
+        { name: node.title }, children);
 }
 
 function tag(fd, tabs, name, attributes = { }, children)

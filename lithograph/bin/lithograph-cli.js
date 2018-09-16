@@ -33,12 +33,11 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 
     options.requires = options.require.map(path => resolve(path));
 
-    const children = await main(paths, options);
+    const children = (await main(paths, options)).toJSON();
     const title = `${moment().format("YYYY-MM-DD-HH.mm.ss")}`;
     const output = `/tmp/lithograph-results/${title}`;
-
     console.log("writing file...");
-//    toJUnitXML(`${output}/junit.xml`, children);
+    toJUnitXML(`${output}/junit.xml`, { title, children });
 /*
     const keyPaths = 
     
