@@ -47,8 +47,9 @@ const Main = Cause("Main",
             reported,
             "fileProcessPool",
             Pool.Release({ indexes: [index] }));
+        const outEvents = finished ? [...events, Cause.Finished()] : events;
 
-        return [updated, [...events, finished && Cause.Finished()]];
+        return [updated, outEvents];
     },
 
     [event.on (Pool.Retained) .from `fileProcessPool`](main, event)
