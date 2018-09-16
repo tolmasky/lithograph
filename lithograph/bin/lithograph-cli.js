@@ -33,23 +33,17 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 
     options.requires = options.require.map(path => resolve(path));
 
-    await main(paths, options);
-/*
+    const children = await main(paths, options);
     const title = `${moment().format("YYYY-MM-DD-HH.mm.ss")}`;
-    const root = Node({ title, children });
-
-    options.output = options.output || `/tmp/lithograph-results/${title}`;
-    options.metadata = options.output;
-    options.requires = options.require.map(path => resolve(path));
-
-    const start = Date.now();
-    const [_, states] = await run(root, options);
-    const duration = Date.now() - start;
+    const output = `/tmp/lithograph-results/${title}`;
 
     console.log("writing file...");
-    toJUnitXML(`${options.output}/junit.xml`, root, states);
-
-    const keyPaths = Seq(states.keys()).toList()
+//    toJUnitXML(`${output}/junit.xml`, children);
+/*
+    const keyPaths = 
+    
+    
+    Seq(states.keys()).toList()
         .sort((lhs, rhs) => lhs
             .zipWith((lhs, rhs) => lhs === rhs ? 0 : lhs - rhs, rhs)
             .find(comparison => comparison !== 0) ||

@@ -29,10 +29,9 @@ const FileProcess = Cause("FileProcess",
             Cause.Start());
     },
 
-    [event.out `Executed`]: { path: -1 },
-    [event.on (FileExecution.Finished)]: fileProcess =>
-        (path => [fileProcess, [FileProcess.Executed({ path })]])
-        (fileProcess.fileExecution.path),
+    [event.out `Executed`]: { result:-1 },
+    [event.on (FileExecution.Finished)]: (fileProcess, { result }) =>
+        [fileProcess, [FileProcess.Executed({ result })]],
 
     [event.out `EndpointRequest`]: { id: -1 },
     [event.on (GarbageCollector.Allocate)]: (fileProcess, { id }) =>

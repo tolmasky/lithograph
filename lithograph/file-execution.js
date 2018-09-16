@@ -80,7 +80,7 @@ const FileExecution = Cause("FileExecution",
         return [fileExecution, [event.update("fromKeyPath", fromKeyPath => fromKeyPath.next)]]
     },
 
-    [event.out `Finished`]: { },
+    [event.out `Finished`]: { result: -1 },
 
     [event.in `TestFinished`]: { path:-1, index:-1, report:-1 },
     [event.on `TestFinished`](fileExecution, { report, path, index })
@@ -102,7 +102,11 @@ const FileExecution = Cause("FileExecution",
             ]);
 
         if (finished)
-            return [updated, [FileExecution.Finished(), ...events]];
+        {
+            const result = toObject(fileExecution.root.node, reports);
+
+            return [updated, [FileExecution.Finished({ result }), ...events]];
+        }
 
         const [enqueued, fromEnqueueEvents] =
             update.in(updated, "pool", Pool.Enqueue({ requests }));
@@ -227,4 +231,21 @@ function getPostOrderLeaves(path)
 
     return node.children.flatMap((_, index) =>
         getPostOrderLeaves(path.child(index)));
+}
+
+function toObject(node, reports)
+{
+    const { title, disabled } = node.metadata;
+    const isTest = node instanceof Test
+    const type = isTest ? "test" : "suite";
+    const report = reports.get(node.metadata.id);
+    const outcome = report.outcome instanceof Report.Success ?
+        { type: "success" } :
+        { type: "failure", reason: report.outcome.reason };
+    const reportObject = { duration: report.duration, outcome };
+    const common = { title, disabled, type, report: reportObject };
+    const children = !isTest &&
+        node.children.map(node => toObject(node, reports));
+
+    return { ...common, ...(children && { children }) };
 }
