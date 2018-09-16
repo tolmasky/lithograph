@@ -133,11 +133,11 @@ async function fetchOEmbed({ URL, maxwidth })
         fragment.firstElementChild,
         { style: "" });
 
-//    if (parseInt(iframe.width, 10) !== iframe.width)
-//        throw new Error(`OEmbed IFrame "width" attribute must be an integer.`);
+    if (parseInt(iframe.width, 10) + "" !== iframe.width)
+        throw new Error(`OEmbed IFrame "width" attribute must be an integer.`);
 
-//    if (parseInt(iframe.height, 10) !== iframe.height)
-//        throw new Error(`OEmbed IFrame "height" attribute must be an integer.`);
+    if (parseInt(iframe.height, 10) + "" !== iframe.height)
+        throw new Error(`OEmbed IFrame "height" attribute must be an integer.`);
 
     iframe.width = "100%";
     iframe.height = "100%";

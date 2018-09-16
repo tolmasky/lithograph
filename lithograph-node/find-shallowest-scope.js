@@ -47,8 +47,6 @@ function inSource(frame, source)
     if (frame.filename !== source.filename)
         return false;
 
-    console.log("SAME FILE!");
-
     const { line, column } = frame;
     const { start, end } = source;
 
