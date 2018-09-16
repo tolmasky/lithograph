@@ -4,7 +4,6 @@ const { List } = require("immutable");
 const glob = require("fast-glob");
 const { Repeat, Seq } = require("immutable");
 
-const Node = require("../node");
 const toJUnitXML = require("../to-junit-xml");
 
 const { resolve } = require("path");

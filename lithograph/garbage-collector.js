@@ -1,7 +1,6 @@
 const { Seq, Record, List, Map } = require("immutable");
 const { Cause, IO, field, event, update } = require("cause");
 const findShallowestScope = require("@lithograph/node/find-shallowest-scope");
-const getBacktrace = require("./get-frames");
 
 const Request = Record({ id:-1, resolve:-1 }, "Request");
 const Allocation = Record({ id:-1, type:-1 }, "Allocation");
@@ -105,3 +104,25 @@ function toAllocateIO(node, push)
         });
     }
 }
+
+const getBacktrace = (function ()
+{
+    const ErrorRegExp = /(?:(?:^Error\n\s+)|(?:\n\s+))at\s+/;
+    const FrameRegExp = /\(([^\(]+):(\d+):(\d+)\)$/;
+    const toInt = string => parseInt(string, 10);
+
+    return function getBacktrace()
+    {
+        const { stackTraceLimit } = Error;
+        Error.stackTraceLimit = Infinity;
+        const frames = Error().stack.split(ErrorRegExp)
+            .map(frame => frame.match(FrameRegExp))
+            .filter(frame => !!frame)
+            .map(([, filename, line, column]) =>
+                ({ filename, line: toInt(line), column: toInt(column) }))
+            .slice(1);
+        Error.stackTraceLimit = stackTraceLimit;
+
+        return frames;
+    }
+})();
