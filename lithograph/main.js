@@ -70,7 +70,7 @@ const Main = Cause("Main",
     [event.on (FileProcess.EndpointRequest)](main, { id, fromKeyPath })
     {
         const [,, fromFileProcess] = fromKeyPath;
-        const requests = [List.of(id, fromFileProcess)];
+        const requests = [List.of(fromFileProcess, id)];
 
         return update.in(main, "browserPool", Pool.Enqueue({ requests }));
     },
@@ -94,7 +94,7 @@ const Main = Cause("Main",
     [event.on (Pool.Retained) .from `browserPool`](main, event)
     {
         const { request, index } = event;
-        const [id, fromFileProcess] = request;
+        const [fromFileProcess, id] = request;
         const { endpoint } = main.browserPool.items.get(index);
 
         return update.in(

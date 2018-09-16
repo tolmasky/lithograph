@@ -190,54 +190,21 @@ function toAsync(iterator)
     {
         (function step(method, input)
         {
-            const { done, value } = iterator[method](input);
+            try
+            {
+                const { done, value } = iterator[method](input);
 
-            if (done)
-                return resolve();
+                if (done)
+                    return resolve();
 
-            Promise.resolve(value)
-                .then(value => step("next", value))
-                .catch(value => step("throw", value));
+                Promise.resolve(value)
+                    .then(value => step("next", value))
+                    .catch(value => step("throw", value));
+            }
+            catch (error)
+            {
+                reject(error);
+            }
         })("next", void 0);
     });
 }
-
-
-/*
-function * ()
-{
-    
-}
-
-
-# Blah (Serial)
-
-## X (Serial)
-    
-    TEST -> BEFORE
-
-    CONTENT ->
-        
-        ONE
-        
-        TWO
-
-## SOMETHING
-
-
-# Blah (Serial)
-
-## X (Concurrent)
-
-BEFORE
-
-### ONE
---
-### TWO
----
-
-## Y
-
-test
-
-[statements], [statements], [statements]*/

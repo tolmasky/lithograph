@@ -21,9 +21,7 @@ const FileProcess = Cause("FileProcess",
     [event.in `Execute`]: { path:-1 },
     [event.on `Execute`]: (fileProcess, { path }) =>
     {console.log("EXECUTING!!!! " + Date.now());
-        const { getBrowser } = fileProcess;
-        const fileExecution =
-            FileExecution.create({ path, getBrowser });
+        const fileExecution = FileExecution.create({ path });
 
         return update.in(
             fileProcess.set("fileExecution", fileExecution),
