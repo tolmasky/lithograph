@@ -3,8 +3,7 @@ const { spawnSync } = require("child_process");
 
 const { List } = require("immutable");
 
-const { openSync: open, writeSync: write_, closeSync: close } = require("fs");
-const write = (fd, s) => (console.log(s), write_(fd, s));
+const { openSync: open, writeSync: write, closeSync: close } = require("fs");
 const escape = (map =>
     (regexp =>
         string => string.replace(regexp, item => map[item]))
@@ -47,15 +46,15 @@ function toXML(fd, node, tabs = 0)
         return tag(fd, tabs, "testsuite",
             { name: node.title }, toChildrenXML);
 
-    const { title, report } = node;
-    const success = report.outcome.type === "success";
+    const { title, report: { outcome } } = node;
+    const success = outcome.type === "success";
     const children = success ?
         null :
         false ?
             () => tag(fd, tabs + 1, "skipped") :
             () => tag(fd, tabs + 1, "failure",
-                { message: value.message, type: "FATAL" },
-                () => write(fd, escape(value.stack) + "\n"));
+                { message: outcome.reason.message, type: "FATAL" },
+                () => write(fd, escape(outcome.reason.stack) + "\n"));
 
     return tag(fd, tabs, "testcase",
         { name: node.title }, children);
