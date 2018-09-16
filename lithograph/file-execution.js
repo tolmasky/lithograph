@@ -241,11 +241,16 @@ function toObject(node, reports)
     const report = reports.get(node.metadata.id);
     const outcome = report.outcome instanceof Report.Success ?
         { type: "success" } :
-        { type: "failure", reason: report.outcome.reason };
+        { type: "failure", reason: toErrorObject(report.outcome.reason) };
     const reportObject = { duration: report.duration, outcome };
     const common = { title, disabled, type, report: reportObject };
     const children = !isTest &&
         node.children.map(node => toObject(node, reports));
 
     return { ...common, ...(children && { children }) };
+}
+
+function toErrorObject(error)
+{
+    return { message: error.message, stack: error.stack };
 }
