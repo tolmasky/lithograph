@@ -25165,7 +25165,6 @@ const Application = Object.assign(props => Application[props.data.state](props),
     },
 
     loaded: ({ data: { items, interactive, input }, keyPath, update }) => {
-        console.log("INPUT: {" + input + "}");
         const onOEmbedURLChange = URL => update([...keyPath, "items", 1], () => OEmbed.Data({ URL }));
 
         return React.createElement(
@@ -25185,7 +25184,7 @@ const Application = Object.assign(props => Application[props.data.state](props),
 
 module.exports = Application;
 
-},{"./input-bar":28,"./lorem-ipsum":29,"./oembed":30,"immutable":15,"react":25}],27:[function(require,module,exports){
+},{"./input-bar":29,"./lorem-ipsum":30,"./oembed":31,"immutable":15,"react":25}],27:[function(require,module,exports){
 const React = require("react");
 const ReactDOM = require("react-dom");
 
@@ -25207,6 +25206,57 @@ update();
 console.log("hello!");
 
 },{"./application":26,"react":25,"react-dom":22}],28:[function(require,module,exports){
+var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
+
+const React = require("react");
+
+module.exports = ({ style, data }) => React.createElement(
+    "ul",
+    { style: _extends({}, FieldsULStyle, style) },
+    data.keySeq().map((key, index) => React.createElement(
+        "li",
+        { key: key, style: FieldsLIStyle },
+        React.createElement(Field, { label: key, value: data.get(key) })
+    ))
+);
+
+const FieldsULStyle = {
+    padding: 0,
+    border: 0,
+    margin: 0,
+    listStyleType: "none",
+    display: "block",
+    fontFamily: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"`
+};
+const FieldsLIStyle = {
+    display: "block"
+};
+
+const Field = ({ label, value }) => [React.createElement(
+    "span",
+    { style: FieldLabelStyle },
+    label,
+    ":"
+), React.createElement("input", { value: value, style: FieldValueStyle })];
+
+const FieldLabelStyle = {
+    width: "50%",
+    display: "inline-block",
+    fontWeight: "bold",
+    textAlign: "right"
+};
+const FieldValueStyle = {
+    width: "calc(50% - 10px)",
+    display: "inline-block",
+    textAlign: "left",
+    marginLeft: "10px",
+    boxSizing: "border-box",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap"
+};
+
+},{"react":25}],29:[function(require,module,exports){
 const React = require("react");
 
 module.exports = ({ data, update, keyPath, action }) => {
@@ -25246,24 +25296,32 @@ const InputBarInputStyle = {
     outline: "none"
 };
 
-},{"react":25}],29:[function(require,module,exports){
+},{"react":25}],30:[function(require,module,exports){
 const React = require("react");
 
 module.exports = () => React.createElement(
     "section",
     { className: "lorem-ipsum" },
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur."
 );
 
-},{"react":25}],30:[function(require,module,exports){
+},{"react":25}],31:[function(require,module,exports){
 const React = require("react");
-const { Record } = require("immutable");
+const { Map, Record } = require("immutable");
+const Fields = require("./fields");
 
 const OEmbed = Object.assign(props => OEmbed[props.data.state](props), {
-    Data: Record({ state: "initial", URL: "", response: null }),
+    Data: Record({
+        state: "initial",
+        URL: "",
+        result: null,
+        error: null,
+        height: 20,
+        width: "100%"
+    }),
 
     initial({ data: { URL }, keyPath, update }) {
-        fetchOEmbed({ URL, maxwidth: 700 }).then(value => update(keyPath, data => data.set("state", "loaded").set("response", value))).catch(value => update(keyPath, data => data.set("state", "errored").set("response", value)));
+        fetchOEmbed({ URL, maxwidth: 700 }).then(value => update(keyPath, data => data.set("state", "loaded").set("result", value))).catch(value => update(keyPath, data => data.set("state", "errored").set("error", value)));
 
         update(keyPath, data => data.set("state", "loading"));
 
@@ -25272,20 +25330,79 @@ const OEmbed = Object.assign(props => OEmbed[props.data.state](props), {
 
     loading: () => React.createElement("section", { className: "oembed loading" }),
 
-    errored: () => React.createElement(
+    errored: ({ data: { error } }) => React.createElement(
         "section",
         null,
-        "ERROR!"
+        error.message
     ),
 
-    loaded: ({ data: { response: { html: __html } } }) => React.createElement("section", { className: "oembed", dangerouslySetInnerHTML: { __html } })
-
+    loaded: ({ data, update, keyPath }) => React.createElement(
+        "section",
+        { className: "oembed" },
+        React.createElement(OEmbedContainer, { data, keyPath, update })
+    )
 });
+
+const OEmbedContainer = function ({ data, keyPath, update }) {
+    window.addEventListener("message", function ({ data }) {
+        const { context, height } = JSON.parse(data);
+
+        if (context !== "iframe.resize") return;
+
+        update([...keyPath, "height"], () => height);
+    });
+
+    const result = data.result;
+    const __html = result.get("iframe").outerHTML;
+    const id = JSON.stringify(keyPath);
+    const height = data.height;
+    const style = Object.assign({}, IFrameContainerStyle, { height });
+
+    return React.createElement(
+        "div",
+        { id: id, style: style },
+        React.createElement("div", { style: OEmbedCalloutStyle }),
+        React.createElement(
+            "div",
+            { style: OEmbedInfoStyle },
+            React.createElement(Fields, { data: Map({ "dynamic-height": height }) }),
+            React.createElement(Fields, { data: result.get("JSON") })
+        ),
+        React.createElement("div", { style: { height: "100%", width: "100%" },
+            dangerouslySetInnerHTML: { __html } })
+    );
+};
+
+const OEmbedCalloutStyle = {
+    position: "absolute",
+    top: "-2px",
+    width: "20px",
+    right: "100%",
+    borderTop: "2px dashed red"
+};
+
+const OEmbedInfoStyle = {
+    position: "absolute",
+    top: "-2px",
+    width: "270px",
+    right: "100%",
+    lineHeight: "1.58",
+    marginRight: "20px",
+    paddingRight: "20px",
+    borderRight: "2px dashed red"
+};
 
 module.exports = OEmbed;
 
+const IFrameContainerStyle = {
+    position: "relative",
+    border: "2px dashed red",
+    width: "calc(100% + 2px)",
+    left: "-2px",
+    top: "-2px"
+};
+
 async function fetchOEmbed({ URL, maxwidth }) {
-    console.log("FETCHING " + URL);
     const format = "json";
     const query = [["url", URL], ["format", format], ["maxwidth", maxwidth]].reduce((params, [key, value]) => (params.append(key, value), params), new URLSearchParams()).toString();
     const oembedURL = `https://embed.tonic.work/oembed?${query}`;
@@ -25293,7 +25410,24 @@ async function fetchOEmbed({ URL, maxwidth }) {
 
     if (response.status !== 200) throw Object.assign(new Error(), { status });
 
-    return await response.json();
+    const JSON = await response.json();
+
+    if (!JSON.html) throw new Error(`OEmbed response must contain an "html" property.`);
+
+    const fragment = Object.assign(document.createElement("div"), { innerHTML: JSON.html });
+
+    if (fragment.childNodes.length !== 1 || !fragment.firstElementChild || fragment.firstElementChild.tagName !== "IFRAME") throw new Error("OEmbed HTML must contain one iframe element.");
+
+    const iframe = Object.assign(fragment.firstElementChild, { style: "" });
+
+    if (parseInt(iframe.width, 10) + "" !== iframe.width) throw new Error(`OEmbed IFrame "width" attribute must be an integer.`);
+
+    if (parseInt(iframe.height, 10) + "" !== iframe.height) throw new Error(`OEmbed IFrame "height" attribute must be an integer.`);
+
+    iframe.width = "100%";
+    iframe.height = "100%";
+
+    return Map({ iframe, JSON: Map(JSON), response });
 }
 
-},{"immutable":15,"react":25}]},{},[27]);
+},{"./fields":28,"immutable":15,"react":25}]},{},[27]);
