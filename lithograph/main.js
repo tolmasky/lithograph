@@ -12,15 +12,13 @@ module.exports = async function main(paths, options)
     const promise =
         IO.toPromise(Main.create({ ...options, paths }));
 
-    await promise;
-
-    console.log("NOW DONE");
+    return await promise;
 }
 
 const Main = Cause("Main",
 {
     [field `paths`]: -1,
-    [field `reports`]: Map(),
+    [field `results`]: List(),
 
     [field `browserPool`]: -1,
     [field `fileProcessPool`]: -1,
@@ -41,15 +39,17 @@ const Main = Cause("Main",
     [event.on (FileProcess.Executed)](main, event)
     {
         const [,, index] = event.fromKeyPath;
-        const reported = main.setIn(["reports", event.path], true);
-        const finished = reported.reports.size === reported.paths.size;
+        const results = main.results.push(event.result);
+        const finished = results.size === main.paths.size;
         const [updated, events] = update.in(
-            reported,
+            main.set("results", results),
             "fileProcessPool",
             Pool.Release({ indexes: [index] }));
-        const outEvents = finished ? [...events, Cause.Finished()] : events;
 
-        return [updated, outEvents];
+        if (!finished)
+            return [updated, events];
+
+        return [updated, [...events, Cause.Finished({ value: results })]];
     },
 
     [event.on (Pool.Retained) .from `fileProcessPool`](main, event)
