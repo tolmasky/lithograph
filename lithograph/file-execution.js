@@ -1,7 +1,7 @@
 const { Record, List, Map, Range, Set } = require("immutable");
-const { Cause, IO, field, event, update } = require("cause");
-const { Test, Suite, fromMarkdown } = require("@lithograph/node");
-const NodePath = require("@lithograph/node/path");
+const { Cause, IO, field, event, update } = require("@cause/cause");
+const { Test, Suite, fromMarkdown } = require("@lithograph/ast");
+const NodePath = require("@lithograph/ast/path");
 const Pool = require("@cause/pool");
 const compile = require("./compile");
 const GarbageCollector = require("./garbage-collector");

@@ -1,6 +1,6 @@
 const { Seq, Record, List, Map } = require("immutable");
-const { Cause, IO, field, event, update } = require("cause");
-const findShallowestScope = require("@lithograph/node/find-shallowest-scope");
+const { Cause, IO, field, event, update } = require("@cause/cause");
+const findShallowestScope = require("@lithograph/ast/find-shallowest-scope");
 
 const Request = Record({ id:-1, resolve:-1 }, "Request");
 const Allocation = Record({ id:-1, type:-1 }, "Allocation");

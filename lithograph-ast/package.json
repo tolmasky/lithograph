@@ -13,6 +13,7 @@
     "remark": "^9.0.0"
   },
   "peerDependencies": {
+    "@lithograph/ast": "1.0.0-alpha.1",
     "immutable": "^3.8.2"
   }
 }

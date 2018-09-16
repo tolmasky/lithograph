@@ -1,6 +1,6 @@
 const { Map, List } = require("immutable");
-const NodePath = require("../lithograph-node/path");
-const { Test, Suite, fromMarkdown } = require("../lithograph-node");
+const NodePath = require("@lithograph/ast/path");
+const { Test, Suite, fromMarkdown } = require("@lithograph/ast");
 const toExpression = require("./compile/value-to-expression");
 
 

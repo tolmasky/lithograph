@@ -1,7 +1,7 @@
 require("source-map-support").install({ hookRequire: true });
 
 const { List, Map } = require("immutable");
-const { Cause, IO, field, event, update } = require("cause");
+const { Cause, IO, field, event, update } = require("@cause/cause");
 const FileExecution = require("./file-execution");
 const GarbageCollector = require("./garbage-collector");
 
