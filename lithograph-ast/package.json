@@ -1,6 +1,6 @@
 {
-  "name": "@lithograph/node",
-  "version": "1.0.0",
+  "name": "@lithograph/ast",
+  "version": "1.0.0-alpha.1",
   "description": "",
   "main": "node.js",
   "scripts": {
@@ -10,7 +10,9 @@
   "author": "Francisco Ryan Tolmasky I",
   "license": "MIT",
   "dependencies": {
-    "immutable": "^3.8.2",
     "remark": "^9.0.0"
+  },
+  "peerDependencies": {
+    "immutable": "^3.8.2"
   }
 }
