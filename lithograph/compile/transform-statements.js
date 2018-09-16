@@ -1,4 +1,4 @@
-const t = require("babel-types");
+const t = require("@babel/types");
 const { transformFromAst } = require("babel-core");
 const plugin = { visitor: { AwaitExpression, TaggedTemplateExpression } };
 const options = { plugins: [plugin] };

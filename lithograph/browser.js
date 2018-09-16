@@ -1,4 +1,4 @@
-const { Cause, IO, field, event, update } = require("cause");
+const { Cause, IO, field, event, update } = require("@cause/cause");
 const puppeteer = require("puppeteer");
 
 

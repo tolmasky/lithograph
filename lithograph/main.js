@@ -1,5 +1,5 @@
 const { Repeat, Range, List, Map } = require("immutable");
-const { Cause, field, event, update, IO } = require("cause");
+const { Cause, field, event, update, IO } = require("@cause/cause");
 const Pool = require("@cause/pool");
 const Fork = require("@cause/fork");
 const FileProcess = require("./file-process");

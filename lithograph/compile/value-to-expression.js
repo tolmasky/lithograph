@@ -1,4 +1,4 @@
-const t = require("babel-types");
+const t = require("@babel/types");
 const { isArray } = Array;
 const { isList } = require("immutable").List;
 const { hasOwnProperty } = Object;
