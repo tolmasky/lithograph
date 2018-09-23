@@ -42,7 +42,7 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 
     print(node);
 
-    console.log("writing file...");
+    console.log("writing file... " + output);
     toJUnitXML(`${output}/junit.xml`, node);
 
     const duration = Date.now() - start;

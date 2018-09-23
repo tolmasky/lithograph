@@ -1,0 +1,16 @@
+{
+  "name": "@lithograph/status",
+  "version": "1.0.0-alpha.3",
+  "description": "",
+  "main": "status.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Francisco Ryan Tolmasky I",
+  "license": "MIT",
+  "peerDependencies": {
+    "@lithograph/ast": "1.0.0-alpha.3",
+    "immutable": "^3.8.2"
+  }
+}
