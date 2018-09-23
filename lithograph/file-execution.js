@@ -2,6 +2,7 @@ const { Record, List, Map, Range, Set } = require("immutable");
 const { Cause, IO, field, event, update } = require("@cause/cause");
 const { Test, Suite, fromMarkdown } = require("@lithograph/ast");
 const NodePath = require("@lithograph/ast/path");
+const Status = require("@lithograph/status");
 const Pool = require("@cause/pool");
 const compile = require("./compile");
 const GarbageCollector = require("./garbage-collector");
@@ -11,20 +12,13 @@ require("./magic-ws-puppeteer");
 require("./test-worker/static");
 
 
-const Report = Object.assign(
-    Record({ duration:-1, outcome:-1 }, "Report"),
-{
-    Success: Record({ }, "Success"),
-    Failure: Record({ reason:-1 }, "Failure")
-});
-
 const FileExecution = Cause("FileExecution",
 {
     [field `path`]: -1,
     [field `root`]: -1,
     [field `pool`]: Pool.create({ count: 100 }),
     [field `running`]: Map(),
-    [field `reports`]: Map(),
+    [field `statuses`]: Map(),
     [field `functions`]: Map(),
     [field `garbageCollector`]: -1,
 
@@ -40,16 +34,16 @@ const FileExecution = Cause("FileExecution",
     [event.on (Cause.Ready) .from `garbageCollector`](fileExecution)
     {
         const { root, garbageCollector } = fileExecution;
+        const [statuses, unblocked] = Status.findUnblockedDescendentPaths(fileExecution.root);
         const { allocate } = garbageCollector;
-        const start = Date.now();
-        const functions = compile(toEnvironment(allocate), root.node);
-        console.log("TOOK: " + (Date.now() - start));
-        const requests = getPostOrderLeaves(fileExecution.root);
+        const outFileExecution = fileExecution
+            .set("functions", compile(toEnvironment(allocate), root.node))
+            .set("statuses", statuses);
 
         return update.in(
-            fileExecution.set("functions", functions),
+            outFileExecution,
             ["pool"],
-            Pool.Enqueue({ requests }));
+            Pool.Enqueue({ requests: unblocked }));
     },
 
     [event.on (Cause.Start)]: event.ignore,/*fileExecution =>
@@ -63,9 +57,11 @@ const FileExecution = Cause("FileExecution",
         const path = request;
         const functions = fileExecution.functions;
 
-        return fileExecution.setIn(
-            ["running", request.node.metadata.id],
-            IO.fromAsync(() => testRun({ functions, path, index })));
+        return fileExecution
+            .update("statuses", statuses =>
+                Status.updateTestToRunning(statuses, path, Date.now()))
+            .setIn(["running", path.node.metadata.id],
+                IO.fromAsync(() => testRun({ functions, path, index })));
     },
 
     // FIXME: Shouldn't need to do this with keyPath. Right?
@@ -82,38 +78,45 @@ const FileExecution = Cause("FileExecution",
 
     [event.out `Finished`]: { result: -1 },
 
-    [event.in `TestFinished`]: { path:-1, index:-1, report:-1 },
-    [event.on `TestFinished`](fileExecution, { report, path, index })
-    {
-        const [reports, requests] =
-            updateReports(fileExecution.reports, path, report);
-        const scopes = Set(reports.keys())
-            .subtract(fileExecution.reports.keys());
-        const finished = reports.has(fileExecution.root.node.metadata.id);
-        const { id } = path.node.metadata;
+    [event.in `TestSucceeded`]: { path:-1, index:-1, end:-1 },
+    [event.on `TestSucceeded`]: testFinished,
 
-        const [updated, events] = update.in.reduce(
-            fileExecution
-                .set("reports", reports)
-                .removeIn(["running", id]),
-            [
-                ["garbageCollector", GarbageCollector.ScopesExited({ scopes })],
-                ["pool", Pool.Release({ indexes: [index] })]
-            ]);
-
-        if (finished)
-        {
-            const result = toObject(fileExecution.root.node, reports);
-
-            return [updated, [FileExecution.Finished({ result }), ...events]];
-        }
-
-        const [enqueued, fromEnqueueEvents] =
-            update.in(updated, "pool", Pool.Enqueue({ requests }));
-
-        return [enqueued, [...events, ...fromEnqueueEvents]];
-    },
+    [event.in `TestFailed`]: { path:-1, index:-1, end:-1, reason:-1 },
+    [event.on `TestFailed`]: testFinished
 });
+
+function testFinished(fileExecution, event)
+{
+    const { path, index, end } = event;
+    const failure = event instanceof FileExecution.TestFailed;
+    const [statuses, requests, scopes] =
+        (failure ? Status.updateTestToFailure : Status.updateTestToSuccess)
+        (fileExecution.statuses, path, end, failure && event.reason);
+    const outFileExecution = fileExecution
+        .set("statuses", statuses)
+        .removeIn(["running", path.node.metadata.id]);
+
+    const [updated, events] = update.in.reduce(outFileExecution,
+    [
+        ["garbageCollector", GarbageCollector.ScopesExited({ scopes })],
+        ["pool", Pool.Release({ indexes: [index] })]
+    ]);
+
+    // If we exited the root scope, then we're done.
+    if (scopes.has(fileExecution.root.node.metadata.id))
+    {
+    console.log("DONE!");
+    process.exit(1000);
+        const result = toObject(fileExecution.root.node, reports);
+
+        return [updated, [FileExecution.Finished({ result }), ...events]];
+    }
+
+    const [enqueued, fromEnqueueEvents] =
+        update.in(updated, "pool", Pool.Enqueue({ requests }));
+
+    return [enqueued, [...events, ...fromEnqueueEvents]];
+}
 
 module.exports = FileExecution;
 
@@ -125,14 +128,16 @@ async function testRun({ functions, path, index })
 
     console.log("RUN " + path.node.metadata.id + " -> " + title + " " + Date.now());
 
-    const outcome = await f()
-        .then(() => Report.Success())
-        .catch(reason => Report.Failure({ reason }));
-    const report = Report({ duration: Date.now() - start , outcome });
+    const [failed, reason] = await f()
+        .then(() => [false])
+        .catch(reason => [true, reason]);
+    const end = Date.now();
 
-    console.log("finished " + id + " -> " + title + " " + report);
+    console.log("finished " + id + " -> " + title + " " + !failed);
 
-    return FileExecution.TestFinished({ path, index, report });
+    return failed ? 
+        FileExecution.TestFailed({ path, index, end, reason }) :
+        FileExecution.TestSucceeded({ path, index, end });
 }
 
 function updateReports(inReports, path, report)
@@ -145,10 +150,9 @@ function updateReports(inReports, path, report)
 
     const { children: siblings, mode } = parent.node;
     const isSerial = mode === Suite.Serial;
-    const siblingsComplete = isSerial ?
-        path.index === siblings.size - 1 :
-        siblings.every(sibling =>
-            outReports.has(sibling.metadata.id));
+    const siblingsComplete = siblings
+        .skip(isSerial ? path.index + 1 : 0)
+        .every(sibling => outReports.has(sibling.metadata.id));
 
     if (siblingsComplete)
         return updateReports(
@@ -216,7 +220,7 @@ function getSuiteReport(path, reports)
     return Report({ duration, outcome });
 }
 
-function getPostOrderLeaves(path)
+function getPostOrderLeaves(path, reports)
 {
     const { node } = path;
 

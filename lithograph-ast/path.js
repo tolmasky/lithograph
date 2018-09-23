@@ -15,12 +15,12 @@ module.exports = class NodePath
 
     toString()
     {
-        return `@[${Array.from(this, node => node.id).join(", ")}]`;
+        return `@[${Array.from(this, path => path.index).join(", ")}]`;
     }
 
     *[Symbol.iterator]()
     {
-        yield this.node;
+        yield this;
         this.parent && (yield * this.parent);
     }
 }
