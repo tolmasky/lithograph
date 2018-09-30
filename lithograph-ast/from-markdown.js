@@ -1,25 +1,45 @@
-const { Record, Seq, List, Map, Stack } = require("immutable");
-const { Suite, Metadata, Source, Test, Fragment } = require("./node");
-const { Serial, Concurrent } = Suite;
-const State = Record({ stack:Stack(), id:1, filename:-1 }, "State");
+const { type, number, string, Either, List, Seq, Stack } = require("@cause/type");
+const { Node, Mode, Block, Source, Test, Fragment } = require("./node");
+
+const NodeList = List(Node);
+const Placeholder = type ( Placeholder =>
+[
+    mode => Mode,
+    block => Block,
+    fragments => List(Fragment),
+    children => List(Node)
+]);
+const State = type (State =>
+[
+    stack => Stack(Placeholder),
+    id => number(1),
+    filename => string
+]);
 
 const swaptop = (item, stack) =>
     stack.peek() === item ? stack : stack.pop().push(item);
-const adopt = (child, parent) =>
-    parent.update("children", list => list.push(child));
+const adoptIn = (key, child, parent) =>
+    parent.update(key, list => list.push(child));
 
 const addf = f => (x, y) => x + f(y);
 const getInnerText = node => node.type === "text" ?
     node.value : node.children.reduce(addf(getInnerText), "");
 
 
+function getSourceFromSyntaxNode({ position }, filename)
+{
+    const start = Source.Position(position.start);
+    const end = Source.Position(position.end);
+
+    return Source({ start, end, filename });
+}
+
 const toPlaceholder = (function ()
 {
-    const modes = { Serial, Concurrent };
-    const union = Object.keys(modes).join("|");
-    const modeRegExp = new RegExp(`\\s*\\((${union})\\)$`);
+    const modes = Object.keys(Mode).join("|");
+    const modeRegExp = new RegExp(`\\s*\\((${modes})\\)$`);
     const parse = text =>
-        (([title, key = "Concurrent"]) => [title, modes[key]])
+        (([title, key = "Concurrent"]) => [title, Mode[key]])
         (text.split(modeRegExp));
     const isEntirelyCrossedOut = heading =>
         heading.children.length === 1 &&
@@ -28,62 +48,72 @@ const toPlaceholder = (function ()
     return function toPlaceholder(state, heading)
     {
         const id = state.id;
-        const source = Source.fromSyntaxNode(heading, state.filename);
+        const source = getSourceFromSyntaxNode(heading, state.filename);
         const disabled = isEntirelyCrossedOut(heading);
         const [title, mode] = parse(getInnerText(heading));
         const depth = heading.depth;
-        const metadata = Metadata({ id, title, disabled, depth });
+        const block = Block({ id, title, disabled, depth, source });
 
-        return [state.set("id", id + 1), Suite({ source, mode, metadata })];
+        return [state.set("id", id + 1), Placeholder({ mode, block })];
     }
 })();
 
-function toConcrete(suite)
+function getSpanningSource(first, last)
 {
-    const { children, mode, metadata } = suite;
+    const { start, filename } = first;
+    const { end } = last;
 
-    if (children.size <= 0)
+    return Source({ start, end, filename });
+}
+
+function toConcrete(placeholder)
+{
+    const { fragments, children, mode } = placeholder;
+    const hasFragments = fragments.size > 0;
+    const hasChildren = children.size > 0;
+
+    if (!hasFragments && !hasChildren)
         return false;
 
-    const source = Source.spanning([suite, children.last()]);
-    const division = children.findIndex(node => !(node instanceof Fragment));
+    const first = placeholder.block.source;
+    const last = hasChildren ?
+        children.last().block.source : fragments.last().source;
+    const block = placeholder.block
+        .set("source", getSpanningSource(first, last));
 
-    if (division === 0)
-        return suite.set("source", source);
+    if (!hasFragments)
+        return Node.Suite({ block, mode, children });
 
-    if (division === -1)
-        return Test({ source, metadata, fragments: children });
+    if (!hasChildren)
+        return Node.Test({ block, fragments });
 
-    const { id } = metadata;
-    const subtitled = (subtitle, dx, start, stop) =>
-    {
-        const title = `${metadata.title} (${subtitle})`;
-        const subset = children.slice(start, stop);
-        const source = Source.spanning(subset);
+    const { title, id } = block;
+    const beforeSource = getSpanningSource(
+        fragments.first().source, fragments.last().source);
+    const beforeBlock = block
+        .set("source", beforeSource)
+        .set("title", `${title} (Before)`)
+        .set("id", id + 0.1);
+    const before = Node.Test({ block: beforeBlock, fragments });
+    const contentSource = getSpanningSource(
+        children.first().block.source, children.last().block.source);
+    const contentBlock = block
+        .set("source", contentSource)
+        .set("title", `${title} (Content)`)
+        .set("id", id + 0.2);
+    const content = Node.Suite({ block: contentBlock, mode, children });
+    const nested = NodeList(before, content);
 
-        return [source, Metadata({ id: id + dx, title }), subset];
-    };
-
-    const before =
-        ((source, metadata, fragments) =>
-            Test({ source, metadata, fragments }))
-        (...subtitled("Before", 0.1, 0, division));
-    const content =
-        ((source, metadata, children) =>
-            Suite({ source, metadata, mode, children }))
-        (...subtitled("Content", 0.2, division, children.size - division + 1));
-    const nested = List.of(before, content);
-
-    return Suite({ source, metadata, mode:Serial, children:nested });
+    return Node.Suite({ block, mode:Mode.Serial, children:nested });
 }
 
 const markdown =
 {
     code(state, code)
     {
-        const source = Source.fromSyntaxNode(code, state.filename);
+        const source = getSourceFromSyntaxNode(code, state.filename);
         const fragment = Fragment({ source, value: code.value });
-        const parent = adopt(fragment, state.stack.peek());
+        const parent = adoptIn("fragments", fragment, state.stack.peek());
 
         return state.update("stack", stack => swaptop(parent, stack));
     },
@@ -91,11 +121,12 @@ const markdown =
     heading(state, heading)
     {
         const { stack } = state;
-        const shallower = ({ metadata }) => heading.depth > metadata.depth;
+        const shallower = ({ block }) => heading.depth > block.depth;
         const count = stack.findIndex(shallower) + 1;
         const remaining = stack.skip(count);
-        const collapsed = stack.take(count).reduce(
-            (child, parent) => adopt(toConcrete(child), parent));
+        const collapsed = stack.take(count)
+            .reduce((child, parent) =>
+                adoptIn("children", toConcrete(child), parent));
         const [updated, placeholder] = toPlaceholder(state, heading);
         const appended = remaining.push(collapsed).push(placeholder);
 
@@ -110,7 +141,7 @@ const markdown =
         const name = getInnerText(children[0]);
         const contents = children[1].value;
         const owner = state.stack.peek().updateIn(
-            ["metadata", "resources"],
+            ["block", "resources"],
             resources => resources.set(name, contents));
 
         return state.update("stack", stack => swaptop(owner, stack));
@@ -119,17 +150,17 @@ const markdown =
 
 function fromDocument(document, filename)
 {
-    const source = Source.fromSyntaxNode(document, filename);
-    const metadata = Metadata({ id:0, title: filename, depth:0 });
-    const suite = Suite({ source, metadata });
+    const source = getSourceFromSyntaxNode(document, filename);
+    const block = Block({ id:0, source, title: filename, depth:0 });
+    const suite = Node.Suite({ block });
 
     const position = { start: { line:1, column:1 } };
     const EOF = { type:"heading", position, depth:1, children:[] };
     const state = [...document.children, EOF].reduce(
         (state, node) => (markdown[node.type] || (x => x))(state, node),
-        State({ id: 1, stack: Stack.of(suite), filename }));
+        State({ id: 1, stack: Stack(Node)([suite]), filename }));
 
-    return toConcrete(state.stack.pop().peek());
+    return state.stack.pop().peek();
 }
 
 module.exports = (function ()

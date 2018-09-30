@@ -7,6 +7,7 @@ const Pool = require("@cause/pool");
 const compile = require("./compile");
 const GarbageCollector = require("./garbage-collector");
 const toEnvironment = require("./file-execution/to-environment");
+const Result = Record({ statuses:Map(), root:-1 }, "FileExecution.Result");
 
 require("./magic-ws-puppeteer");
 require("./test-worker/static");
@@ -85,11 +86,29 @@ const FileExecution = Cause("FileExecution",
     [event.on `TestFailed`]: testFinished
 });
 
+FileExecution.Result = Result;
+
+Result.serialize = function serializeResult(result)
+{
+    const root = Suite.serialize(result.root);
+    const statuses = Status.serialize.map(result.statuses);
+
+    return { statuses, root };
+}
+
+Result.deserialize = function deserializeResult(serialized)
+{
+    const root = Suite.deserialize(serialized.root);
+    const statuses = Status.deserialize.map(serialized.statuses);
+
+    return Result({ statuses, root });
+}
+
 function testFinished(fileExecution, event)
 {
     const { path, index, end } = event;
     const failure = event instanceof FileExecution.TestFailed;
-    const [statuses, requests, scopes] =
+    const [statuses, requests, scopes, finished] =
         (failure ? Status.updateTestToFailure : Status.updateTestToSuccess)
         (fileExecution.statuses, path, end, failure && event.reason);
     const outFileExecution = fileExecution
@@ -103,11 +122,12 @@ function testFinished(fileExecution, event)
     ]);
 
     // If we exited the root scope, then we're done.
-    if (scopes.has(fileExecution.root.node.metadata.id))
+    if (finished)
     {
-    console.log("DONE!");
-    process.exit(1000);
-        const result = toObject(fileExecution.root.node, reports);
+        const root = fileExecution.root.node;
+        console.log("DONE " + fileExecution.root.node.metadata.id + " " + scopes);
+        const result = FileExecution.Result
+            .serialize(FileExecution.Result({ statuses, root }));
 
         return [updated, [FileExecution.Finished({ result }), ...events]];
     }
@@ -138,103 +158,6 @@ async function testRun({ functions, path, index })
     return failed ? 
         FileExecution.TestFailed({ path, index, end, reason }) :
         FileExecution.TestSucceeded({ path, index, end });
-}
-
-function updateReports(inReports, path, report)
-{
-    const { parent, node } = path;
-    const outReports = inReports.set(node.metadata.id, report);
-
-    if (!parent)
-        return [outReports, List()];
-
-    const { children: siblings, mode } = parent.node;
-    const isSerial = mode === Suite.Serial;
-    const siblingsComplete = siblings
-        .skip(isSerial ? path.index + 1 : 0)
-        .every(sibling => outReports.has(sibling.metadata.id));
-
-    if (siblingsComplete)
-        return updateReports(
-            outReports,
-            parent,
-            getSuiteReport(parent, outReports));
-
-    if (isSerial && report.outcome instanceof Report.Failure)
-    {
-        const failure = getDescendentFailure(report);
-        const completed = path.index + 1;
-        const descendentReports = Map(siblings
-            .skip(completed)
-            .flatMap((_, index) =>
-                getDescendents(parent.child(index + completed)))
-            .map(path => [path.node.metadata.id, failure]));
-        const mergedReports = outReports.merge(descendentReports);
-
-        return updateReports(
-            mergedReports,
-            parent,
-            getSuiteReport(parent, mergedReports));
-    }
-
-    const unblockedTestPaths = isSerial ?
-        getPostOrderLeaves(parent.child(path.index + 1)) :
-        List();
-
-    return [outReports, unblockedTestPaths];
-}
-
-function getDescendents(path)
-{
-    return path.node instanceof Test ?
-        List.of(path) :
-        path.node.children
-            .flatMap((_, index) =>
-                getDescendents(path.child(index)))
-            .push(path);
-}
-
-function getDescendentFailure(report)
-{
-    const reason = Error(
-        "Test skipped due to previous failure: " +
-        report.outcome.reason);
-    const outcome = Report.Failure({ reason });
-    const failure = Report({ outcome, duration: 0 });
-
-    return failure;
-}
-
-function getSuiteReport(path, reports)
-{
-    const childReports = path.node.children
-        .map(child => reports.get(child.metadata.id));
-    const failures = childReports.filter(report =>
-        report.outcome instanceof Report.Failure);
-    const duration = childReports.reduce(
-        (duration, report) => duration + report.duration, 0);
-    const outcome = failures.size > 0 ?
-        Report.Failure({ reason: failures }) :
-        Report.Success();
-
-    return Report({ duration, outcome });
-}
-
-function getPostOrderLeaves(path, reports)
-{
-    const { node } = path;
-
-    if (node instanceof Test)
-        return List.of(path);
-
-    if (node.children.size <= 0)
-        return List();
-
-    if (node.mode === Suite.Serial)
-        return getPostOrderLeaves(path.child(0));
-
-    return node.children.flatMap((_, index) =>
-        getPostOrderLeaves(path.child(index)));
 }
 
 function toObject(node, reports)
