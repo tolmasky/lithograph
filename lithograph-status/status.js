@@ -1,4 +1,4 @@
-const { List, Map, Range, Record, Set, Stack } = require("immutable");
+const { List, Map, Range, Record, Stack } = require("immutable");
 const { Suite, Test } = require("../lithograph-ast");
 
 const is = type => value => value instanceof type;
@@ -6,11 +6,12 @@ const is = type => value => value instanceof type;
 function Status(test, suite, name)
 {
     return name === void(0) ?
-        (type => Object.assign(type, { is: is(type) }))
+        Status[suite] =
+            (type => Object.assign(type, { is: is(type) }))
             (Record(test, suite)) :
         (([Test, Suite]) =>
             ({ Test, Suite, is: v => Test.is(v) || Suite.is(v) }))
-        ([Status(test, `${name}.Test`), Status(suite, `${name}.Suite`)])
+            ([Status(test, `${name}.Test`), Status(suite, `${name}.Suite`)]);
 }
 
 const None = false;
@@ -33,7 +34,8 @@ module.exports = Object.assign(
     { updateTestToRunning },
     { updateTestToSuccess },
     { updateTestToFailure },
-    { findUnblockedDescendentPaths });
+    { findUnblockedDescendentPaths },
+    { serialize, deserialize, Failure, Success, Skipped, Omitted });
 
 
 // (Map<id, Status>, NodePath, time) ->
@@ -86,11 +88,11 @@ function updateTestToSuccess(statuses, path, end)
 // Mark a test as having failed with `reasin` at time `time`, calculating any
 // other results that may be created as a consequence, and returning any newly
 // unblocked paths.
-function updateTestToFailure(statuses, path, reason, end)
+function updateTestToFailure(statuses, path, end, reason)
 {
     const running = statuses.get(path.node.metadata.id);
     const duration = Range(running.start, end);
-    const failure = Failure.Test({ duration, reason: error });
+    const failure = Failure.Test({ duration, reason });
 
     return updatePathToResult(statuses, path, failure);
 }
@@ -108,7 +110,7 @@ function updatePathToResult(statuses, path, result)
 
     // If we have no parent, we've resolved the last status in the tree.
     if (!parent)
-        return [withResult, List(), Stack.of(id)];
+        return [withResult, List(), Stack.of(id), true];
 
     const { mode, children: siblings } = parent.node;
     const parentId = parent.node.metadata.id;
@@ -123,19 +125,23 @@ function updatePathToResult(statuses, path, result)
                 Failure.is(result) && Omitted({ id }));
     const completed = remaining === 0;
     const withSiblings = withResult.concat(siblingStatuses);
-    const [withParent, parentUnblocked, exited] = completed ?
-        updatePathToResult(withSiblings, parent, getSuiteResult(parent)) :
-        [withSiblings.setIn([parentId, "remaining"], remaining), List(), Stack()];
-
-    return [withParent, unblocked.concat(parentUnblocked), exited.push(id)];
+    const [withParent, parentUnblocked, exited, root] = completed ?
+        updatePathToResult(withSiblings, parent,
+            getSuiteStatus(withSiblings, parent)) :
+        [withSiblings.setIn([parentId, "remaining"], remaining),
+            List(), Stack(), false];
+console.log("remaining for" + parent.node.metadata.id + ": " + remaining);
+if (completed)
+console.log("I SHOULD HAVE SET " + parent.node.metadata.id + " to " + getSuiteStatus(statuses, parent));
+    return [withParent, unblocked.concat(parentUnblocked), exited.push(id), root];
 }
 
-function getSuiteReport(path)
+function getSuiteStatus(statuses, path)
 {
     const { node: { children } } = path;
-    const childPairs = path.children
+    const childPairs = path.node.children
         .map(child => child.metadata.id)
-        .map(id => [id, reports.get(id)])
+        .map(id => [id, statuses.get(id)])
         .filter(([, report]) =>
             Success.is(report) || Failure.is(report));
     const failures = childPairs
@@ -283,4 +289,29 @@ function getDescendentPairs(node, request)
         node.children
             .flatMap(node => getDescendentPairs(node, report))
             .push([node.metadata.id, report]);
+}
+
+function deserialize({ type, JS })
+{
+    return Status[type](JS);
+}
+
+deserialize.map = function deserializeStatusMap(object)
+{
+    return Map(Object
+        .keys(object)
+        .map(key => [key, deserialize(object[key])]));
+}
+
+function serialize(status)
+{
+    return { type: status._name, JS: status.toJS() };
+}
+
+serialize.map = function serializeStatusMap(statuses)
+{
+    return Map(statuses
+        .entrySeq()
+        .map(([key, value]) => [key, serialize(value)]))
+        .toObject();
 }

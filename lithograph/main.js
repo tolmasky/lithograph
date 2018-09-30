@@ -39,7 +39,8 @@ const Main = Cause("Main",
     [event.on (FileProcess.Executed)](main, event)
     {
         const [,, index] = event.fromKeyPath;
-        const results = main.results.push(event.result);
+        const results = main.results.push(
+            FileExecution.Result.deserialize(event.result));
         const finished = results.size === main.paths.size;
         const [updated, events] = update.in(
             main.set("results", results),

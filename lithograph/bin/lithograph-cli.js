@@ -34,16 +34,12 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
     options.requires = options.require.map(path => resolve(path));
 
     const start = Date.now();
-    const children = (await main(paths, options)).toJSON();
-
+    const results = await main(paths, options);
     const title = `${moment().format("YYYY-MM-DD-HH.mm.ss")}`;
     const output = options.output || `/tmp/lithograph-results/${title}`;
-    const node = { title, children };
-
-    print(node);
 
     console.log("writing file... " + output);
-    toJUnitXML(`${output}/junit.xml`, node);
+    toJUnitXML(`${output}/junit.xml`, results);
 
     const duration = Date.now() - start;
 
