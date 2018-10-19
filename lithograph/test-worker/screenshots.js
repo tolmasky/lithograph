@@ -15,7 +15,7 @@ module.exports = async function (browser, screenshotsPath)
         const results = await Promise.all(pages
             .map((page, index) => [page, `${screenshotsPath}/page-${index}.png`])
             .map(([page, path]) => page.screenshot({ path })
-                .then(() => path)
+                .then(() => path.replace(/ /g, "\ ")
                 .catch((e) => console.log(e))));
 
         console.log(results);
