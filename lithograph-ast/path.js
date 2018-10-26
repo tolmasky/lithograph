@@ -1,5 +1,6 @@
+const { fromNative } = require("@cause/type");
 
-module.exports = class NodePath
+module.exports = fromNative(class NodePath
 {
     constructor(node, parent, index = 0)
     {
@@ -23,7 +24,8 @@ module.exports = class NodePath
         yield this;
         this.parent && (yield * this.parent);
     }
-}
+});
+
 /*
 function NodePath(node, parent)
 {

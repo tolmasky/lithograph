@@ -1,5 +1,5 @@
 const { type, number, string, Either, List, Seq, Stack } = require("@cause/type");
-const { Node, Mode, Block, Source, Test, Fragment } = require("./node");
+const { Node, Mode, Block, Source, Test, Suite, Fragment } = require("./node");
 
 const NodeList = List(Node);
 const Placeholder = type ( Placeholder =>
@@ -152,15 +152,20 @@ function fromDocument(document, filename)
 {
     const source = getSourceFromSyntaxNode(document, filename);
     const block = Block({ id:0, source, title: filename, depth:0 });
-    const suite = Node.Suite({ block });
+    const start = Placeholder({ block, mode: Mode.Concurrent });
 
     const position = { start: { line:1, column:1 } };
     const EOF = { type:"heading", position, depth:1, children:[] };
     const state = [...document.children, EOF].reduce(
         (state, node) => (markdown[node.type] || (x => x))(state, node),
-        State({ id: 1, stack: Stack(Node)([suite]), filename }));
+        State({ id: 1, stack: Stack(Placeholder)([start]), filename }));
+    // The top of the stack will always be our EOF marker.
+    const top = toConcrete(state.stack.pop().peek());
+    const root = top instanceof Test ?
+        Suite({ block, children:NodeList.of(top) }) :
+        top;
 
-    return state.stack.pop().peek();
+    return root;
 }
 
 module.exports = (function ()
