@@ -1,20 +1,17 @@
-const { type, number, string, Either, List, Seq, Stack } = require("@cause/type");
-const { Node, Mode, Block, Source, Test, Suite, Fragment } = require("./node");
+const { is, data, number, string } = require("@algebraic/type");
+const { List, Map, Stack } = require("@algebraic/collections");
+const { Node, Block, Source, Test, Suite, Fragment } = require("./node");
 
-const NodeList = List(Node);
-const Placeholder = type ( Placeholder =>
-[
-    mode => Mode,
+const Placeholder = data `Placeholder` (
+    mode => Suite.Mode,
     block => Block,
-    fragments => List(Fragment),
-    children => List(Node)
-]);
-const State = type (State =>
-[
+    fragments => [List(Fragment), List(Fragment)()],
+    children => [List(Node), List(Node)()] );
+
+const State = data `State` (
     stack => Stack(Placeholder),
-    id => number(1),
-    filename => string
-]);
+    id => number,
+    filename => string );
 
 const swaptop = (item, stack) =>
     stack.peek() === item ? stack : stack.pop().push(item);
@@ -36,10 +33,10 @@ function getSourceFromSyntaxNode({ position }, filename)
 
 const toPlaceholder = (function ()
 {
-    const modes = Object.keys(Mode).join("|");
+    const modes = Object.keys(Suite.Mode).join("|");
     const modeRegExp = new RegExp(`\\s*\\((${modes})\\)$`);
     const parse = text =>
-        (([title, key = "Concurrent"]) => [title, Mode[key]])
+        (([title, key = "Concurrent"]) => [title, Suite.Mode[key]])
         (text.split(modeRegExp));
     const isEntirelyCrossedOut = heading =>
         heading.children.length === 1 &&
@@ -53,8 +50,9 @@ const toPlaceholder = (function ()
         const [title, mode] = parse(getInnerText(heading));
         const depth = heading.depth;
         const block = Block({ id, title, disabled, depth, source });
+        const updatedState = State({ ...state, id: id + 1 });
 
-        return [state.set("id", id + 1), Placeholder({ mode, block })];
+        return [updatedState, Placeholder({ mode, block })];
     }
 })();
 
@@ -78,8 +76,8 @@ function toConcrete(placeholder)
     const first = placeholder.block.source;
     const last = hasChildren ?
         children.last().block.source : fragments.last().source;
-    const block = placeholder.block
-        .set("source", getSpanningSource(first, last));
+    const source = getSpanningSource(first, last);
+    const block = Block({ ...placeholder.block, source });
 
     if (!hasFragments)
         return Node.Suite({ block, mode, children });
@@ -90,21 +88,27 @@ function toConcrete(placeholder)
     const { title, id } = block;
     const beforeSource = getSpanningSource(
         fragments.first().source, fragments.last().source);
-    const beforeBlock = block
-        .set("source", beforeSource)
-        .set("title", `${title} (Before)`)
-        .set("id", id + 0.1);
+    const beforeBlock = Block(
+    {
+        ...block,
+        source: beforeSource,
+        title: `${title} (Before)`,
+        id: id + 0.1
+    });
     const before = Node.Test({ block: beforeBlock, fragments });
     const contentSource = getSpanningSource(
         children.first().block.source, children.last().block.source);
-    const contentBlock = block
-        .set("source", contentSource)
-        .set("title", `${title} (Content)`)
-        .set("id", id + 0.2);
+    const contentBlock = Block(
+    {
+        ...block,
+        source: contentSource,
+        title: `${title} (Content)`,
+        id: id + 0.2
+    });
     const content = Node.Suite({ block: contentBlock, mode, children });
-    const nested = NodeList(before, content);
+    const nested = List(Node)([before, content]);
 
-    return Node.Suite({ block, mode:Mode.Serial, children:nested });
+    return Node.Suite({ block, mode:Suite.Mode.Serial, children:nested });
 }
 
 const markdown =
@@ -113,9 +117,11 @@ const markdown =
     {
         const source = getSourceFromSyntaxNode(code, state.filename);
         const fragment = Fragment({ source, value: code.value });
-        const parent = adoptIn("fragments", fragment, state.stack.peek());
+        const parent = state.stack.peek();
+        const fragments = parent.fragments.push(fragment);
+        const updated = Placeholder({ ...parent, fragments });
 
-        return state.update("stack", stack => swaptop(parent, stack));
+        return State({ ...state, stack: swaptop(updated, state.stack) });
     },
 
     heading(state, heading)
@@ -125,12 +131,12 @@ const markdown =
         const count = stack.findIndex(shallower) + 1;
         const remaining = stack.skip(count);
         const collapsed = stack.take(count)
-            .reduce((child, parent) =>
-                adoptIn("children", toConcrete(child), parent));
+            .reduce((child, parent) => Placeholder({ ...parent,
+                children: parent.children.push(toConcrete(child)) }));
         const [updated, placeholder] = toPlaceholder(state, heading);
         const appended = remaining.push(collapsed).push(placeholder);
 
-        return updated.set("stack", appended);
+        return State({ ...updated, stack: appended });
     },
 
     blockquote(state, { children })
@@ -144,24 +150,26 @@ const markdown =
             ["block", "resources"],
             resources => resources.set(name, contents));
 
-        return state.update("stack", stack => swaptop(owner, stack));
+        return State({ ...state, stack: swaptop(owner, stack) });
     }
 }
 
 function fromDocument(document, filename)
 {
     const source = getSourceFromSyntaxNode(document, filename);
-    const block = Block({ id:0, source, title: filename, depth:0 });
-    const start = Placeholder({ block, mode: Mode.Concurrent });
+    const title = filename;
+    const block = Block({ id:0, source, title, depth:0 });
+    const mode = Suite.Mode.Concurrent;
+    const start = Placeholder({ block, mode });
 
-    const position = { start: { line:1, column:1 } };
+    const position = { start: { line:1, column:1 }, end: { line:1, column:1 } };
     const EOF = { type:"heading", position, depth:1, children:[] };
     const state = [...document.children, EOF].reduce(
         (state, node) => (markdown[node.type] || (x => x))(state, node),
         State({ id: 1, stack: Stack(Placeholder)([start]), filename }));
     // The top of the stack will always be our EOF marker.
     const top = toConcrete(state.stack.pop().peek());
-    const root = top instanceof Test ?
+    const root = is(Test, top) ?
         Suite({ block, children:NodeList.of(top) }) :
         top;
 
