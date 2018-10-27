@@ -1,190 +1,82 @@
-const { List, Map, Range, Record, Stack } = require("immutable");
-const { Suite, Test } = require("../lithograph-ast");
+const { data, union, is, string, number } = require("@algebraic/type");
+const { List, Map } = require("@algebraic/collections");
+const { Node, Suite: { Mode } } = require("@lithograph/ast");
 
-const is = type => value => value instanceof type;
+const NodePath = require("./node-path");
+const NodePathList = List(NodePath);
+const TestPathList = List(NodePath.Test);
 
-function Status(test, suite, name)
+const Result = require("@lithograph/result");
+const ResultMap = Map(number, Result);
+
+const Incomplete = union `Incomplete` (
+    union `Running` (
+        data `Test` (start => number),
+        data `Suite` (start => number, children => ResultMap) ),
+
+    union `Waiting` (
+        data `Test` (),
+        data `Suite` (children => ResultMap) ) );
+
+const IncompleteMap = Map(number, Incomplete);
+const Status = union `Status` (Result, Incomplete);
+
+
+console.log("hey! - there.");
+module.exports.findUnblockedDescendentPaths = findUnblockedDescendentPaths
+
+function findUnblockedDescendentPaths(nodePath, incomplete = IncompleteMap())
 {
-    return name === void(0) ?
-        Status[suite] =
-            (type => Object.assign(type, { is: is(type) }))
-            (Record(test, suite)) :
-        (([Test, Suite]) =>
-            ({ Test, Suite, is: v => Test.is(v) || Suite.is(v) }))
-            ([Status(test, `${name}.Test`), Status(suite, `${name}.Suite`)]);
+    return is(NodePath.Test, nodePath) ?
+        findUnblockedDescendentPathsOfTestPath(nodePath, incomplete) :
+        findUnblockedDescendentPathsOfSuitePath(nodePath, incomplete);
 }
 
-const None = false;
-const Waiting = Status(
-    { },
-    { remaining: -1 }, "Waiting");
-const Running = Status(
-    { start: -1 },
-    { start: -1, remaining: -1 }, "Running");
-const Failure = Status(
-    { duration:-1, reason:-1 },
-    { durations:List(), failures:List() }, "Failure");
-const Success = Status(
-    { duration:-1 },
-    { durations:List(), total:-1, self:-1 }, "Success");
-const Omitted = Status({ id:-1 }, "Omitted");
-const Skipped = Status({ id:-1 }, "Skipped");
-
-module.exports = Object.assign(
-    { updateTestToRunning },
-    { updateTestToSuccess },
-    { updateTestToFailure },
-    { findUnblockedDescendentPaths },
-    { serialize, deserialize, Failure, Success, Skipped, Omitted });
-
-
-// (Map<id, Status>, NodePath, time) ->
-// [Map<id, Status>]
-//
-// Mark the test found at `path` as `Running`, having started at time `start`.
-// Return updated statuses map.
-function updateTestToRunning(statuses, path, start)
+function findUnblockedDescendentPathsOfSuitePath(suitePath, incomplete)
 {
-    const { parent, node } = path;
-    const withSelf = statuses.set(node.metadata.id, Running.Test({ start }));
+    const { suite } = suitePath;
 
-    return updateSuiteToRunning(withSelf, parent, start);
+    // If we don't have any children, we might as well consider ourselves as
+    // `Success`. In practice, the markdown parser should never allow this, but
+    // perhaps other ways of constructing Suites may someday create such
+    // situations.
+    if (suite.children.size <= 0)
+        return { unblocked: TestPathList(), status:Result.Success(), incomplete };
+
+    // At this point, we have to recurse to find unblocked paths. However, if
+    // all our children are immediately resolvable, there is still a chance that
+    // we will thus have an early resolution as well.
+    const children = NodePath.Suite.children(suitePath);
+    const { unblocked, results, incomplete: withChildren } =
+        suite.mode === Mode.Concurrent ?
+            resolveConcurrentSiblingPaths(children, incomplete) :
+            resolveSerialSiblingPaths(children, false);
+
+    // If we have as many results as children, we're done.
+    if (results.size === children.size)
+        return { unblocked, result:Result.Success(), incomplete };
+
+    const status = Incomplete.Waiting.Suite({ children: results });
+    const updated = withChildren.set(NodePath.id(suitePath), status);
+
+    return { unblocked, status, incomplete: updated };
 }
 
-function updateSuiteToRunning(statuses, path, start)
+function findUnblockedDescendentPathsOfTestPath(testPath, incomplete)
 {
-    const { parent, node } = path;
-    const { metadata: { id } } = node;
-    const status = statuses.get(id);
+    const { test: { block } } = testPath;
 
-    if (Running.is(status))
-        return statuses;
+    if (block.disabled)
+        throw "DO SOMEHTING";
+    
+    const status = Incomplete.Waiting.Test;
+    const unblocked = TestPathList.of(testPath);
+    const updated = incomplete.set(block.id, status);
 
-    const { remaining } = status;
-    const running = Running.Suite({ start, remaining });
-    const withSelf = statuses.set(id, running);
-
-    return parent ?
-        updateSuiteToRunning(withSelf, parent, start) :
-        withSelf;
+    return { unblocked, status, incomplete: updated };
 }
 
-// (Map<id, Status>, NodePath, time) ->
-// [Map<id, Status>, List<NodePath>, Stack<NodeId>]
-//
-// Mark a test as having succeeded at time `time`, calculating any other results
-// that may be created as a consequence, and returning any newly unblocked paths.
-function updateTestToSuccess(statuses, path, end)
-{
-    const running = statuses.get(path.node.metadata.id);
-    const duration = Range(running.start, end);
-
-    return updatePathToResult(statuses, path, Success.Test({ duration }));
-}
-
-// (Map<id, Report>, NodePath, Object, time) ->
-// [Map<id, Report>, List<NodePath>, Stack<NodeId>]
-//
-// Mark a test as having failed with `reasin` at time `time`, calculating any
-// other results that may be created as a consequence, and returning any newly
-// unblocked paths.
-function updateTestToFailure(statuses, path, end, reason)
-{
-    const running = statuses.get(path.node.metadata.id);
-    const duration = Range(running.start, end);
-    const failure = Failure.Test({ duration, reason });
-
-    return updatePathToResult(statuses, path, failure);
-}
-
-// (Map<id, Status>, NodePath, Success | Failure) ->
-// [Map<id, Status>, List<NodePath>, Stack<NodeId>]
-//
-// Assign a report to the node at `path`, calcualting any other reports that may
-// be created as a consequence, and return newly unblocked paths.
-function updatePathToResult(statuses, path, result)
-{
-    const { parent, node } = path;
-    const { metadata: { id } } = node;
-    const withResult = statuses.set(id, result);
-
-    // If we have no parent, we've resolved the last status in the tree.
-    if (!parent)
-        return [withResult, List(), Stack.of(id), true];
-
-    const { mode, children: siblings } = parent.node;
-    const parentId = parent.node.metadata.id;
-    const parentReport = statuses.get(parentId);
-    const [siblingStatuses, unblocked, remaining] =
-        mode === Suite.Concurrent ?
-            [Map(), List(), parentReport.remaining - 1] :
-            resolveSerialSiblingPaths(
-                siblings.toSeq()
-                    .map((_, index) => parent.child(index))
-                    .skip(path.index + 1),
-                Failure.is(result) && Omitted({ id }));
-    const completed = remaining === 0;
-    const withSiblings = withResult.concat(siblingStatuses);
-    const [withParent, parentUnblocked, exited, root] = completed ?
-        updatePathToResult(withSiblings, parent,
-            getSuiteStatus(withSiblings, parent)) :
-        [withSiblings.setIn([parentId, "remaining"], remaining),
-            List(), Stack(), false];
-console.log("remaining for" + parent.node.metadata.id + ": " + remaining);
-if (completed)
-console.log("I SHOULD HAVE SET " + parent.node.metadata.id + " to " + getSuiteStatus(statuses, parent));
-    return [withParent, unblocked.concat(parentUnblocked), exited.push(id), root];
-}
-
-function getSuiteStatus(statuses, path)
-{
-    const { node: { children } } = path;
-    const childPairs = path.node.children
-        .map(child => child.metadata.id)
-        .map(id => [id, statuses.get(id)])
-        .filter(([, report]) =>
-            Success.is(report) || Failure.is(report));
-    const failures = childPairs
-        .filter(([, report]) => Failure.is(report))
-        .map(([id]) => id);
-
-    return failures.size > 0 ?
-        Failure.Suite({ failures }) :
-        Success.Suite();
-}
-
-// (Seq<NodePath>, Maybe<Omitted>) ->
-// [Map<id, Status>, List<NodePath>, integer]
-//
-// Given a sequence of contiguous sibling paths where the first path is
-// unblocked, and a possible Omitted status, recursively traverse unblocked
-// descendent paths, setting them either to the Omitted status if present, or
-// their natural immediately resolvable status if possible.
-//
-// Returns a Map of node id's to resolved statuses, the list of any newly
-// unblocked paths, and the number of remaining blocked siblings.
-function resolveSerialSiblingPaths(siblings, omitted)
-{
-    const forSiblings = siblings
-        .map(path => omitted ?
-            setDescendentPathsToStatus(path, omitted) :
-            findUnblockedDescendentPaths(path));
-    const completed = forSiblings.count(([, , completed]) => completed);
-
-    // We add one because `completed` represents every resolved path, so the one
-    // that follows must be unblocked. We want to take all of its unblocked
-    // descendents, as well as making sure its parents are marked as Waiting.
-    // Don't worry if completed + 1 > size, `take` ignores anything pass the end.
-    const [statuses, unblocked] = forSiblings
-        .take(completed + 1)
-        .reduce(([statuses, unblocked], forSibling) =>
-            [statuses.concat(forSibling[0]), unblocked.concat(forSibling[1])],
-            [Map(), List()]);
-    const remaining = siblings.size - completed;
-
-    return [statuses, unblocked, remaining];
-}
-
+/*
 // (NodePath) ->
 // [Map<id, Status>, List<NodePath>, bool]
 //
@@ -195,8 +87,13 @@ function resolveSerialSiblingPaths(siblings, omitted)
 // (Tests), and a boolean showing whether the path is itself completed.
 function findUnblockedDescendentPaths(path)
 {
+    if (TestPath.is(path))
+    {
+        
+    }
+    
     const { node } = path;
-    const { metadata: { disabled, id } } = node;
+    const { block: { disabled, id } } = node;
 
     // If we are disabled, we know that we, and all our descendents, are
     // Skipped.
@@ -230,88 +127,94 @@ function findUnblockedDescendentPaths(path)
 
     return [withSelf, unblocked, completed];
 }
-
+*/
 // (Seq<NodePath>) ->
 // [Map<id, Status>, List<NodePath>, integer]
 //
 // Given a sequence of sibling paths where all paths are unblocked, recursively
 // traverse unblocked descendent paths, setting them either to their natural
-// immediately resolvable status if possible, or otherwise noting their
+// immediately resolvable `Result` if possible, or otherwise noting their
 // descendent unblocked paths.
 //
 // Returns a Map of node id's to resolved statuses, the list of any newly
 // unblocked paths, and the number of remaining blocked siblings.
-function resolveConcurrentSiblingPaths(siblings)
+function resolveConcurrentSiblingPaths(siblings, incomplete)
 {
-    const forSiblings = siblings
-        .map(path => findUnblockedDescendentPaths(path));
-    const completed = forSiblings.count(([, , completed]) => completed);
-    const [statuses, unblocked] = forSiblings.reduce(
-        ([statuses, unblocked], forSibling) =>
-            [statuses.concat(forSibling[0]), unblocked.concat(forSibling[1])],
-        [Map(), List()]);
+    const unblocked = TestPathList();
+    const results = ResultMap();
 
-    return [statuses, unblocked, siblings.size - completed];
+    return siblings.reduce(function (accum, nodePath)
+    {
+        const child = findUnblockedDescendentPaths(nodePath, accum.incomplete);
+
+        const unblocked = accum.unblocked.concat(child.unblocked);        
+        const results = is(Result, child.status) ?
+            accum.results.set(NodePath.id(nodePath), child.status) :
+            accum.results;
+
+        return { unblocked, results, incomplete: child.incomplete };
+    }, { unblocked, results, incomplete });
 }
 
-// (NodePath, Skipped | Omitted) ->
-// [Map<id, Report>, List<NodePath>.size === 0, boolean = true]
+/*
+
+
+        accum.results.
+
+        return [
+            concatenated.concat(unblocked),
+            is(Result, status) ?
+                results.set(NodePath.id(nodePath), status) : results,
+            is(Incomplete, state) ?
+                incomplete.set(NodePath.id(nodePath), state) : incomplete]
+
+        const concatenated = 
+        [nodePath, [unblocked, status]]
+    
+        
+        .reduce(([concatenated, results, incomplete], 
+                [nodePath, [unblocked, status]]) =>
+            [concatenated.concat(unblocked),
+                is(Result, state) ?
+                    results.set(NodePath.id(nodePath), state) : results,
+                is(Incomplete, state) ?
+                    incomplete.set(NodePath.id(nodePath), state) : incomplete],
+            [NodePathList(), ResultMap(), IncompleteMap()]);
+            
+const Status = data `Status`
+    `RunningTest` (start => number)
+    `RunningSuite` (start => number, children => Map(number, AnyResult))
+    `WaitingTest`
+    `WatiingSuite` (children => Map(number, AnyResult))
+
+// (Status, NodePath, time) ->
+// [Map<id, Status>]
 //
-// Given an unblocked path, recursively traverse all descendents with a passed
-// result of either Skipped or Omitted, taking into account that if a Node is
-// disabled, it will receive the state of Skipped even if the requested state
-// was Omitted.
-//
-// Returns a Map of node id's to resolved statuses, an empty list and the boolean
-// true marking that this path is in fact now complete.
-function setDescendentPaths(path, result)
+// Mark the test found at `path` as `Running`, having started at time `start`.
+// Return updated statuses map.
+function updateTestToRunning(statuses, path, start)
 {
-    const pairs = getDescendentPairs(path.node, result);
-    const statuses = Map(pairs);
+    const { parent, node } = path;
+    const withSelf = statuses.set(node.block.id, Status.RunningTest({ start }));
 
-    return [statuses, List(), true];
+    return updateSuiteToRunning(withSelf, parent, start);
 }
 
-// (Suite | Test, Skipped | Omitted) ->
-// List<[id, Skipped | Omitted]>
-//
-// Given a node and a requested status of either Skipped or Omitted, return a
-// List of pairs from node id to the requested end state of either Skipped or
-// Omitted, taking into account that if a Node is disabled, it will be paired
-// with Skipped even if the requested state was Omitted.
-function getDescendentPairs(node, request)
+function updateSuiteToRunning(statuses, path, start)
 {
-    const { metadata: { disabled, id } } = node;
-    const report = disabled ? Skipped({ id }) : request;
+    const { parent, node } = path;
+    const { block: { id } } = node;
+    const status = statuses.get(id);
 
-    return node instanceof Test ?
-        List.of([id, report]) :
-        node.children
-            .flatMap(node => getDescendentPairs(node, report))
-            .push([node.metadata.id, report]);
-}
+    if (Status.RunningSuite.is(status))
+        return statuses;
 
-function deserialize({ type, JS })
-{
-    return Status[type](JS);
-}
+    const { children } = status;
+    const running = Status.RunningSuite({ start, children });
+    const withSelf = statuses.set(id, running);
 
-deserialize.map = function deserializeStatusMap(object)
-{
-    return Map(Object
-        .keys(object)
-        .map(key => [key, deserialize(object[key])]));
+    return parent ?
+        updateSuiteToRunning(withSelf, parent, start) :
+        withSelf;
 }
-
-function serialize(status)
-{
-    return { type: status._name, JS: status.toJS() };
-}
-
-serialize.map = function serializeStatusMap(statuses)
-{
-    return Map(statuses
-        .entrySeq()
-        .map(([key, value]) => [key, serialize(value)]))
-        .toObject();
-}
+*/
