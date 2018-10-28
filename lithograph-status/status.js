@@ -117,10 +117,7 @@ function updateParentPathWithChildResult(childPath, childResult, incomplete)
         Result.Success.Suite({ suite, children });
 
     if (is(NodePath.Suite.Root, suitePath))
-    {
-        console.log("ALL DONE???", result);
-        process.exit(1);
-    }
+        return { status: result, incomplete: ResultMap() };
 
     return updatePathToResult(suitePath, result, withSiblings);
 }
