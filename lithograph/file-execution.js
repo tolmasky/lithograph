@@ -113,25 +113,28 @@ function testFinished(fileExecution, event)
     const failure = event instanceof FileExecution.TestFailed;
     //[statuses, requests, scopes, finished]
     console.log(fileExecution.incomplete);
-    const incomplete =
+    const { status, incomplete } =
         Status.updateTestPathToSuccess(testPath, fileExecution.incomplete, Date.now());
 //        (failure ? Status.updateTestPathToFailure : Status.updateTestPathToSuccess)
 //        (fileExecution.statuses, path, end, failure && event.reason);
+    const finished = incomplete.size === 0;
     const outFileExecution = fileExecution
-        .set("statuses", statuses)
-        .removeIn(["running", path.node.metadata.id]);
-
+        .set("incomplete", incomplete)
+        .removeIn(["running", NodePath.id(testPath)]);
+/*
     const [updated, events] = update.in.reduce(outFileExecution,
     [
         ["garbageCollector", GarbageCollector.ScopesExited({ scopes })],
         ["pool", Pool.Release({ indexes: [index] })]
     ]);
-
+*/
     // If we exited the root scope, then we're done.
     if (finished)
     {
-        const root = fileExecution.root.node;
-        console.log("DONE " + fileExecution.root.node.metadata.id + " " + scopes);
+        const root = fileExecution.root;
+        console.log("DONE " + status);
+        //console.log("DONE " + fileExecution.root.node.metadata.id + " " + scopes);
+        process.exit(1);
         const result = FileExecution.Result
             .serialize(FileExecution.Result({ statuses, root }));
 
