@@ -36,8 +36,6 @@ const FileExecution = Cause("FileExecution",
     {
         const { root, garbageCollector } = fileExecution;
         const { unblocked, incomplete } = Status.findUnblockedDescendentPaths(root);
-        console.log(unblocked.get(0));
-        console.log(incomplete);
         const { allocate } = garbageCollector;
         const outFileExecution = fileExecution
             .set("functions", compile(toEnvironment(allocate), root))
@@ -84,10 +82,10 @@ const FileExecution = Cause("FileExecution",
 
     [event.out `Finished`]: { result: -1 },
 
-    [event.in `TestSucceeded`]: { path:-1, index:-1, end:-1 },
+    [event.in `TestSucceeded`]: { testPath:-1, index:-1, end:-1 },
     [event.on `TestSucceeded`]: testFinished,
 
-    [event.in `TestFailed`]: { path:-1, index:-1, end:-1, reason:-1 },
+    [event.in `TestFailed`]: { testPath:-1, index:-1, end:-1, reason:-1 },
     [event.on `TestFailed`]: testFinished
 });
 
@@ -110,12 +108,15 @@ Result.deserialize = function deserializeResult(serialized)
 }
 
 function testFinished(fileExecution, event)
-{
+{console.log("OK HERE");
     const { testPath, index, end } = event;
     const failure = event instanceof FileExecution.TestFailed;
-    const [statuses, requests, scopes, finished] =
-        (failure ? Status.updateTestPathToFailure : Status.updateTestPathToSuccess)
-        (fileExecution.statuses, path, end, failure && event.reason);
+    //[statuses, requests, scopes, finished]
+    console.log(fileExecution.incomplete);
+    const incomplete =
+        Status.updateTestPathToSuccess(testPath, fileExecution.incomplete, Date.now());
+//        (failure ? Status.updateTestPathToFailure : Status.updateTestPathToSuccess)
+//        (fileExecution.statuses, path, end, failure && event.reason);
     const outFileExecution = fileExecution
         .set("statuses", statuses)
         .removeIn(["running", path.node.metadata.id]);

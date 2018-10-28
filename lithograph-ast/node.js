@@ -75,7 +75,8 @@ NodePath.Suite.child = function (index, suitePath)
 NodePath.id = function (nodePath)
 {
     return is(NodePath.Test, nodePath) ?
-        nodePath.test.block.id : nodePath.suite.block.id;
+        nodePath.test.block.id :
+        nodePath.suite.block.id;
 }
 
 Node.fromMarkdown = function fromMarkdown (filename)
