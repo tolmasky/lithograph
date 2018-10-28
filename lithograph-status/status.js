@@ -1,8 +1,7 @@
 const { data, union, is, string, number } = require("@algebraic/type");
 const { List, Map } = require("@algebraic/collections");
-const { Node, Suite: { Mode } } = require("@lithograph/ast");
+const { Node, NodePath, Suite: { Mode } } = require("@lithograph/ast");
 
-const NodePath = require("./node-path");
 const NodePathList = List(NodePath);
 const TestPathList = List(NodePath.Test);
 

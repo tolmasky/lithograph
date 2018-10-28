@@ -1,7 +1,6 @@
 const { Record, List, Map, Range, Set } = require("immutable");
 const { Cause, IO, field, event, update } = require("@cause/cause");
-const { Test, Suite, fromMarkdown } = require("@lithograph/ast");
-const NodePath = require("@lithograph/ast/path");
+const { Test, NodePath, Suite, fromMarkdown } = require("@lithograph/ast");
 const Status = require("@lithograph/status");
 const Pool = require("@cause/pool");
 const compile = require("./compile");
@@ -19,14 +18,14 @@ const FileExecution = Cause("FileExecution",
     [field `root`]: -1,
     [field `pool`]: Pool.create({ count: 100 }),
     [field `running`]: Map(),
-    [field `statuses`]: Map(),
+    [field `statuses`]: 0,
     [field `functions`]: Map(),
     [field `garbageCollector`]: -1,
 
     init: ({ path }) =>
     {
         const node = fromMarkdown(path);
-        const root = new NodePath(node);
+        const root = NodePath.Suite.Root({ suite: node });
         const garbageCollector = GarbageCollector.create({ node });
 
         return { path, root, garbageCollector };
@@ -35,10 +34,12 @@ const FileExecution = Cause("FileExecution",
     [event.on (Cause.Ready) .from `garbageCollector`](fileExecution)
     {
         const { root, garbageCollector } = fileExecution;
-        const [statuses, unblocked] = Status.findUnblockedDescendentPaths(fileExecution.root);
+        const { unblocked, incomplete } = Status.findUnblockedDescendentPaths(root);
+        console.log(unblocked.get(0));
+        console.log(incomplete);
         const { allocate } = garbageCollector;
         const outFileExecution = fileExecution
-            .set("functions", compile(toEnvironment(allocate), root.node))
+            .set("functions", compile(toEnvironment(allocate), root))
             .set("statuses", statuses);
 
         return update.in(
@@ -54,7 +55,7 @@ const FileExecution = Cause("FileExecution",
                 { requests: getPostOrderLeaves(fileExecution.root) })),*/
 
     [event.on (Pool.Retained)]: (fileExecution, { index, request }) =>
-    {
+    {console.log("here?");
         const path = request;
         const functions = fileExecution.functions;
 
