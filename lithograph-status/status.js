@@ -11,11 +11,11 @@ const ResultMap = Map(number, Result);
 const Incomplete = union `Incomplete` (
     union `Running` (
         data `Test` (start => number),
-        data `Suite` (start => number, children => ResultMap) ),
+        data `Suite` (start => number, childResults => ResultMap) ),
 
     union `Waiting` (
         data `Test` (),
-        data `Suite` (children => ResultMap) ) );
+        data `Suite` (childResults => ResultMap) ) );
 const { Running, Waiting } = Incomplete;
 
 const IncompleteMap = Map(number, Incomplete);
@@ -60,8 +60,8 @@ function updateSuitePathToRunning(suitePath, incomplete, start)
     if (is(Running, status))
         return incomplete;
 
-    const { children } = status;
-    const running = Running.Suite({ start, children });
+    const { childResults } = status;
+    const running = Running.Suite({ start, childResults });
     const withSelf = incomplete.set(id, running);
 
     // As long as we're not the root path, keep going.
@@ -73,51 +73,89 @@ function updateSuitePathToRunning(suitePath, incomplete, start)
 function updateTestPathToSuccess(testPath, incomplete, end)
 {
     const { test, parent } = testPath;
-    const { id } = test.block;
-    const { start } = incomplete.get(id);
+    const { start } = incomplete.get(test.block.id);
     const duration = Result.Duration({ start, end });
     const success = Result.Success.Test({ duration, test });
-    const incomplete_ = incomplete.remove(id);
 
-    return updateSuitePathWithChildResult(parent, success, incomplete_);
+    return updateParentPathWithChildResult(testPath, success, incomplete);
 }
 
-function updateSuitePathWithChildResult(suitePath, childResult, incomplete)
-{
-console.log("UPDATE WITH CHILD RESULT: ", childResult);
-process.exit(1);
-    const suite = suitePath.suite;
-    const { block: { id }, mode, children } = suite;
-    const status = incomplete.get(id);
-    const childResults = status.children
-        .set(Result.id(childResult), childResult);
+// (unblocked, incomplete)
+function updateParentPathWithChildResult(childPath, childResult, incomplete)
+{console.log("WORKING ON", childPath);
+    const { index, parent: suitePath } = childPath;
+    const { suite } = suitePath;
+    const { block: { id }, mode, children: siblings } = suite;
+    const running = incomplete.get(id);
+    const childId = NodePath.id(childPath);
+    const childResults = running.childResults.set(childId, childResult);
+    const withoutChild = incomplete.remove(childId);
+
+    const [childResults_, unblocked, withSiblings] =
+        mode === Mode.Concurrent ?
+            [childResults, TestPathList(), withoutChild] :
+            resolveSerialSiblingPaths(
+                siblings.toSeq()
+                    .map((_, index) => NodePath.child(index, suitePath))
+                    .skip(path.index + 1),
+                Failure.is(result) && Omitted({ id }));
+    const completed = childResults.size === siblings.size;
+    
+    if (!completed)
+    {
+        const status = Running({ ...running, childResults });
+        const withSelf = withSiblings.set(id, status);
+
+        return { unblocked, incomplete: withSelf };
+    }
+
+    const children = suite.children
+        .map(node => childResults.get(node.block.id));
+    const failed = children.some(is(Result.Failure));
+    const result = failed ?
+        Result.Failure.Suite({ suite, children }) :
+        Result.Success.Suite({ suite, children });
+
+    if (is(NodePath.Suite.Root, suitePath))
+    {
+        console.log("ALL DONE???", result);
+        process.exit(1);
+    }
+
+    return updatePathToResult(suitePath, result, withSiblings);
+}
     /*const incomplete = 
+    const [withParent, parentUnblocked, exited, root] = completed ?
+        updatePathToResult(withSiblings, parent,
+            getSuiteStatus(withSiblings, parent)) :
+        [withSiblings.setIn([parentId, "remaining"], remaining),
+            List(), Stack(), false];
+            
+
     
 
     if (childResults.size < children.size)
         return incomplete.set(id,
             Running.Suite({ ...status, children: childResults }));    
 */
-    const [siblingStatuses, unblocked, remaining] =
-        mode === Suite.Mode.Concurrent ?
-            [ResultMap(childResult.id, childResult), TestPathList()] :
-            resolveSerialSiblingPaths(
-                siblings.toSeq()
-                    .map((_, index) => NodePath.child(index, suitePath))
-                    .skip(path.index + 1),
-                Failure.is(result) && Omitted({ id }));
-    const completed = remaining === 0;
-    const withSiblings = withResult.concat(siblingStatuses);
-    const [withParent, parentUnblocked, exited, root] = completed ?
-        updatePathToResult(withSiblings, parent,
-            getSuiteStatus(withSiblings, parent)) :
-        [withSiblings.setIn([parentId, "remaining"], remaining),
-            List(), Stack(), false];
+/*
 console.log("remaining for" + parent.node.metadata.id + ": " + remaining);
 if (completed)
 console.log("I SHOULD HAVE SET " + parent.node.metadata.id + " to " + getSuiteStatus(statuses, parent));
     return [withParent, unblocked.concat(parentUnblocked), exited.push(id), root];
 }
+
+function getSuiteResult(suite, running)
+{
+    const { childResults } = running;
+    const children = suite
+        .map(node => childResults.get(NodePath.id(node)));
+    const failed = children.some(is(Result.Failure));
+
+    return failed ?
+        Result.Failure.Suite({ suite, children }) :
+        Result.Success.Suite({ suite, children });
+}*/
 
 function findUnblockedDescendentPaths(nodePath, incomplete = IncompleteMap())
 {
@@ -150,7 +188,7 @@ function findUnblockedDescendentPathsOfSuitePath(suitePath, incomplete)
     if (results.size === children.size)
         return { unblocked, result:Result.Success(), incomplete };
 
-    const status = Incomplete.Waiting.Suite({ children: results });
+    const status = Incomplete.Waiting.Suite({ childResults: results });
     const updated = withChildren.set(NodePath.id(suitePath), status);
 
     return { unblocked, status, incomplete: updated };
