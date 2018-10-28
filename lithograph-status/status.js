@@ -16,13 +16,47 @@ const Incomplete = union `Incomplete` (
     union `Waiting` (
         data `Test` (),
         data `Suite` (children => ResultMap) ) );
+const { Running, Waiting } = Incomplete;
 
 const IncompleteMap = Map(number, Incomplete);
 const Status = union `Status` (Result, Incomplete);
 
+// (Map<id, Status>, NodePath, time) ->
+// [Map<id, Status>]
+//
+// Mark the test found at `path` as `Running`, having started at time `start`.
+// Return updated statuses map.
+function updateTestPathToRunning(testPath, incomplete, start)
+{
+    const { parent, test: { block: { id } } } = testPath;
+    const withSelf = incomplete.set(id, Running.Test({ start }));
+
+    return updateSuitePathToRunning(parent, withSelf, start);
+}
+
+function updateSuitePathToRunning(suitePath, incomplete, start)
+{
+    const { parent, suite } = suitePath;
+    const { block: { id } } = suite;
+    const status = incomplete.get(id);
+
+    if (is(Running, status))
+        return incomplete;
+
+    const { children } = status;
+    const running = Running.Suite({ start, children });
+    const withSelf = incomplete.set(id, running);
+
+    return is(NodePath.Suite.Root, suitePath) ?
+        withSelf :
+        updateSuitePathToRunning(parent, withSelf, start);
+}
+
+
 
 console.log("hey! - there.");
 module.exports.findUnblockedDescendentPaths = findUnblockedDescendentPaths
+module.exports.updateTestPathToRunning = updateTestPathToRunning;
 
 function findUnblockedDescendentPaths(nodePath, incomplete = IncompleteMap())
 {

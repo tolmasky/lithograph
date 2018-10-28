@@ -21,6 +21,7 @@ const FileExecution = Cause("FileExecution",
     [field `statuses`]: 0,
     [field `functions`]: Map(),
     [field `garbageCollector`]: -1,
+    [field `incomplete`]: Map(),//number, Status.Incomplete),
 
     init: ({ path }) =>
     {
@@ -40,7 +41,7 @@ const FileExecution = Cause("FileExecution",
         const { allocate } = garbageCollector;
         const outFileExecution = fileExecution
             .set("functions", compile(toEnvironment(allocate), root))
-            .set("statuses", statuses);
+            .set("incomplete", incomplete);
 
         return update.in(
             outFileExecution,
@@ -56,14 +57,17 @@ const FileExecution = Cause("FileExecution",
 
     [event.on (Pool.Retained)]: (fileExecution, { index, request }) =>
     {console.log("here?");
-        const path = request;
+        const testPath = request;
         const functions = fileExecution.functions;
+        const incomplete = Status.updateTestPathToRunning(
+            testPath,
+            fileExecution.incomplete,
+            Date.now());
 
         return fileExecution
-            .update("statuses", statuses =>
-                Status.updateTestToRunning(statuses, path, Date.now()))
-            .setIn(["running", path.node.metadata.id],
-                IO.fromAsync(() => testRun({ functions, path, index })));
+            .set("incomplete", incomplete)
+            .setIn(["running", testPath.test.block.id],
+                IO.fromAsync(() => testRun({ functions, testPath, index })));
     },
 
     // FIXME: Shouldn't need to do this with keyPath. Right?
@@ -107,10 +111,10 @@ Result.deserialize = function deserializeResult(serialized)
 
 function testFinished(fileExecution, event)
 {
-    const { path, index, end } = event;
+    const { testPath, index, end } = event;
     const failure = event instanceof FileExecution.TestFailed;
     const [statuses, requests, scopes, finished] =
-        (failure ? Status.updateTestToFailure : Status.updateTestToSuccess)
+        (failure ? Status.updateTestPathToFailure : Status.updateTestPathToSuccess)
         (fileExecution.statuses, path, end, failure && event.reason);
     const outFileExecution = fileExecution
         .set("statuses", statuses)
@@ -141,13 +145,13 @@ function testFinished(fileExecution, event)
 
 module.exports = FileExecution;
 
-async function testRun({ functions, path, index })
+async function testRun({ functions, testPath, index })
 {
     const start = Date.now();
-    const { id, title } = path.node.metadata;
+    const { id, title } = testPath.test.block;
     const f = functions.get(id);
 
-    console.log("RUN " + path.node.metadata.id + " -> " + title + " " + Date.now());
+    console.log("RUN " + testPath.test.block.id + " -> " + title + " " + Date.now());
 
     const [failed, reason] = await f()
         .then(() => [false])
@@ -157,8 +161,8 @@ async function testRun({ functions, path, index })
     console.log("finished " + id + " -> " + title + " " + !failed);
 
     return failed ? 
-        FileExecution.TestFailed({ path, index, end, reason }) :
-        FileExecution.TestSucceeded({ path, index, end });
+        FileExecution.TestFailed({ testPath, index, end, reason }) :
+        FileExecution.TestSucceeded({ testPath, index, end });
 }
 
 function toObject(node, reports)
