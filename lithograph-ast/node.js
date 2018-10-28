@@ -44,11 +44,13 @@ Node.Suite.Mode = Mode;
 const NodePath = union `NodePath` (
     data `Test` (
         test => Node.Test,
+        index => number,
         parent => NodePath.Suite),
 
     union `Suite` (
         data `Nested` (
             suite => Node.Suite,
+            index => number,
             parent => NodePath.Suite ),
 
         data `Root` ( suite => Node.Suite ) ) );
@@ -59,8 +61,8 @@ NodePath.Suite.children = function (suitePath)
 {
     return suitePath.suite.children.map((node, index) =>
         is(Node.Test, node) ?
-            NodePath.Test({ test: node, parent: suitePath }) :
-            NodePath.Suite.Nested({ suite: node, parent: suitePath }));
+            NodePath.Test({ test: node, index, parent: suitePath }) :
+            NodePath.Suite.Nested({ suite: node, index, parent: suitePath }));
 }
 
 NodePath.Suite.child = function (index, suitePath)
@@ -68,8 +70,8 @@ NodePath.Suite.child = function (index, suitePath)
     const child = suitePath.suite.children.get(index);
 
     return is(Node.Test, child) ?
-        NodePath.Test({ test: child, parent: suitePath }) :
-        NodePath.Suite.Nested({ suite: child, parent: suitePath });
+        NodePath.Test({ test: child, index, parent: suitePath }) :
+        NodePath.Suite.Nested({ suite: child, index, parent: suitePath });
 }
 
 NodePath.id = function (nodePath)

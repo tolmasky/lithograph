@@ -1,4 +1,5 @@
 const { data, union, string, number } = require("@algebraic/type");
+const { List } = require("@algebraic/collections");
 const Node = require("@lithograph/ast");
 
 const result = ([name]) => 
@@ -33,7 +34,7 @@ const Result = union `Result` (
 
     result `Success` (
         [duration => Duration],
-        [children => List(union `Passed` (Success, Skipped))]),
+        [children => List(union `Passed` (Result.Success, Result.Skipped))]),
     
     result `Failure` (
         [duration => number, reason => Reason],
