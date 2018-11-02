@@ -1,12 +1,14 @@
 const { Record, List, Map, Range, Set } = require("immutable");
 const { Cause, IO, field, event, update } = require("@cause/cause");
 const { Test, NodePath, Suite, fromMarkdown } = require("@lithograph/ast");
-const Status = require("@lithograph/status");
+//const Status = require("@lithograph/status");
 const Pool = require("@cause/pool");
 const compile = require("./compile");
 const GarbageCollector = require("./garbage-collector");
 const toEnvironment = require("./file-execution/to-environment");
 const Result = Record({ statuses:Map(), root:-1 }, "FileExecution.Result");
+//const S = require("@lithograph/status/status[.js");
+const Status = require("@lithograph/status/status-tree");
 
 require("./magic-ws-puppeteer");
 require("./test-worker/static");
@@ -22,12 +24,12 @@ const FileExecution = Cause("FileExecution",
     [field `functions`]: Map(),
     [field `garbageCollector`]: -1,
     [field `incomplete`]: Map(),//number, Status.Incomplete),
+    [field `status`]: -1,
 
     init: ({ path }) =>
     {
-        const node = fromMarkdown(path);
-        const root = NodePath.Suite.Root({ suite: node });
-        const garbageCollector = GarbageCollector.create({ node });
+        const root = fromMarkdown(path);
+        const garbageCollector = GarbageCollector.create({ node: root });
 
         return { path, root, garbageCollector };
     },
@@ -35,11 +37,14 @@ const FileExecution = Cause("FileExecution",
     [event.on (Cause.Ready) .from `garbageCollector`](fileExecution)
     {
         const { root, garbageCollector } = fileExecution;
-        const { unblocked, incomplete } = Status.findUnblockedDescendentPaths(root);
+        const { unblocked, status } =
+            Status.initialStatusOfNode(fileExecution.root);
+        const f = np => np.index + ", " + (np.next ? f(np.next) : "");
         const { allocate } = garbageCollector;
+        console.log(status);
         const outFileExecution = fileExecution
             .set("functions", compile(toEnvironment(allocate), root))
-            .set("incomplete", incomplete);
+            .set("status", status);
 
         return update.in(
             outFileExecution,
@@ -54,17 +59,19 @@ const FileExecution = Cause("FileExecution",
                 { requests: getPostOrderLeaves(fileExecution.root) })),*/
 
     [event.on (Pool.Retained)]: (fileExecution, { index, request }) =>
-    {console.log("here?");
+    {    const f = np => np.index + ", " + (np.next ? f(np.next) : "");
+    console.log("GOIGN TO RUN: ", f(request));
+            
         const testPath = request;
         const functions = fileExecution.functions;
-        const incomplete = Status.updateTestPathToRunning(
-            testPath,
-            fileExecution.incomplete,
+        const { status, test } = Status.updateChildPathToRunning(
+            fileExecution.status,
+            testPath.next,
             Date.now());
-
+console.log("NEW STATUS:", test.fragments);
         return fileExecution
-            .set("incomplete", incomplete)
-            .setIn(["running", testPath.test.block.id],
+            .set("status", status)
+            .setIn(["running", test.block.id],
                 IO.fromAsync(() => testRun({ functions, testPath, index })));
     },
 
