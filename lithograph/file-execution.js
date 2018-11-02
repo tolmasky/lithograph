@@ -59,20 +59,18 @@ const FileExecution = Cause("FileExecution",
                 { requests: getPostOrderLeaves(fileExecution.root) })),*/
 
     [event.on (Pool.Retained)]: (fileExecution, { index, request }) =>
-    {    const f = np => np.index + ", " + (np.next ? f(np.next) : "");
-    console.log("GOIGN TO RUN: ", f(request));
-            
+    {
         const testPath = request;
         const functions = fileExecution.functions;
         const { status, test } = Status.updateChildPathToRunning(
             fileExecution.status,
             testPath.next,
             Date.now());
-console.log("NEW STATUS:", test.fragments);
+
         return fileExecution
             .set("status", status)
             .setIn(["running", test.block.id],
-                IO.fromAsync(() => testRun({ functions, testPath, index })));
+                IO.fromAsync(() => testRun({ functions, test, testPath, index })));
     },
 
     // FIXME: Shouldn't need to do this with keyPath. Right?
@@ -89,10 +87,10 @@ console.log("NEW STATUS:", test.fragments);
 
     [event.out `Finished`]: { result: -1 },
 
-    [event.in `TestSucceeded`]: { testPath:-1, index:-1, end:-1 },
+    [event.in `TestSucceeded`]: { testPath:-1, test:-1, index:-1, end:-1 },
     [event.on `TestSucceeded`]: testFinished,
 
-    [event.in `TestFailed`]: { testPath:-1, index:-1, end:-1, reason:-1 },
+    [event.in `TestFailed`]: { testPath:-1, test:-1, index:-1, end:-1, reason:-1 },
     [event.on `TestFailed`]: testFinished
 });
 
@@ -116,27 +114,28 @@ Result.deserialize = function deserializeResult(serialized)
 
 function testFinished(fileExecution, event)
 {console.log("OK HERE");
-    const { testPath, index, end } = event;
+    const { testPath, test, index, end } = event;
     const failure = event instanceof FileExecution.TestFailed;
     //[statuses, requests, scopes, finished]
-    console.log(fileExecution.incomplete);
-    const { status, incomplete } =
-        Status.updateTestPathToSuccess(testPath, fileExecution.incomplete, Date.now());
+//    console.log(fileExecution.incomplete);
+    const { status, unblocked } =
+        Status.updateChildPathToSuccess(fileExecution.status, testPath, Date.now());
 //        (failure ? Status.updateTestPathToFailure : Status.updateTestPathToSuccess)
 //        (fileExecution.statuses, path, end, failure && event.reason);
-    const finished = incomplete.size === 0;
+    //const finished = incomplete.size === 0;
+    const scopes = List();
     const outFileExecution = fileExecution
-        .set("incomplete", incomplete)
-        .removeIn(["running", NodePath.id(testPath)]);
-/*
+        .set("status", status)
+        .removeIn(["running", test.block.id]);
+
     const [updated, events] = update.in.reduce(outFileExecution,
     [
         ["garbageCollector", GarbageCollector.ScopesExited({ scopes })],
         ["pool", Pool.Release({ indexes: [index] })]
     ]);
-*/
+
     // If we exited the root scope, then we're done.
-    if (finished)
+    if (false)//finished)
     {
         const root = fileExecution.root;
         console.log("DONE " + status);
@@ -148,6 +147,7 @@ function testFinished(fileExecution, event)
         return [updated, [FileExecution.Finished({ result }), ...events]];
     }
 
+    const requests = List();
     const [enqueued, fromEnqueueEvents] =
         update.in(updated, "pool", Pool.Enqueue({ requests }));
 
@@ -156,13 +156,13 @@ function testFinished(fileExecution, event)
 
 module.exports = FileExecution;
 
-async function testRun({ functions, testPath, index })
+async function testRun({ functions, test, testPath, index })
 {
     const start = Date.now();
-    const { id, title } = testPath.test.block;
+    const { id, title } = test.block;
     const f = functions.get(id);
 
-    console.log("RUN " + testPath.test.block.id + " -> " + title + " " + Date.now());
+    console.log("RUN " + test.block.id + " -> " + title + " " + Date.now());
 
     const [failed, reason] = await f()
         .then(() => [false])
@@ -173,7 +173,7 @@ async function testRun({ functions, testPath, index })
 
     return failed ? 
         FileExecution.TestFailed({ testPath, index, end, reason }) :
-        FileExecution.TestSucceeded({ testPath, index, end });
+        FileExecution.TestSucceeded({ testPath, test, index, end });
 }
 
 function toObject(node, reports)

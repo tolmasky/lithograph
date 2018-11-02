@@ -11,15 +11,19 @@ const NodePathList = List(NodePath);
 
 const Status = union `Status` (
     union `Running` (
-        data `Test`
-            (start => number),
+        data `Test` (
+            test => Node.Test,
+            start => number ),
         data `Suite` (
+            suite => Node.Suite,
             running => RunningMap,
             waiting => WaitingMap,
             completed => [ResultMap, ResultMap()] ) ),
     union `Waiting` (
-        data `Test` (test => Node.Test),
+        data `Test` (
+            test => Node.Test),
         data `Suite` (
+            suite => Node.Suite,
             completed => ResultMap,
             waiting => WaitingMap) ),
     Result );
@@ -63,11 +67,55 @@ function updateChildPathToRunning(status, childPath, start)
         .set(index, updatedChild);
     const waiting = childIsRunning ?
         status.waiting : status.waiting.remove(index);
+    const { suite } = status;
 
-    return { test, status: Status.Running.Suite({ running, waiting }) };
+    return { test, status: Status.Running.Suite({ suite, running, waiting }) };
 }
 
 Status.updateChildPathToRunning = updateChildPathToRunning;
+
+function updateChildPathToSuccess(inStatus, childPath, end)
+{
+    if (is(Status.Running.Test, inStatus))
+    {console.log(inStatus);
+        const { test, start } = inStatus;
+        const duration = Result.Duration.Interval({ start, end });
+        const status = Result.Success.Test({ test, duration });
+
+        return { unblocked:NodePathList(), status };
+    }
+
+    const { index, next } = childPath;
+    const existingChild = inStatus.running.get(index);
+    const { unblocked, status: updatedChild } =
+        updateChildPathToSuccess(existingChild, next, end);
+    const completedChild = is(Result, updatedChild);
+    const running = completedChild ?
+        inStatus.running :
+        inStatus.running.set(index, updatedChild);
+    const completed = completedChild ?
+        inStatus.completed.set(index, updatedChild) :
+        inStatus.completed;
+    const { suite } = inStatus;
+
+    if (completed.size === suite.children.size)
+    {
+        const children = suite.children
+            .map((_, index) => completed.get(index));
+        const failed = children.some(is(Result.Failure));
+        const status = failed ?
+            Result.Failure.Suite({ suite, children }) :
+            Result.Success.Suite({ suite, children });
+
+        return { unblocked, status };
+    }
+
+    const status = Status.Running.Suite({ ...inStatus, completed, running });
+
+    return { unblocked, status };
+}
+
+Status.updateChildPathToSuccess = updateChildPathToSuccess;
 
 function initialStatusOfSuite(suite, index)
 {

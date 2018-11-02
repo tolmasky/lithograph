@@ -18,10 +18,12 @@ const Reason = union `Reason` (
 
     data `Value` ( stringified => string ) );
 
-const Duration = data `Duration` (
-    start => number,
-    end => number );
-    
+const Duration = union `Duration` (
+    data `Interval` (
+        start => number,
+        end => number ),
+    data  `Instant` () );
+
 
 const Result = union `Result` (
     result `Skipped` (
@@ -33,12 +35,13 @@ const Result = union `Result` (
         [origin => number, children => List(Omitted)]),
 
     result `Success` (
-        [duration => Duration],
-        [children => List(union `Passed` (Result.Success, Result.Skipped))]),
-    
+        [duration => [Duration, Duration.Instant]],
+        [children => [List(Passed), List(Passed)()]]),
+
     result `Failure` (
         [duration => number, reason => Reason],
         [duration => number, children => List(Result) ]) );
+const Passed = union `Passed` (Result.Success, Result.Skipped);
 
 Result.Duration = Duration;
 Result.Failure.Reason = Reason;
