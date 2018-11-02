@@ -89,16 +89,16 @@ function fromSerial(suitePath, index)
     const childPath = NodePath.Suite.child(index, suitePath);
 
     if (index === children.size - 1)
-        return fromPath(child, true);
+        return fromPath(childPath, true);
 
     const isTestPath = is(NodePath.Test, childPath);
     const $statements = isTestPath ?
-        fromTest(child, false) : [];
+        fromTest(childPath, false) : [];
 
     const next = fromSerial(suitePath, index + 1);
     const current = isTestPath ?
         toExpression(childPath.test.block.id) :
-        fromPath(child, false);
+        fromPath(childPath, false);
     const $children = toExpression([next, current]);
 
     return SERIAL_TEMPLATE({ $statements, $children });
