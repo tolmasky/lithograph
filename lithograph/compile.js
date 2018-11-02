@@ -15,16 +15,16 @@ module.exports = (function()
     const { dirname } = require("path");
     const generate = require("babel-generator").default;
 
-    return function (environment, rootPath)
+    return function (environment, suite)
     {
-        const fragment = fromPath(rootPath);
+        const fragment = fromPath(NodePath.Suite.Root({ suite }));
         const { code, map } = generate(fragment, { sourceMaps: true });
         const mapComment =
             "//# sourceMappingURL=data:application/json;charset=utf-8;base64," +
             Buffer.from(JSON.stringify(map), "utf-8").toString("base64");
         const parameters = Object.keys(environment);
         const source = `return (${parameters}) => (${code});\n${mapComment}`;
-        const { filename } = rootPath.suite.block.source;
+        const { filename } = suite.block.source;
         const module = new Module(filename);
 
         module.filename = filename;

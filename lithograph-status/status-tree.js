@@ -11,11 +11,12 @@ const NodePathList = List(NodePath);
 
 const Status = union `Status` (
     union `Running` (
-        data `Test` (start => number),
+        data `Test`
+            (start => number),
         data `Suite` (
-            start => number,
-            unblocked => Stack(number),
-            children => ResultMap) ),
+            running => RunningMap,
+            waiting => WaitingMap,
+            completed => [ResultMap, ResultMap()] ) ),
     union `Waiting` (
         data `Test` (test => Node.Test),
         data `Suite` (
@@ -23,8 +24,11 @@ const Status = union `Status` (
             waiting => WaitingMap) ),
     Result );
 
+module.exports = Status;
+
 const WaitingMap = Map(number, Status.Waiting);
 const ResultMap = OrderedMap(number, Result);
+const RunningMap = OrderedMap(number, Status.Running);
 
 
 function initialStatusOfNode(node, index = 0)
@@ -34,7 +38,36 @@ function initialStatusOfNode(node, index = 0)
         initialStatusOfSuite(node, index);
 }
 
-module.exports = initialStatusOfNode;
+Status.initialStatusOfNode = initialStatusOfNode;
+
+function updateChildPathToRunning(status, childPath, start)
+{
+    if (is(Status.Waiting.Test, status))
+    {
+        const { test } = status;
+
+        return { test, status:Status.Running.Test({ test, start }) };
+    }
+
+    const { index, next } = childPath;
+    const isRunning = is(Status.Running.Suite, status);
+    const childIsRunning = isRunning && status.running.has(index);
+    console.log("CHILD IS RUNNING: ", childIsRunning);
+    if (!childIsRunning) console.log(status);
+    const existingChild = childIsRunning ?
+            status.running.get(index) :
+            status.waiting.get(index);
+    const { test, status: updatedChild } =
+        updateChildPathToRunning(existingChild, next, start);
+    const running = (isRunning ? status.running : RunningMap())
+        .set(index, updatedChild);
+    const waiting = childIsRunning ?
+        status.waiting : status.waiting.remove(index);
+
+    return { test, status: Status.Running.Suite({ running, waiting }) };
+}
+
+Status.updateChildPathToRunning = updateChildPathToRunning;
 
 function initialStatusOfSuite(suite, index)
 {
@@ -106,7 +139,7 @@ function initialStatusOfTest(test, index)
     const status = disabled ?
         Result.Skipped({ origin:id, test }) :
         Status.Waiting.Test({ test });
-    if (unblocked.size) console.log("UNBLOCKED!", unblocked);
+
     return { status, unblocked };
 }
 

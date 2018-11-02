@@ -2,6 +2,8 @@ const { is, data, number, string } = require("@algebraic/type");
 const { List, Map, Stack } = require("@algebraic/collections");
 const { Node, Block, Source, Test, Suite, Fragment } = require("./node");
 
+const NodeList = List(Node);
+
 const Placeholder = data `Placeholder` (
     mode => Suite.Mode,
     block => Block,
@@ -170,7 +172,7 @@ function fromDocument(document, filename)
     // The top of the stack will always be our EOF marker.
     const top = toConcrete(state.stack.pop().peek());
     const root = is(Test, top) ?
-        Suite({ block, children:NodeList.of(top) }) :
+        Suite({ block, mode, children:NodeList.of(top) }) :
         top;
 
     return root;
