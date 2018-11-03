@@ -69,7 +69,7 @@ function updateTestPathToRunning(inStatus, testPath, start)
     const updatedWaiting = isRunningChild ? waiting : waiting.remove(index);
     if (updatedWaiting.size < waiting.size) console.log("REMOVED " + index);
     const status = Running.Suite(
-        { suite, running: updatedRunning, waiting: updatedWaiting });
+        { ...inStatus, running: updatedRunning, waiting: updatedWaiting });
 
     return { test, status };
 }
@@ -107,6 +107,12 @@ function updateTestPathToSuccess(inStatus, testPath, end)
         suite.mode === Mode.Concurrent ?
             { ...inStatus, completed: ResultMap() } :
             initialStatusOfChildren(suite.children, hasUnblocked, index + 1);
+    if (suite.block.title === "No. 2 (Content)" || 
+    suite.block.title === "No. 2")
+        console.log("SIZE: " + suite.block.title + " " + inStatus.completed
+        .set(index, fromChild.status)
+        .concat(restCompleted).size);
+
     const completed = inStatus.completed
         .set(index, fromChild.status)
         .concat(restCompleted);
@@ -125,6 +131,11 @@ function updateTestPathToSuccess(inStatus, testPath, end)
 
     const running = inStatus.running.remove(index);
     const status = Running.Suite({ suite, waiting, completed, running });
+    if (suite.block.title === "No. 2") {
+    global.CHECKER = status;
+        console.log("BEFORE: " + inStatus.completed.size + " " + inStatus.running.size + " " + inStatus.waiting.size);
+        console.log("AFTER: " + completed.size + " " + running.size + " " + waiting.size);
+    }
 //console.log("COMPLETED SIZE: " + completed.size + inStatus.completed.size + " for " + suite.block.title);
     return { unblocked, status };
 }
