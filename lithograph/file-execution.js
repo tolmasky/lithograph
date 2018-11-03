@@ -1,3 +1,4 @@
+const { is } = require("@algebraic/type");
 const { Record, List, Map, Range, Set } = require("immutable");
 const { Cause, IO, field, event, update } = require("@cause/cause");
 const { Test, NodePath, Suite, fromMarkdown } = require("@lithograph/ast");
@@ -66,7 +67,7 @@ const FileExecution = Cause("FileExecution",
             fileExecution.status,
             testPath,
             Date.now());
-
+console.log("RUNNING: ", status.running.size + " " + status.waiting.size);
         return fileExecution
             .set("status", status)
             .setIn(["running", test.block.id],
@@ -113,18 +114,27 @@ Result.deserialize = function deserializeResult(serialized)
 }
 
 function testFinished(fileExecution, event)
-{console.log("OK HERE");
+{
     const { testPath, test, index, end } = event;
     const failure = event instanceof FileExecution.TestFailed;
+    //console.log("FINISHED " + test.block.title);
     //[statuses, requests, scopes, finished]
 //    console.log(fileExecution.incomplete);
     const { status, unblocked } =
         Status.updateTestPathToSuccess(fileExecution.status, testPath, Date.now());
 //        (failure ? Status.updateTestPathToFailure : Status.updateTestPathToSuccess)
 //        (fileExecution.statuses, path, end, failure && event.reason);
-    //const finished = incomplete.size === 0;
-    const f = np => np.index + ", " + (np.next ? f(np.next) : "");
-    console.log("UNBLOCKED", unblocked.map(f));
+    const finished = is(Status.Result, status);
+    try {
+    console.log("STATUS IS", status.running.get(0).running.get(0).running.get(0).running.size, status.running.get(0).running.get(0).running.get(0).running);
+    } catch(e) { }
+    console.log("BEFORE " + fileExecution.status.running.size + " " + fileExecution.status.waiting.size + " " + fileExecution.status.completed.size);
+    console.log("FINISHED " + (status.running || {size:0}).size + " " + (status.waiting || {size:0}).size + " " + (status.completed || status.children).size);
+    //console.log("STATUS:", status);
+    //Error.stackTraceLimit = 1000;
+    //console.log(Error().stack);
+//    const f = np => np.index + ", " + (np.next ? f(np.next) : "");
+//    console.log("UNBLOCKED", unblocked.map(f));
     const scopes = List();
     const outFileExecution = fileExecution
         .set("status", status)
@@ -137,7 +147,7 @@ function testFinished(fileExecution, event)
     ]);
 
     // If we exited the root scope, then we're done.
-    if (false)//finished)
+    if (finished)
     {
         const root = fileExecution.root;
         console.log("DONE " + status);
