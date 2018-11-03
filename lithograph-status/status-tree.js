@@ -52,12 +52,12 @@ function updateTestPathToRunning(inStatus, testPath, start)
 
         return { test, status: Running.Test({ test, start }) };
     }
-console.log("IN, " + inStatus + " for " + testPath);
+//console.log("IN, " + inStatus + " for " + testPath);
     const { suite, running = RunningMap(), waiting } = inStatus;
     const { children } = suite;
     const [index, nextPath] = IndexPath.pop(testPath, children.size);
-console.log("INDEX IS " + index, nextPath, testPath, children.size);
-    const isRunning = is(Running.Suite, inStatus);
+//console.log("INDEX IS " + index, nextPath, testPath, children.size);
+    const isRunning = is(Running, inStatus);
     const isRunningChild = isRunning && inStatus.running.has(index);
 
     const existingChild =
@@ -67,6 +67,7 @@ console.log("INDEX IS " + index, nextPath, testPath, children.size);
 
     const updatedRunning = running.set(index, updatedChild);
     const updatedWaiting = isRunningChild ? waiting : waiting.remove(index);
+    if (updatedWaiting.size < waiting.size) console.log("REMOVED " + index);
     const status = Running.Suite(
         { suite, running: updatedRunning, waiting: updatedWaiting });
 
@@ -87,8 +88,8 @@ function updateTestPathToSuccess(inStatus, testPath, end)
     }
 
     const { suite } = inStatus;
-    const { children } = suite;
-    const [index, nextPath] = IndexPath.pop(testPath, children.size);
+    const { children: { size } } = suite;
+    const [index, nextPath] = IndexPath.pop(testPath, size);
 
     const existingChild = inStatus.running.get(index);
     const fromChild = updateTestPathToSuccess(existingChild, nextPath, end);
@@ -97,22 +98,22 @@ function updateTestPathToSuccess(inStatus, testPath, end)
     {
         const running = inStatus.running.set(index, fromChild.status);
         const unblocked = fromChild.unblocked
-            .map(testPath => IndexPath.push(testPath, children.size, index));
+            .map(testPath => IndexPath.push(testPath, size, index));
 
         return { unblocked, status: Running.Suite({ ...inStatus, running }) };
     }
 
     const { unblocked = TestPathList(), waiting, completed: restCompleted } =
-        inStatus.mode === Mode.Concurrent ?
+        suite.mode === Mode.Concurrent ?
             { ...inStatus, completed: ResultMap() } :
-            initialStatusOfChildren(children, hasUnblocked, index + 1);
+            initialStatusOfChildren(suite.children, hasUnblocked, index + 1);
     const completed = inStatus.completed
         .set(index, fromChild.status)
         .concat(restCompleted);
 
-    if (completed.size === children.size)
+    if (completed.size === size)
     {
-        const children = children
+        const children = suite.children
             .map((_, index) => completed.get(index));
         const failed = children.some(is(Result.Failure));
         const status = failed ?
@@ -124,7 +125,7 @@ function updateTestPathToSuccess(inStatus, testPath, end)
 
     const running = inStatus.running.remove(index);
     const status = Running.Suite({ suite, waiting, completed, running });
-
+//console.log("COMPLETED SIZE: " + completed.size + inStatus.completed.size + " for " + suite.block.title);
     return { unblocked, status };
 }
 
