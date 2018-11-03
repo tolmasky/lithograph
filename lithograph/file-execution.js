@@ -39,10 +39,9 @@ const FileExecution = Cause("FileExecution",
         const { root, garbageCollector } = fileExecution;
         const { unblocked, status } =
             Status.initialStatusOfNode(fileExecution.root);
-        const f = np => np.index + ", " + (np.next ? f(np.next) : "");
         const { allocate } = garbageCollector;
         console.log(status);
-        console.log("UNBLOCKED", unblocked.map(f));
+        console.log("UNBLOCKED", unblocked);
         const outFileExecution = fileExecution
             .set("functions", compile(toEnvironment(allocate), root))
             .set("status", status);
@@ -63,9 +62,9 @@ const FileExecution = Cause("FileExecution",
     {
         const testPath = request;
         const functions = fileExecution.functions;
-        const { status, test } = Status.updateChildPathToRunning(
+        const { status, test } = Status.updateTestPathToRunning(
             fileExecution.status,
-            testPath.next,
+            testPath,
             Date.now());
 
         return fileExecution
@@ -120,7 +119,7 @@ function testFinished(fileExecution, event)
     //[statuses, requests, scopes, finished]
 //    console.log(fileExecution.incomplete);
     const { status, unblocked } =
-        Status.updateChildPathToSuccess(fileExecution.status, testPath.next, Date.now());
+        Status.updateTestPathToSuccess(fileExecution.status, testPath, Date.now());
 //        (failure ? Status.updateTestPathToFailure : Status.updateTestPathToSuccess)
 //        (fileExecution.statuses, path, end, failure && event.reason);
     //const finished = incomplete.size === 0;

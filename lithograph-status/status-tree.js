@@ -1,13 +1,11 @@
 const { data, union, is, string, number } = require("@algebraic/type");
 const { List, OrderedMap, Map } = require("@algebraic/collections");
 const { Node, Suite: { Mode } } = require("@lithograph/ast");
+const IndexPath = require("./index-path");
 const Result = require("./result");
 
-const NodePath = union `NodePath` (
-    data `Test` (index => number),
-    data `Suite` (index => number, next => NodePath) );
-
-const NodePathList = List(NodePath);
+// Should be List((Test, IndexPath));
+const TestPathList = List(number);
 
 const Status = union `Status` (
     union `Running` (
@@ -28,6 +26,8 @@ const Status = union `Status` (
             waiting => WaitingMap) ),
     Result );
 
+const { Running, Waiting } = Status;
+
 module.exports = Status;
 
 const WaitingMap = Map(number, Status.Waiting);
@@ -35,88 +35,80 @@ const ResultMap = OrderedMap(number, Result);
 const RunningMap = OrderedMap(number, Status.Running);
 
 
-function initialStatusOfNode(node, index = 0)
+function initialStatusOfNode(node)
 {
     return is(Node.Test, node) ?
-        initialStatusOfTest(node, index) :
-        initialStatusOfSuite(node, index);
+        initialStatusOfTest(node) :
+        initialStatusOfSuite(node);
 }
 
 Status.initialStatusOfNode = initialStatusOfNode;
 
-function updateChildPathToRunning(status, childPath, start)
+function updateTestPathToRunning(inStatus, testPath, start)
 {
-    if (is(Status.Waiting.Test, status))
+    if (testPath === IndexPath.End)
     {
-        const { test } = status;
+        const { test } = inStatus;
 
-        return { test, status:Status.Running.Test({ test, start }) };
+        return { test, status: Running.Test({ test, start }) };
     }
-//console.log(childPath, status);
-    const { index, next } = childPath;
-    const isRunning = is(Status.Running.Suite, status);
-    const childIsRunning = isRunning && status.running.has(index);
-    console.log("CHILD IS RUNNING: ", childIsRunning, index);
-    if (!childIsRunning) console.log(status);
-    const existingChild = childIsRunning ?
-            status.running.get(index) :
-            status.waiting.get(index);
-    const { test, status: updatedChild } =
-        updateChildPathToRunning(existingChild, next, start);
-    const running = (isRunning ? status.running : RunningMap())
-        .set(index, updatedChild);
-    const waiting = childIsRunning ?
-        status.waiting : status.waiting.remove(index);
-    const { suite } = status;
+console.log("IN, " + inStatus + " for " + testPath);
+    const { suite, running = RunningMap(), waiting } = inStatus;
+    const { children } = suite;
+    const [index, nextPath] = IndexPath.pop(testPath, children.size);
+console.log("INDEX IS " + index, nextPath, testPath, children.size);
+    const isRunning = is(Running.Suite, inStatus);
+    const isRunningChild = isRunning && inStatus.running.has(index);
 
-    return { test, status: Status.Running.Suite({ suite, running, waiting }) };
+    const existingChild =
+        (isRunningChild ? running : waiting).get(index);
+    const { test, status: updatedChild } =
+        updateTestPathToRunning(existingChild, nextPath, start);
+
+    const updatedRunning = running.set(index, updatedChild);
+    const updatedWaiting = isRunningChild ? waiting : waiting.remove(index);
+    const status = Running.Suite(
+        { suite, running: updatedRunning, waiting: updatedWaiting });
+
+    return { test, status };
 }
 
-Status.updateChildPathToRunning = updateChildPathToRunning;
+Status.updateTestPathToRunning = updateTestPathToRunning;
 
-function updateChildPathToSuccess(inStatus, childPath, end, parentIndex = 0)
+function updateTestPathToSuccess(inStatus, testPath, end)
 {
-    if (is(Status.Running.Test, inStatus))
+    if (testPath === IndexPath.End)
     {
         const { test, start } = inStatus;
         const duration = Result.Duration.Interval({ start, end });
         const status = Result.Success.Test({ test, duration });
 
-        return { unblocked:NodePathList(), status };
-    }
-
-    const { index, next } = childPath;
-    const existingChild = inStatus.running.get(index);
-    const { unblocked: unblockedFromChild, status: updatedChild } =
-        updateChildPathToSuccess(existingChild, next, end, index);
-
-    if (!is(Result, updatedChild))
-    {
-        const running = inStatus.running.set(index, updatedChild);
-        const status = Status.Running.Suite({ ...inStatus, running });
-        const unblocked = unblockedFromChild
-            .map(next => NodePath.Suite({ index: parentIndex, next }))
-
-        return { unblocked, status };
+        return { unblocked: TestPathList(), status };
     }
 
     const { suite } = inStatus;
     const { children } = suite;
-    const { unblocked, completed, waiting } = (function ()
+    const [index, nextPath] = IndexPath.pop(testPath, children.size);
+
+    const existingChild = inStatus.running.get(index);
+    const fromChild = updateTestPathToSuccess(existingChild, nextPath, end);
+
+    if (!is(Result, fromChild.status))
     {
-        const waiting = inStatus.waiting;
-        const completed = inStatus.completed.set(index, updatedChild);
+        const running = inStatus.running.set(index, fromChild.status);
+        const unblocked = fromChild.unblocked
+            .map(testPath => IndexPath.push(testPath, children.size, index));
 
-        if (inStatus.mode === Mode.Concurrent)
-            return { unblocked: NodePathList(), waiting, completed };
+        return { unblocked, status: Running.Suite({ ...inStatus, running }) };
+    }
 
-        return initialStatusOfChildren(
-            { waiting, completed },
-            children.toSeq().skip(index + 1),
-            parentIndex,
-            constrainToOneUnblockedChild,
-            index + 1);
-    })();
+    const { unblocked = TestPathList(), waiting, completed: restCompleted } =
+        inStatus.mode === Mode.Concurrent ?
+            { ...inStatus, completed: ResultMap() } :
+            initialStatusOfChildren(children, hasUnblocked, index + 1);
+    const completed = inStatus.completed
+        .set(index, fromChild.status)
+        .concat(restCompleted);
 
     if (completed.size === children.size)
     {
@@ -131,14 +123,14 @@ function updateChildPathToSuccess(inStatus, childPath, end, parentIndex = 0)
     }
 
     const running = inStatus.running.remove(index);
-    const status = Status.Running.Suite({ suite, waiting, completed, running });
+    const status = Running.Suite({ suite, waiting, completed, running });
 
     return { unblocked, status };
 }
 
-Status.updateChildPathToSuccess = updateChildPathToSuccess;
+Status.updateTestPathToSuccess = updateTestPathToSuccess;
 
-function initialStatusOfSuite(suite, index)
+function initialStatusOfSuite(suite)
 {
     const { block: { disabled, id }, children } = suite;
 
@@ -146,10 +138,9 @@ function initialStatusOfSuite(suite, index)
         return assignOriginResultForNode(suite, Result.Skipped, id);
 
     const isSerial = suite.mode === Mode.Serial;
-    const condition = isSerial && constrainToOneUnblockedChild;
     const { unblocked, waiting, completed } =
-        initialStatusOfChildren({ }, children, index, condition);
-
+        initialStatusOfChildren(children, isSerial && hasUnblocked);
+console.log("U 00 " + unblocked);
     // If we have as many results as children, we're done and we have to be
     // Success.
     const status = completed.size === children.size ?
@@ -159,24 +150,28 @@ function initialStatusOfSuite(suite, index)
     return { unblocked, status };
 }
 
-function initialStatusOfChildren(initial, siblings, parentIndex, condition, offset = 0)
+function initialStatusOfChildren(children, condition, skip = 0)
 {
-    const { waiting = WaitingMap(), completed = ResultMap() } = initial;
-    const unblocked = NodePathList();
+    const waiting = WaitingMap();
+    const completed = ResultMap();
+    const unblocked = TestPathList();
+    const skipped = skip > 0 ? children.toSeq().skip(skip) : children;
+    const { size } = children;
 
-    return siblings.reduce(function (accum, node, index)
+    return skipped.reduce(function (accum, node, unoffsetted)
     {
         if (condition && condition(accum))
             return accum;
 
-        const { unblocked, status } = initialStatusOfNode(node, index);
+        const index = unoffsetted + skip;
+        const { unblocked, status } = initialStatusOfNode(node);
         const isResult = is(Result, status);
         const completed = isResult ?
             accum.completed.set(index, status) : accum.completed;
         const waiting = !isResult ?
             accum.waiting.set(index, status) : accum.waiting;
         const concatenated = accum.unblocked.concat(
-            unblocked.map(next => NodePath.Suite({ index: parentIndex, next })));
+            unblocked.map(testPath => IndexPath.push(testPath, size, index)));
 
         return { unblocked:concatenated, waiting, completed };
     }, { unblocked, waiting, completed });
@@ -193,17 +188,17 @@ function assignOriginResultForNode(node, result, origin)
     return result.Suite({ suite: node, origin, children });
 }
 
-function constrainToOneUnblockedChild({ unblocked })
+function hasUnblocked({ unblocked })
 {
     return unblocked.size > 0;
 }
 
-function initialStatusOfTest(test, index)
+function initialStatusOfTest(test)
 {
     const { block: { disabled, id } } = test;
     const unblocked = disabled ?
-        NodePathList() :
-        NodePathList.of(NodePath.Test({ index }));
+        TestPathList() :
+        TestPathList.of(IndexPath.End);
     const status = disabled ?
         Result.Skipped({ origin:id, test }) :
         Status.Waiting.Test({ test });
