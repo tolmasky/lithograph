@@ -42,6 +42,7 @@ const FileExecution = Cause("FileExecution",
         const f = np => np.index + ", " + (np.next ? f(np.next) : "");
         const { allocate } = garbageCollector;
         console.log(status);
+        console.log("UNBLOCKED", unblocked.map(f));
         const outFileExecution = fileExecution
             .set("functions", compile(toEnvironment(allocate), root))
             .set("status", status);
@@ -119,10 +120,12 @@ function testFinished(fileExecution, event)
     //[statuses, requests, scopes, finished]
 //    console.log(fileExecution.incomplete);
     const { status, unblocked } =
-        Status.updateChildPathToSuccess(fileExecution.status, testPath, Date.now());
+        Status.updateChildPathToSuccess(fileExecution.status, testPath.next, Date.now());
 //        (failure ? Status.updateTestPathToFailure : Status.updateTestPathToSuccess)
 //        (fileExecution.statuses, path, end, failure && event.reason);
     //const finished = incomplete.size === 0;
+    const f = np => np.index + ", " + (np.next ? f(np.next) : "");
+    console.log("UNBLOCKED", unblocked.map(f));
     const scopes = List();
     const outFileExecution = fileExecution
         .set("status", status)
@@ -147,9 +150,8 @@ function testFinished(fileExecution, event)
         return [updated, [FileExecution.Finished({ result }), ...events]];
     }
 
-    const requests = List();
     const [enqueued, fromEnqueueEvents] =
-        update.in(updated, "pool", Pool.Enqueue({ requests }));
+        update.in(updated, "pool", Pool.Enqueue({ requests: unblocked }));
 
     return [enqueued, [...events, ...fromEnqueueEvents]];
 }

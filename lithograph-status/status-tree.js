@@ -52,11 +52,11 @@ function updateChildPathToRunning(status, childPath, start)
 
         return { test, status:Status.Running.Test({ test, start }) };
     }
-
+//console.log(childPath, status);
     const { index, next } = childPath;
     const isRunning = is(Status.Running.Suite, status);
     const childIsRunning = isRunning && status.running.has(index);
-    console.log("CHILD IS RUNNING: ", childIsRunning);
+    console.log("CHILD IS RUNNING: ", childIsRunning, index);
     if (!childIsRunning) console.log(status);
     const existingChild = childIsRunning ?
             status.running.get(index) :
@@ -74,10 +74,10 @@ function updateChildPathToRunning(status, childPath, start)
 
 Status.updateChildPathToRunning = updateChildPathToRunning;
 
-function updateChildPathToSuccess(inStatus, childPath, end)
+function updateChildPathToSuccess(inStatus, childPath, end, parentIndex = 0)
 {
     if (is(Status.Running.Test, inStatus))
-    {console.log(inStatus);
+    {
         const { test, start } = inStatus;
         const duration = Result.Duration.Interval({ start, end });
         const status = Result.Success.Test({ test, duration });
@@ -87,20 +87,40 @@ function updateChildPathToSuccess(inStatus, childPath, end)
 
     const { index, next } = childPath;
     const existingChild = inStatus.running.get(index);
-    const { unblocked, status: updatedChild } =
-        updateChildPathToSuccess(existingChild, next, end);
-    const completedChild = is(Result, updatedChild);
-    const running = completedChild ?
-        inStatus.running :
-        inStatus.running.set(index, updatedChild);
-    const completed = completedChild ?
-        inStatus.completed.set(index, updatedChild) :
-        inStatus.completed;
-    const { suite } = inStatus;
+    const { unblocked: unblockedFromChild, status: updatedChild } =
+        updateChildPathToSuccess(existingChild, next, end, index);
 
-    if (completed.size === suite.children.size)
+    if (!is(Result, updatedChild))
     {
-        const children = suite.children
+        const running = inStatus.running.set(index, updatedChild);
+        const status = Status.Running.Suite({ ...inStatus, running });
+        const unblocked = unblockedFromChild
+            .map(next => NodePath.Suite({ index: parentIndex, next }))
+
+        return { unblocked, status };
+    }
+
+    const { suite } = inStatus;
+    const { children } = suite;
+    const { unblocked, completed, waiting } = (function ()
+    {
+        const waiting = inStatus.waiting;
+        const completed = inStatus.completed.set(index, updatedChild);
+
+        if (inStatus.mode === Mode.Concurrent)
+            return { unblocked: NodePathList(), waiting, completed };
+
+        return initialStatusOfChildren(
+            { waiting, completed },
+            children.toSeq().skip(index + 1),
+            parentIndex,
+            constrainToOneUnblockedChild,
+            index + 1);
+    })();
+
+    if (completed.size === children.size)
+    {
+        const children = children
             .map((_, index) => completed.get(index));
         const failed = children.some(is(Result.Failure));
         const status = failed ?
@@ -110,7 +130,8 @@ function updateChildPathToSuccess(inStatus, childPath, end)
         return { unblocked, status };
     }
 
-    const status = Status.Running.Suite({ ...inStatus, completed, running });
+    const running = inStatus.running.remove(index);
+    const status = Status.Running.Suite({ suite, waiting, completed, running });
 
     return { unblocked, status };
 }
@@ -127,7 +148,7 @@ function initialStatusOfSuite(suite, index)
     const isSerial = suite.mode === Mode.Serial;
     const condition = isSerial && constrainToOneUnblockedChild;
     const { unblocked, waiting, completed } =
-        initialStatusOfChildren(children, index, condition);
+        initialStatusOfChildren({ }, children, index, condition);
 
     // If we have as many results as children, we're done and we have to be
     // Success.
@@ -138,11 +159,10 @@ function initialStatusOfSuite(suite, index)
     return { unblocked, status };
 }
 
-function initialStatusOfChildren(siblings, parentIndex, condition)
+function initialStatusOfChildren(initial, siblings, parentIndex, condition, offset = 0)
 {
+    const { waiting = WaitingMap(), completed = ResultMap() } = initial;
     const unblocked = NodePathList();
-    const waiting = WaitingMap();
-    const completed = ResultMap();
 
     return siblings.reduce(function (accum, node, index)
     {
