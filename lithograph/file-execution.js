@@ -118,45 +118,11 @@ function testFinished(fileExecution, event)
     const { testPath, test, index, end } = event;
     const failure = event instanceof FileExecution.TestFailed;
     console.log("> FINISHED " + test.block.title);
-    //[statuses, requests, scopes, finished]
-//    console.log(fileExecution.incomplete);
-    const { status, unblocked } =
+    const { status, unblocked, scopes } =
         Status.updateTestPathToSuccess(fileExecution.status, testPath, Date.now());
 //        (failure ? Status.updateTestPathToFailure : Status.updateTestPathToSuccess)
 //        (fileExecution.statuses, path, end, failure && event.reason);
     const finished = is(Status.Result, status);
-    /*
-    try {
-    console.log("STATUS IS", status.running.get(0).running.get(0).running.get(0).running.size, status.running.get(0).running.get(0).running.get(0).running);
-    } catch(e) { }
-    console.log("BEFORE " + fileExecution.status.running.size + " " + fileExecution.status.waiting.size + " " + fileExecution.status.completed.size);
-    console.log("FINISHED " + (status.running || {size:0}).size + " " + (status.waiting || {size:0}).size + " " + (status.completed || status.children).size);*/
-    
-    /*(function x(running, status)
-    {
-        if (running.size > 0)
-        {
-            const child = running.first();
-            
-            if (child.running){
-                x(child.running, child);
-            }
-            else
-            {
-                //console.log("IT IS:", child);
-            }
-        }
-        else
-            console.log("this makes no sense..." + status.suite.block.title + " " + status.completed.size, status.running.size, status.waiting.size, status.suite.children.size, status === global.CHECKER);
-    })(status.running, status);*/
-console.log("BEFORE " + fileExecution.status.running.size + " " + fileExecution.status.waiting.size + " " + fileExecution.status.completed.size);
-    console.log("FINISHED " + (status.running || {size:0}).size + " " + (status.waiting || {size:0}).size + " " + (status.completed || status.children).size);
-    //console.log("STATUS:", status);
-    //Error.stackTraceLimit = 1000;
-    //console.log(Error().stack);
-//    const f = np => np.index + ", " + (np.next ? f(np.next) : "");
-//    console.log("UNBLOCKED", unblocked.map(f));
-    const scopes = List();
     const outFileExecution = fileExecution
         .set("status", status)
         .removeIn(["running", test.block.id]);

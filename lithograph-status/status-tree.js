@@ -4,8 +4,9 @@ const { Node, Suite: { Mode } } = require("@lithograph/ast");
 const IndexPath = require("./index-path");
 const Result = require("./result");
 
-// Should be List((Test, IndexPath));
+
 const TestPathList = List(number);
+const ScopeList = List(number);
 
 const Status = union `Status` (
     union `Running` (
@@ -52,11 +53,11 @@ function updateTestPathToRunning(inStatus, testPath, start)
 
         return { test, status: Running.Test({ test, start }) };
     }
-//console.log("IN, " + inStatus + " for " + testPath);
+
     const { suite, running = RunningMap(), waiting } = inStatus;
     const { children } = suite;
     const [index, nextPath] = IndexPath.pop(testPath, children.size);
-//console.log("INDEX IS " + index, nextPath, testPath, children.size);
+
     const isRunning = is(Running, inStatus);
     const isRunningChild = isRunning && inStatus.running.has(index);
 
@@ -83,8 +84,9 @@ function updateTestPathToSuccess(inStatus, testPath, end)
         const { test, start } = inStatus;
         const duration = Result.Duration.Interval({ start, end });
         const status = Result.Success.Test({ test, duration });
+        const scopes = ScopeList.of(test.block.id);
 
-        return { unblocked: TestPathList(), status };
+        return { unblocked: TestPathList(), scopes, status };
     }
 
     const { suite } = inStatus;
@@ -99,20 +101,16 @@ function updateTestPathToSuccess(inStatus, testPath, end)
         const running = inStatus.running.set(index, fromChild.status);
         const unblocked = fromChild.unblocked
             .map(testPath => IndexPath.push(testPath, size, index));
+        const scopes = fromChild.scopes;
+        const status = Running.Suite({ ...inStatus, running });
 
-        return { unblocked, status: Running.Suite({ ...inStatus, running }) };
+        return { unblocked, scopes, status };
     }
 
     const { unblocked = TestPathList(), waiting, completed: restCompleted } =
         suite.mode === Mode.Concurrent ?
             { ...inStatus, completed: ResultMap() } :
             initialStatusOfChildren(suite.children, hasUnblocked, index + 1);
-    if (suite.block.title === "No. 2 (Content)" || 
-    suite.block.title === "No. 2")
-        console.log("SIZE: " + suite.block.title + " " + inStatus.completed
-        .set(index, fromChild.status)
-        .concat(restCompleted).size);
-
     const completed = inStatus.completed
         .set(index, fromChild.status)
         .concat(restCompleted);
@@ -125,19 +123,16 @@ function updateTestPathToSuccess(inStatus, testPath, end)
         const status = failed ?
             Result.Failure.Suite({ suite, children }) :
             Result.Success.Suite({ suite, children });
+        const scopes = fromChild.scopes.unshift(suite.block.id);
 
-        return { unblocked, status };
+        return { unblocked, scopes, status };
     }
 
     const running = inStatus.running.remove(index);
     const status = Running.Suite({ suite, waiting, completed, running });
-    if (suite.block.title === "No. 2") {
-    global.CHECKER = status;
-        console.log("BEFORE: " + inStatus.completed.size + " " + inStatus.running.size + " " + inStatus.waiting.size);
-        console.log("AFTER: " + completed.size + " " + running.size + " " + waiting.size);
-    }
-//console.log("COMPLETED SIZE: " + completed.size + inStatus.completed.size + " for " + suite.block.title);
-    return { unblocked, status };
+    const scopes = fromChild.scopes;
+
+    return { unblocked, status, scopes };
 }
 
 Status.updateTestPathToSuccess = updateTestPathToSuccess;
@@ -152,7 +147,7 @@ function initialStatusOfSuite(suite)
     const isSerial = suite.mode === Mode.Serial;
     const { unblocked, waiting, completed } =
         initialStatusOfChildren(children, isSerial && hasUnblocked);
-console.log("U 00 " + unblocked);
+
     // If we have as many results as children, we're done and we have to be
     // Success.
     const status = completed.size === children.size ?
