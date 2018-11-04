@@ -92,7 +92,7 @@ function toAllocateIO(node, push)
 
             // If for whatever reason we don't find a matching scope, we'll have
             // to return an error immediately.
-            if (!scope)
+            if (scope === false)
                 return reject(
                     Error("A browser was attempted to be created out of scope"));
 

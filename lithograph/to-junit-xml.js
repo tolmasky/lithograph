@@ -47,7 +47,7 @@ function toXML(fd, result, tabs = 0)
     if (is(Result.Suite, result))
     {
         const { suite: { block } } = result;
-console.log("HERE FOR " + block.title);
+
         return tag(fd, tabs, "testsuite",
             { name: block.title, id: block.id }, toChildrenXML);
     }
@@ -67,9 +67,7 @@ console.log("HERE FOR " + block.title);
 }
 
 function tag(fd, tabs, name, attributes = { }, children)
-{console.log(attributes);
-console.log(Object
-        .keys(attributes));
+{
     const attributesString = Object
         .keys(attributes)
         .map(key => `${key} = "${escape(attributes[key] + "")}"`)
