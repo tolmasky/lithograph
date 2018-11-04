@@ -27,6 +27,12 @@ const Status = union `Status` (
             waiting => WaitingMap) ),
     Result );
 
+const Report = union `Report` (
+    data `Success` (end => number),
+    data `Failure` (end => number, reason => Result.Failure.Reason) );
+
+Status.Report = Report;
+
 const { Running, Waiting } = Status;
 
 module.exports = Status;
@@ -77,14 +83,17 @@ function updateTestPathToRunning(inStatus, testPath, start)
 
 Status.updateTestPathToRunning = updateTestPathToRunning;
 
-function updateTestPathToSuccess(inStatus, testPath, end)
+function updateTestPathWithReport(inStatus, testPath, report)
 {
     if (testPath === IndexPath.End)
     {
         const { test, start } = inStatus;
+        const { end } = report;
         const duration = Result.Duration.Interval({ start, end });
-        const status = Result.Success.Test({ test, duration });
         const scopes = ScopeList.of(test.block.id);
+        const status = is(Report.Failure, report) ?
+            Result.Failure.Test({ test, duration, reason: report.reason }) :
+            Result.Success.Test({ test, duration });
 
         return { unblocked: TestPathList(), scopes, status };
     }
@@ -94,7 +103,7 @@ function updateTestPathToSuccess(inStatus, testPath, end)
     const [index, nextPath] = IndexPath.pop(testPath, size);
 
     const existingChild = inStatus.running.get(index);
-    const fromChild = updateTestPathToSuccess(existingChild, nextPath, end);
+    const fromChild = updateTestPathWithReport(existingChild, nextPath, report);
 
     if (!is(Result, fromChild.status))
     {
@@ -135,7 +144,7 @@ function updateTestPathToSuccess(inStatus, testPath, end)
     return { unblocked, status, scopes };
 }
 
-Status.updateTestPathToSuccess = updateTestPathToSuccess;
+Status.updateTestPathWithReport = updateTestPathWithReport;
 
 function initialStatusOfSuite(suite)
 {
