@@ -12,7 +12,7 @@ const escape = (map =>
     ({ ">": "&gt;", "<": "&lt;", "'": "&apos;", "\"": "&quot;", "&": "&amp;" });
 
 
-module.exports = function (path, results)
+module.exports = function (path, id, time, results)
 {
     spawnSync("mkdir", ["-p", dirname(path)]);
 
@@ -20,29 +20,17 @@ module.exports = function (path, results)
 
     write(fd, `<?xml version = "1.0" encoding = "UTF-8" ?>\n`);
 
-    for (const result of results)
-        toXML(fd, result);
+    tag(fd, 0, "testsuites",
+        { id, tests:0, failures:0, time },
+        () => results.map(result => toXML(fd, result, 1)));
 
     close(fd);
 }
 
-function toXML(fd, result, tabs = 0)
+function toXML(fd, result, tabs)
 {
     const toChildrenXML = () => result.children
         .map((result, index) => toXML(fd, result, tabs + 1));
-
-    if (tabs === 0)
-    {
-        const id = "0";
-        const name = result.suite.block.title;
-        const tests = "0";
-        const failures = "0";
-        const time = "0";
-
-        return tag(fd, tabs, "testsuites",
-            { id, name, tests, failures, time },
-            toChildrenXML);
-    }
 
     if (is(Result.Suite, result))
     {
