@@ -43,6 +43,12 @@ const Result = union `Result` (
         [duration => number, children => List(Result) ]) );
 const Passed = union `Passed` (Result.Success, Result.Skipped);
 
+Result.Suite = union `Suite` (
+    Skipped => Result.Skipped.Suite,
+    Omitted => Result.Omitted.Suite,
+    Success => Result.Success.Suite,
+    Failure => Result.Failure.Suite );
+
 Result.Duration = Duration;
 Result.Failure.Reason = Reason;
 

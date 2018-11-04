@@ -1,9 +1,8 @@
 const { dirname } = require("path");
 const { spawnSync } = require("child_process");
-const { Suite, Test } = require("@lithograph/ast");
-const { Failure, Success, Skipped, Omitted } = require("@lithograph/status");
-
-const { List } = require("immutable");
+const { is, union } = require("@algebraic/type");
+const { Result } = require("@lithograph/status");
+const JUnitSkipped = union `JUnitSkipped` (Result.Skipped, Result.Omitted);
 
 const { openSync: open, writeSync: write, closeSync: close } = require("fs");
 const escape = (map =>
@@ -21,21 +20,21 @@ module.exports = function (path, results)
 
     write(fd, `<?xml version = "1.0" encoding = "UTF-8" ?>\n`);
 
-    for (const { statuses, root } of results)
-        toXML(fd, root, statuses);
+    for (const result of results)
+        toXML(fd, result);
 
     close(fd);
 }
 
-function toXML(fd, node, statuses, tabs = 0)
+function toXML(fd, result, tabs = 0)
 {
-    const toChildrenXML = () => node.children
-        .map((node, index) => toXML(fd, node, tabs + 1));
+    const toChildrenXML = () => result.children
+        .map((result, index) => toXML(fd, result, tabs + 1));
 
     if (tabs === 0)
     {
         const id = "0";
-        const name = node.metadata.title;
+        const name = result.suite.block.title;
         const tests = "0";
         const failures = "0";
         const time = "0";
@@ -45,29 +44,35 @@ function toXML(fd, node, statuses, tabs = 0)
             toChildrenXML);
     }
 
-    if (node instanceof Suite)
+    if (is(Result.Suite, result))
+    {
+        const { suite: { block } } = result;
+console.log("HERE FOR " + block.title);
         return tag(fd, tabs, "testsuite",
-            { name: node.metadata.title }, toChildrenXML);
+            { name: block.title, id: block.id }, toChildrenXML);
+    }
 
-    const { metadata: { title, id } } = node;
-    const result = statuses.get(id);console.log("RESULT", result);
-    const children = Success.is(result) ?
+    const { test } = result;
+    const { block: { title, id } } = test;
+    const children = is(Result.Success.Test, result) ?
         null :
-        Skipped.is(result) ?
+        is (JUnitSkipped, result) ?
             () => tag(fd, tabs + 1, "skipped") :
             () => tag(fd, tabs + 1, "failure",
                 { message: reason.message || "", type: "FATAL" },
                 () => write(fd, escape(result.reason.stack || "") + "\n"));
 
     return tag(fd, tabs, "testcase",
-        { name: title }, children);
+        { name: title, id }, children);
 }
 
 function tag(fd, tabs, name, attributes = { }, children)
 {console.log(attributes);
+console.log(Object
+        .keys(attributes));
     const attributesString = Object
         .keys(attributes)
-        .map(key => `${key} = "${escape(attributes[key])}"`)
+        .map(key => `${key} = "${escape(attributes[key] + "")}"`)
         .join(" ");
     const spaces = " ".repeat(tabs * 4);
 
