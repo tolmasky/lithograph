@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/ast",
-  "version": "1.0.0-alpha.4",
+  "version": "1.0.0-alpha.5",
   "description": "",
   "main": "node.js",
   "scripts": {
@@ -13,6 +13,8 @@
     "remark": "^9.0.0"
   },
   "peerDependencies": {
+    "@algebraic/type": "1.0.0-alpha.1",
+    "@algebraic/collections": "1.0.0-alpha.1",
     "immutable": "^3.8.2"
   }
 }
