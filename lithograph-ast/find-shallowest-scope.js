@@ -1,14 +1,9 @@
+const { is } = require("@algebraic/type");
 const { Seq } = require("immutable");
 const { Test, Suite } = require("./node");
-const { Serial, Concurrent } = Suite;
 
-const isTest = node => node instanceof Test;
-const isSuite = node => node instanceof Suite;
-const hasMode = (mode, node) => node.mode === mode;
-const isSerial = node => isSuite(node) && hasMode(Serial, node);
-const isConcurrent = node => isSuite(node) && hasMode(Concurrent, node);
-const hasBlock = node =>
-    isTest(node) || isSerial(node) || isConcurrent(node);
+const isSerial = suite => suite.mode === Suite.Mode.Serial;
+const isConcurrent = suite => suite.mode === Suite.Mode.Concurrent;
 
 
 // We start by determining where the request for allocation came from by
@@ -21,15 +16,18 @@ module.exports = function findShallowestScope(backtrace, node)
     // actually exit early as soon as we find a match.
     return Seq(backtrace)
         .map(frame => findScope(frame, node))
-        .findLast(scope => !!scope);
+        .findLast(scope => scope !== false);
 }
 
 function findScope(frame, node, parent)
 {
-    if (isTest(node) && parent && isSerial(parent))
-        return false;
+    // Tests in a Serial Suite share scope, so just return false in this case.
+    if (is(Test, node))
+        return  !(parent && isSerial(parent)) &&
+                inSource(frame, node.block.source) &&
+                node.block.id;
 
-    if (!inSource(frame, node.source))
+    if (!inSource(frame, node.block.source))
         return false;
 
     // Note: Seq.map is lazy, so although this appears like it will perform the
@@ -37,9 +35,9 @@ function findScope(frame, node, parent)
     // as soon as we find a match.
     const child = Seq(node.children)
         .map(child => findScope(frame, child, node))
-        .find(scope => !!scope);
+        .find(scope => scope !== false);
 
-    return child || node && node.metadata.id;
+    return child === false ? node.block.id : child;
 }
 
 function inSource(frame, source)

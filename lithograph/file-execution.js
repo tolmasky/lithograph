@@ -42,8 +42,6 @@ const FileExecution = Cause("FileExecution",
         const { unblocked, status } =
             Status.initialStatusOfNode(fileExecution.root);
         const { allocate } = garbageCollector;
-        console.log(status);
-        console.log("UNBLOCKED", unblocked);
         const outFileExecution = fileExecution
             .set("functions", compile(toEnvironment(allocate), root))
             .set("status", status);
@@ -68,7 +66,7 @@ const FileExecution = Cause("FileExecution",
             fileExecution.status,
             testPath,
             Date.now());
-console.log("RUNNING: ", status.running.size + " " + status.waiting.size);
+
         return fileExecution
             .set("status", status)
             .setIn(["running", test.block.id],
