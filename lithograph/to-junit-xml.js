@@ -59,7 +59,7 @@ console.log("HERE FOR " + block.title);
         is (JUnitSkipped, result) ?
             () => tag(fd, tabs + 1, "skipped") :
             () => tag(fd, tabs + 1, "failure",
-                { message: reason.message || "", type: "FATAL" },
+                { message: result.reason.message || "", type: "FATAL" },
                 () => write(fd, escape(result.reason.stack || "") + "\n"));
 
     return tag(fd, tabs, "testcase",

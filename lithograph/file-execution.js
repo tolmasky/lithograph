@@ -10,6 +10,7 @@ const toEnvironment = require("./file-execution/to-environment");
 const Result = Record({ statuses:Map(), root:-1 }, "FileExecution.Result");
 //const S = require("@lithograph/status/status[.js");
 const Status = require("@lithograph/status/status-tree");
+const { Reason } = Status.Result.Failure;
 
 require("./magic-ws-puppeteer");
 require("./test-worker/static");
@@ -88,19 +89,16 @@ console.log("RUNNING: ", status.running.size + " " + status.waiting.size);
 
     [event.out `Finished`]: { result: -1 },
 
-    [event.in `TestSucceeded`]: { testPath:-1, test:-1, index:-1, end:-1 },
-    [event.on `TestSucceeded`]: testFinished,
-
-    [event.in `TestFailed`]: { testPath:-1, test:-1, index:-1, end:-1, reason:-1 },
-    [event.on `TestFailed`]: testFinished
+    [event.in `Report`]: { testPath:-1, test:-1, index: -1, report:-1 },
+    [event.on `Report`]: testFinished
 });
 
 FileExecution.Result = Result;
 
-Result.serialize = function serializeResult(result)
+/*Result.serialize = function serializeResult(result)
 {
     return { status: result.status };
-}
+}*/
 
 Result.deserialize = function deserializeResult(serialized)
 {console.log(serialized.toJS());
@@ -109,36 +107,32 @@ Result.deserialize = function deserializeResult(serialized)
 
 function testFinished(fileExecution, event)
 {
-    const { testPath, test, index, end } = event;
-    const failure = event instanceof FileExecution.TestFailed;
-    console.log("> FINISHED " + test.block.title);
-    const { status, unblocked, scopes } =
-        Status.updateTestPathToSuccess(fileExecution.status, testPath, Date.now());
-//        (failure ? Status.updateTestPathToFailure : Status.updateTestPathToSuccess)
-//        (fileExecution.statuses, path, end, failure && event.reason);
-    const finished = is(Status.Result, status);
-    const outFileExecution = fileExecution
-        .set("status", status)
+    const { testPath, test, index, report } = event;
+    const { status } = fileExecution;
+    const { status: updatedStatus, unblocked, scopes } =
+        Status.updateTestPathWithReport(status, testPath, report);
+    const withUpdatedStatus = fileExecution
+        .set("status", updatedStatus)
         .removeIn(["running", test.block.id]);
-
-    const [updated, events] = update.in.reduce(outFileExecution,
+    const [withUpdatedHelpers, events] = update.in.reduce(withUpdatedStatus,
     [
         ["garbageCollector", GarbageCollector.ScopesExited({ scopes })],
         ["pool", Pool.Release({ indexes: [index] })]
     ]);
+    const finished = is(Status.Result, withUpdatedHelpers.status);
 
     // If we exited the root scope, then we're done.
     if (finished)
     {
-        const serialized = serialize(Status.Result, status);
+        const serialized = serialize(Status.Result, updatedStatus);
 
         console.log(serialized);        
 
-        return [updated, [FileExecution.Finished({ result: serialized }), ...events]];
+        return [withUpdatedHelpers, [FileExecution.Finished({ result: serialized }), ...events]];
     }
 
     const [enqueued, fromEnqueueEvents] =
-        update.in(updated, "pool", Pool.Enqueue({ requests: unblocked }));
+        update.in(withUpdatedHelpers, "pool", Pool.Enqueue({ requests: unblocked }));
 
     return [enqueued, [...events, ...fromEnqueueEvents]];
 }
@@ -153,16 +147,23 @@ async function testRun({ functions, test, testPath, index })
 
     console.log("RUN " + test.block.id + " -> " + title + " " + Date.now());
 
-    const [failed, reason] = await f()
-        .then(() => [false])
-        .catch(reason => [true, reason]);
+    const [succeeded, error] = await f()
+        .then(() => [true])
+        .catch(error => [false, error]);
     const end = Date.now();
+    const report = succeeded ?
+        Status.Report.Success({ end }) :
+        Status.Report.Failure(
+        {
+            end,
+            reason: error instanceof Error ?
+                Reason.Error(error) :
+                Reason.Value({ stringified: JSON.stringified(error) })
+        });
 
-    console.log("finished " + id + " -> " + title + " " + !failed);
+    console.log("finished " + id + " -> " + title + " " + succeeded);
 
-    return failed ? 
-        FileExecution.TestFailed({ testPath, index, end, reason }) :
-        FileExecution.TestSucceeded({ testPath, test, index, end });
+    return FileExecution.Report({ testPath, test, index, end, report });
 }
 
 function toObject(node, reports)

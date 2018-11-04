@@ -12,7 +12,7 @@ const result = ([name]) =>
             suite => Node.Suite) );
 
 const Reason = union `Reason` (
-    data `Exception` (
+    data `Error` (
         stack => string,
         message => string ),
 
@@ -39,8 +39,8 @@ const Result = union `Result` (
         [children => [List(Passed), List(Passed)()]]),
 
     result `Failure` (
-        [duration => number, reason => Reason],
-        [duration => number, children => List(Result) ]) );
+        [duration => Duration, reason => Reason],
+        [children => List(Result)]) );
 const Passed = union `Passed` (Result.Success, Result.Skipped);
 
 Result.Suite = union `Suite` (
