@@ -1,4 +1,4 @@
-const { is } = require("@algebraic/type");
+const { is, serialize, deserialize } = require("@algebraic/type");
 const { Record, List, Map, Range, Set } = require("immutable");
 const { Cause, IO, field, event, update } = require("@cause/cause");
 const { Test, NodePath, Suite, fromMarkdown } = require("@lithograph/ast");
@@ -99,18 +99,12 @@ FileExecution.Result = Result;
 
 Result.serialize = function serializeResult(result)
 {
-    const root = Suite.serialize(result.root);
-    const statuses = Status.serialize.map(result.statuses);
-
-    return { statuses, root };
+    return { status: result.status };
 }
 
 Result.deserialize = function deserializeResult(serialized)
-{
-    const root = Suite.deserialize(serialized.root);
-    const statuses = Status.deserialize.map(serialized.statuses);
-
-    return Result({ statuses, root });
+{console.log(serialized.toJS());
+    return deserialize(Status.Result, serialized.toJS());
 }
 
 function testFinished(fileExecution, event)
@@ -136,14 +130,11 @@ function testFinished(fileExecution, event)
     // If we exited the root scope, then we're done.
     if (finished)
     {
-        const root = fileExecution.root;
-        console.log("DONE " + status);
-        //console.log("DONE " + fileExecution.root.node.metadata.id + " " + scopes);
-        process.exit(1);
-        const result = FileExecution.Result
-            .serialize(FileExecution.Result({ statuses, root }));
+        const serialized = serialize(Status.Result, status);
 
-        return [updated, [FileExecution.Finished({ result }), ...events]];
+        console.log(serialized);        
+
+        return [updated, [FileExecution.Finished({ result: serialized }), ...events]];
     }
 
     const [enqueued, fromEnqueueEvents] =

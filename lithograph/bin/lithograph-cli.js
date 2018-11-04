@@ -35,6 +35,7 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 
     const start = Date.now();
     const results = await main(paths, options);
+    console.log(results);
     const title = `${moment().format("YYYY-MM-DD-HH.mm.ss")}`;
     const output = options.output || `/tmp/lithograph-results/${title}`;
 
