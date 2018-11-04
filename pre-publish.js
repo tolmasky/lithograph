@@ -3,7 +3,7 @@ const { existsSync, readdirSync, writeFileSync } = require("fs");
 const { hasOwnProperty } = Object.prototype;
 
 
-const version = "1.0.0-alpha.3";
+const version = "1.0.0-alpha.4";
 const packages = readdirSync(__dirname)
     .map(name => join(__dirname, name, "package.json"))
     .filter(path => existsSync(path))
