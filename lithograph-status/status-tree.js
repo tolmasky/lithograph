@@ -216,7 +216,7 @@ function initialStatusOfTest(test)
         TestPathList() :
         TestPathList.of(IndexPath.End);
     const status = disabled ?
-        Result.Skipped({ origin:id, test }) :
+        Result.Skipped.Test({ origin:id, test }) :
         Status.Waiting.Test({ test });
 
     return { status, unblocked };
