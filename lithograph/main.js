@@ -4,6 +4,7 @@ const Pool = require("@cause/pool");
 const Fork = require("@cause/fork");
 const FileProcess = require("./file-process");
 const FileExecution = require("./file-execution");
+const Result = require("@lithograph/status/result");
 const Browser = require("./browser");
 
 
@@ -36,16 +37,15 @@ const Main = Cause("Main",
         return { fileProcessPool, browserPool, paths };
     },
 
-    [event.on (FileProcess.Executed)](main, event)
+    [event._on(Result.Suite)] (main, result)
     {
-        const [,, index] = event.fromKeyPath;
-        const results = main.results.push(
-            FileExecution.Result.deserialize(event.result));
-        const finished = results.size === main.paths.size;
+        const [,, index] = result.fromKeyPath;
         const [updated, events] = update.in(
-            main.set("results", results),
+            main.update("results", results => results.push(result)),
             "fileProcessPool",
             Pool.Release({ indexes: [index] }));
+        const { results } = updated;
+        const finished = results.size === main.paths.size;
 
         if (!finished)
             return [updated, events];

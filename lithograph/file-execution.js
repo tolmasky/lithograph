@@ -58,9 +58,8 @@ const FileExecution = Cause("FileExecution",
             update.in(fileExecution, ["pool"], Pool.Enqueue(
                 { requests: getPostOrderLeaves(fileExecution.root) })),*/
 
-    [event.on (Pool.Retained)]: (fileExecution, { index, request }) =>
+    [event.on (Pool.Retained)]: (fileExecution, { index, request: testPath }) =>
     {
-        const testPath = request;
         const functions = fileExecution.functions;
         const { status, test } = Status.updateTestPathToRunning(
             fileExecution.status,
@@ -93,16 +92,6 @@ const FileExecution = Cause("FileExecution",
 
 FileExecution.Result = Result;
 
-/*Result.serialize = function serializeResult(result)
-{
-    return { status: result.status };
-}*/
-
-Result.deserialize = function deserializeResult(serialized)
-{//console.log(serialized.toJS());
-    return deserialize(Status.Result, serialized.toJS());
-}
-
 function testFinished(fileExecution, event)
 {
     const { testPath, test, index, report } = event;
@@ -121,13 +110,7 @@ function testFinished(fileExecution, event)
 
     // If we exited the root scope, then we're done.
     if (finished)
-    {
-        const serialized = serialize(Status.Result, updatedStatus);
-
-        //console.log(serialized);
-
-        return [withUpdatedHelpers, [FileExecution.Finished({ result: serialized }), ...events]];
-    }
+        return [withUpdatedHelpers, [...events, withUpdatedHelpers.status]];
 
     const [enqueued, fromEnqueueEvents] =
         update.in(withUpdatedHelpers, "pool", Pool.Enqueue({ requests: unblocked }));

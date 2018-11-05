@@ -33,6 +33,7 @@ const Report = union `Report` (
     data `Success` (end => number),
     data `Failure` (end => number, reason => Result.Failure.Reason) );
 
+Status.Status = Status;
 Status.Report = Report;
 
 const { Running, Waiting } = Status;
