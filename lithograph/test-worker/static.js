@@ -1,7 +1,7 @@
 const { parse } = require("url");
 const { Map } = require("immutable");
 
-const PagePrototype = require("puppeteer/lib/Page").prototype;
+const PagePrototype = require("puppeteer/lib/Page").Page.prototype;
 const FramePrototype = require("puppeteer/lib/FrameManager").Frame.prototype;
 const BrowserContextPrototype = require("puppeteer/lib/Browser")
     .BrowserContext.prototype;
