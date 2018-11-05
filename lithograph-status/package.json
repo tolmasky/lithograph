@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/status",
-  "version": "1.0.0-alpha.7",
+  "version": "1.0.0-alpha.8",
   "description": "",
   "main": "status.js",
   "scripts": {
@@ -12,7 +12,7 @@
   "peerDependencies": {
     "@algebraic/type": "1.0.0-alpha.1",
     "@algebraic/collections": "1.0.0-alpha.1",
-    "@lithograph/ast": "1.0.0-alpha.7",
+    "@lithograph/ast": "1.0.0-alpha.8",
     "immutable": "^3.8.2"
   }
 }
