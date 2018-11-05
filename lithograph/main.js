@@ -4,8 +4,10 @@ const Pool = require("@cause/pool");
 const Fork = require("@cause/fork");
 const FileProcess = require("./file-process");
 const FileExecution = require("./file-execution");
-const Result = require("@lithograph/status/result");
 const Browser = require("./browser");
+
+const Node = require("@lithograph/ast");
+const Result = require("@lithograph/status/result");
 
 
 module.exports = async function main(paths, options)
@@ -18,13 +20,14 @@ module.exports = async function main(paths, options)
 
 const Main = Cause("Main",
 {
+    [field `title`]: -1,
     [field `paths`]: -1,
     [field `results`]: List(),
 
     [field `browserPool`]: -1,
     [field `fileProcessPool`]: -1,
 
-    init({ paths: iterable, concurrency, requires, headless })
+    init({ paths: iterable, title, concurrency, requires, headless })
     {
         const paths = List(iterable);
 
@@ -34,7 +37,7 @@ const Main = Cause("Main",
         const fileProcessPool = Pool.create(
             { items: Repeat(fork, concurrency) });
 
-        return { fileProcessPool, browserPool, paths };
+        return { fileProcessPool, browserPool, paths, title };
     },
 
     [event._on(Result.Suite)] (main, result)
@@ -50,7 +53,11 @@ const Main = Cause("Main",
         if (!finished)
             return [updated, events];
 
-        return [updated, [...events, Cause.Finished({ value: results })]];
+        const children = results.map(result => result.suite);
+        const suite = toRootSuite({ title: main.title, children });
+        const value = Result.Suite.fromChildren(suite, results);
+
+        return [updated, [...events, Cause.Finished({ value })]];
     },
 
     [event.on (Pool.Retained) .from `fileProcessPool`](main, event)
@@ -105,5 +112,14 @@ const Main = Cause("Main",
             FileProcess.EndpointResponse({ id, endpoint }));
     }
 });
+
+function toRootSuite({ title, children })
+{
+    const empty = Node.Source.Position({ line:-1, column:-1 });
+    const source = Node.Source({ filename: "", start: empty, end: empty });
+    const block = Node.Block({ id: -1, title, depth: -1, source });
+
+    return Node.Suite({ block, children, mode: Node.Suite.Mode.Concurrent });
+}
 
 

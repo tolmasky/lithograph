@@ -37,7 +37,7 @@ const Node = union `Node` (
     data `Suite` (
         block => Block,
         children => [List(Node), List(Node)()],
-        mode => Mode ) );
+        mode => [Mode, Mode.Concurrent] ) );
 
 Node.Suite.Mode = Mode;
 

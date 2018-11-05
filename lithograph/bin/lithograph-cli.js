@@ -1,3 +1,6 @@
+const { is } = require("@algebraic/type");
+const Result = require("@lithograph/status/result");
+
 const main = require("../main");
 const { List } = require("immutable");
 
@@ -32,27 +35,27 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
         .map(path => resolve(path));
 
     options.requires = options.require.map(path => resolve(path));
+    options.title = `${moment().format("YYYY-MM-DD-HH.mm.ss")}`;
 
     const start = Date.now();
-    const results = await main(paths, options);
-    const id = `${moment().format("YYYY-MM-DD-HH.mm.ss")}`;
-    const output = options.output || `/tmp/lithograph-results/${id}`;
-    const filename = `${output}/junit.xml`;
+    const result = await main(paths, options);
     const time = Date.now() - start;
 
+    const output = options.output || `/tmp/lithograph-results/${options.title}`;
+    const filename = `${output}/junit.xml`;
+
     console.log("Writing file... " + filename);
-    toJUnitXML(filename, id, time, results);
+    toJUnitXML(filename, result, time);
 
     console.log("Test Time: " + time + "ms");
     console.log("Total Time (including writing results): " + (Date.now() - start) + "ms");
 
     console.log(require("fs").readFileSync(filename, "utf-8"));
 
-    process.exit(1);
-/*
-    if (states.get(List()).aggregate === 2)
+    if (is(Result.Failure, result))
         process.exit(1);
-*/
+
+    console.log("ALL ENABLED TESTS PASSED");
 })();
 
 

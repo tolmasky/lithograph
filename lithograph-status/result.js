@@ -1,4 +1,4 @@
-const { data, union, string, number, declare } = require("@algebraic/type");
+const { is, data, union, string, number, declare } = require("@algebraic/type");
 const { List } = require("@algebraic/collections");
 const Node = require("@lithograph/ast");
 const FIXME_ANY = declare({ is: () => true, serialize:[()=>0,true],deserialize:()=>undefined });
@@ -63,6 +63,15 @@ Result.Suite = union `Suite` (
     Omitted => Result.Omitted.Suite,
     Success => Result.Success.Suite,
     Failure => Result.Failure.Suite );
+
+Result.Suite.fromChildren = function (suite, children)
+{
+    const failed = children.some(is(Result.Failure));
+
+    return failed ?
+        Result.Failure.Suite({ suite, children }) :
+        Result.Success.Suite({ suite, children });
+}
 
 Result.Duration = Duration;
 Result.Failure.Reason = Reason;
