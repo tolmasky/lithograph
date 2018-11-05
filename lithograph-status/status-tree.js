@@ -3,6 +3,8 @@ const { List, OrderedMap, Map } = require("@algebraic/collections");
 const { Node, Suite: { Mode } } = require("@lithograph/ast");
 const IndexPath = require("./index-path");
 const Result = require("./result");
+const getResultId = result => (is(Result.Suite, result) ?
+    result.suite : result.test ).block.id;
 
 
 const TestPathList = List(number);
@@ -119,7 +121,11 @@ function updateTestPathWithReport(inStatus, testPath, report)
     const { unblocked = TestPathList(), waiting, completed: restCompleted } =
         suite.mode === Mode.Concurrent ?
             { ...inStatus, completed: ResultMap() } :
-            initialStatusOfChildren(suite.children, hasUnblocked, index + 1);
+            initialStatusOfChildren(suite.children,
+                hasUnblocked,
+                index + 1,
+                is(Result.Failure, fromChild.status) &&
+                    getResultId(fromChild.status));
     const completed = inStatus.completed
         .set(index, fromChild.status)
         .concat(restCompleted);
@@ -166,7 +172,7 @@ function initialStatusOfSuite(suite)
     return { unblocked, status };
 }
 
-function initialStatusOfChildren(children, condition, skip = 0)
+function initialStatusOfChildren(children, condition, skip = 0, omission)
 {
     const waiting = WaitingMap();
     const completed = ResultMap();
@@ -180,6 +186,11 @@ function initialStatusOfChildren(children, condition, skip = 0)
             return accum;
 
         const index = unoffsetted + skip;
+
+        if (is(number, omission))
+            return { ...accum, completed: accum.completed
+                .set(index, updateNodeToOmitted(node, omission)) };
+
         const { unblocked, status } = initialStatusOfNode(node);
         const isResult = is(Result, status);
         const completed = isResult ?
@@ -193,12 +204,17 @@ function initialStatusOfChildren(children, condition, skip = 0)
     }, { unblocked, waiting, completed });
 }
 
+function updateNodeToOmitted(node, origin)
+{
+    return assignOriginResultForNode(node, Result.Omitted, origin);
+}
+
 function assignOriginResultForNode(node, result, origin)
 {
-    if (is(Test, node))
+    if (is(Node.Test, node))
         return result.Test({ test: node, origin });
 
-    const children = suite.children
+    const children = node.children
         .map(node => assignOriginResultForNode(node, result, origin));
  
     return result.Suite({ suite: node, origin, children });
