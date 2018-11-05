@@ -99,7 +99,7 @@ FileExecution.Result = Result;
 }*/
 
 Result.deserialize = function deserializeResult(serialized)
-{console.log(serialized.toJS());
+{//console.log(serialized.toJS());
     return deserialize(Status.Result, serialized.toJS());
 }
 
@@ -124,7 +124,7 @@ function testFinished(fileExecution, event)
     {
         const serialized = serialize(Status.Result, updatedStatus);
 
-        console.log(serialized);        
+        //console.log(serialized);
 
         return [withUpdatedHelpers, [FileExecution.Finished({ result: serialized }), ...events]];
     }

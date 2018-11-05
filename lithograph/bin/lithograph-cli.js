@@ -35,18 +35,20 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 
     const start = Date.now();
     const results = await main(paths, options);
-    console.log(results);
-
     const id = `${moment().format("YYYY-MM-DD-HH.mm.ss")}`;
-    const output = options.output || `/tmp/lithograph-results/${id}/junit.xml`;
+    const output = options.output || `/tmp/lithograph-results/${id}`;
+    const filename = `${output}/junit.xml`;
     const time = Date.now() - start;
 
-    console.log("Writing file... " + output);
-    toJUnitXML(output, id, time, results);
+    console.log("Writing file... " + filename);
+    toJUnitXML(filename, id, time, results);
 
     console.log("Test Time: " + time + "ms");
     console.log("Total Time (including writing results): " + (Date.now() - start) + "ms");
 
+    console.log(require("fs").readFileSync(filename, "utf-8"));
+
+    process.exit(1);
 /*
     if (states.get(List()).aggregate === 2)
         process.exit(1);
