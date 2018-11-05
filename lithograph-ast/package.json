@@ -13,8 +13,8 @@
     "remark": "^9.0.0"
   },
   "peerDependencies": {
-    "@algebraic/type": "1.0.0-alpha.2",
-    "@algebraic/collections": "1.0.0-alpha.2",
+    "@algebraic/type": "1.0.0-alpha.3",
+    "@algebraic/collections": "1.0.0-alpha.3",
     "immutable": "^3.8.2"
   }
 }
