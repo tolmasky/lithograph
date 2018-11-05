@@ -133,12 +133,9 @@ function updateTestPathWithReport(inStatus, testPath, report)
 
     if (completed.size === size)
     {
-        const children = suite.children
-            .map((_, index) => completed.get(index));
-        const failed = children.some(is(Result.Failure));
-        const status = failed ?
-            Result.Failure.Suite({ suite, children }) :
-            Result.Success.Suite({ suite, children });
+        const status = Result.Suite.fromChildren(
+            suite,
+            suite.children.map((_, index) => completed.get(index)));
         const scopes = fromChild.scopes.unshift(suite.block.id);
 
         return { unblocked, scopes, status };
@@ -217,7 +214,7 @@ function assignOriginResultForNode(node, result, origin)
 
     const children = node.children
         .map(node => assignOriginResultForNode(node, result, origin));
- 
+
     return result.Suite({ suite: node, origin, children });
 }
 
