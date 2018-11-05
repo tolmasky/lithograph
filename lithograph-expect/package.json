@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/expect",
-  "version": "1.0.0-alpha.6",
+  "version": "1.0.0-alpha.7",
   "description": "",
   "main": "lithograph-expect.js",
   "scripts": {
