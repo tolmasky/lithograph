@@ -28,11 +28,11 @@ const Duration = union `Duration` (
 const Result = union `Result` (
     result `Skipped` (
         [origin => number],
-        [origin => number, children => List(Skipped)]),
+        [origin => number, children => List(Result.Skipped)]),
 
     result `Omitted` (
         [origin => number],
-        [origin => number, children => List(Omitted)]),
+        [origin => number, children => List(Result.Omitted)]),
 
     result `Success` (
         [duration => [Duration, Duration.Instant]],
