@@ -4,6 +4,7 @@ const { List, Map } = require("immutable");
 const { Cause, IO, field, event, update } = require("@cause/cause");
 const FileExecution = require("./file-execution");
 const GarbageCollector = require("./garbage-collector");
+const Result = require("@lithograph/status/result");
 
 
 const FileProcess = Cause("FileProcess",
@@ -30,8 +31,8 @@ const FileProcess = Cause("FileProcess",
     },
 
     [event.out `Executed`]: { result:-1 },
-    [event.on (FileExecution.Finished)]: (fileProcess, { result }) =>
-        [fileProcess, [FileProcess.Executed({ result })]],
+    [event._on (Result)]: (fileProcess, result) =>
+        [fileProcess, [result.update("fromKeyPath", () => undefined)]],
 
     [event.out `EndpointRequest`]: { id: -1 },
     [event.on (GarbageCollector.Allocate)]: (fileProcess, { id }) =>

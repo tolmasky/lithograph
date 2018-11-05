@@ -15,14 +15,13 @@ const GarbageCollector = Cause("GarbageCollector",
     init: ({ node }) => ({ allocateIO: toAllocateIO(node) }),
 
     [event.in `AllocateReady`]: { allocate: -1 },
-    [event.on `AllocateReady`]: (endpoints, { allocate }) => {
-    console.log(allocate);
-return    [
+    [event.on `AllocateReady`]: (endpoints, { allocate }) =>
+    [
         endpoints
             .set("allocate", allocate)
             .set("ready", true),
         [Cause.Ready()]
-    ] },
+    ],
 
     [event.out `Allocate`]: { id:-1, type: -1 },
     [event.in `Request`]: { scope: -1, type: -1, resolve: -1 },

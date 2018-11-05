@@ -10,8 +10,8 @@
   "author": "Francisco Ryan Tolmasky I",
   "license": "MIT",
   "peerDependencies": {
-    "@algebraic/type": "1.0.0-alpha.1",
-    "@algebraic/collections": "1.0.0-alpha.1",
+    "@algebraic/type": "1.0.0-alpha.2",
+    "@algebraic/collections": "1.0.0-alpha.2",
     "@lithograph/ast": "1.0.0-alpha.8",
     "immutable": "^3.8.2"
   }
