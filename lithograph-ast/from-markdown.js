@@ -148,11 +148,14 @@ const markdown =
 
         const name = getInnerText(children[0]);
         const contents = children[1].value;
-        const owner = state.stack.peek().updateIn(
-            ["block", "resources"],
-            resources => resources.set(name, contents));
+        const placeholder = state.stack.peek();
+        const block = placeholder.block;
+        const updatedResources = block.resources.set(name, contents);
+        const updatedBlock = Block({ ...block, resources: updatedResources });
+        const updatedPlaceholder =
+            Placeholder({ ...placeholder, block: updatedBlock });
 
-        return State({ ...state, stack: swaptop(owner, stack) });
+        return State({ ...state, stack: swaptop(updatedPlaceholder, state.stack) });
     }
 }
 

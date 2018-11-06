@@ -56,7 +56,9 @@ Status.initialStatusOfNode = initialStatusOfNode;
 
 function updateTestPathToRunning(inStatus, testPath, start)
 {
-    if (testPath === IndexPath.End)
+    // testPath === IndexPath.End is not a good test, since 0 -> ... -> 0 is
+    // indestinguishable from IndexPath.End
+    if (is(Status.Waiting.Test, inStatus))
     {
         const { test } = inStatus;
 
@@ -87,7 +89,9 @@ Status.updateTestPathToRunning = updateTestPathToRunning;
 
 function updateTestPathWithReport(inStatus, testPath, report)
 {
-    if (testPath === IndexPath.End)
+    // testPath === IndexPath.End is not a good test, since 0 -> ... -> 0 is
+    // indestinguishable from IndexPath.End
+    if (is(Status.Running.Test, inStatus))
     {
         const { test, start } = inStatus;
         const { end } = report;

@@ -74,11 +74,11 @@ NodePath.Suite.child = function (index, suitePath)
         NodePath.Suite.Nested({ suite: child, index, parent: suitePath });
 }
 
-NodePath.id = function (nodePath)
+NodePath.block = function (nodePath)
 {
     return is(NodePath.Test, nodePath) ?
-        nodePath.test.block.id :
-        nodePath.suite.block.id;
+        nodePath.test.block :
+        nodePath.suite.block;
 }
 
 Node.fromMarkdown = function fromMarkdown (filename)

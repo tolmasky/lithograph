@@ -130,7 +130,7 @@ const fromConcurrent = (function ()
 
 function getResource(nodePath, URL)
 {
-    const { resources } = nodePath.metadata;
+    const { resources } = NodePath.block(nodePath);
 
     if (resources.has(URL))
         return resources.get(URL);
