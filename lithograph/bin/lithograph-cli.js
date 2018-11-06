@@ -2,11 +2,8 @@ const { is } = require("@algebraic/type");
 const Result = require("@lithograph/status/result");
 
 const main = require("../main");
-const { List } = require("immutable");
 
 const glob = require("fast-glob");
-const { Repeat, Seq } = require("immutable");
-
 const toJUnitXML = require("../to-junit-xml");
 
 const { resolve } = require("path");
@@ -50,31 +47,13 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
     console.log("Test Time: " + time + "ms");
     console.log("Total Time (including writing results): " + (Date.now() - start) + "ms");
 
-    console.log(require("fs").readFileSync(filename, "utf-8"));
+    //console.log(require("fs").readFileSync(filename, "utf-8"));
 
     if (is(Result.Failure, result))
+    {
+        console.log("TESTS FAILED TO PASS");
         process.exit(1);
+    }
 
     console.log("ALL ENABLED TESTS PASSED");
 })();
-
-
-function print(node, tabs = 0)
-{
-    if (tabs === 0)
-        console.log(node.title);
-    else
-    {
-        const prefix = Repeat(" ", tabs).join("");
-        const { duration, outcome } = node.report;
-        const emoji =
-            outcome.type === "skipped" ? "-" :
-            outcome.type === "success" ? "✓" : "✕";
-        const post = outcome.type === "skipped" ? "(skipped)" : `(${duration}ms)`;
-
-        console.log(`${prefix}${emoji} ${node.title} ${post}`);
-    }
-
-    if (node.children)
-        return node.children.map(node => print(node, tabs + 1))
-}
