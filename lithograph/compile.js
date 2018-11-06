@@ -148,7 +148,8 @@ const parseFragment = (function ()
 
     return function parseFragment({ source, value })
     {
-        const startLine = source.start.line;
+        // Add one because of the triple-ticks.
+        const startLine = source.start.line + 1;
         const sourceFilename = source.filename;
         const options =
             { startLine, allowAwaitOutsideFunction, sourceFilename };
