@@ -1,4 +1,4 @@
-const { Repeat, Range, List, Map } = require("immutable");
+const { Repeat, List } = require("immutable");
 const { Cause, field, event, update, IO } = require("@cause/cause");
 const Pool = require("@cause/pool");
 const Fork = require("@cause/fork");
@@ -8,6 +8,7 @@ const Browser = require("./browser");
 
 const Node = require("@lithograph/ast");
 const Result = require("@lithograph/status/result");
+const Log = require("./log");
 
 
 module.exports = async function main(paths, options)
@@ -40,6 +41,8 @@ const Main = Cause("Main",
         return { fileProcessPool, browserPool, paths, title };
     },
 
+    [event._on(Log)]: (main, log) => (console.log(log.message), [main, []]),
+
     [event._on(Result.Suite)] (main, result)
     {
         const [,, index] = result.fromKeyPath;
@@ -63,7 +66,7 @@ const Main = Cause("Main",
     [event.on (Pool.Retained) .from `fileProcessPool`](main, event)
     {
         const { request: path, index } = event;
-    console.log("RETAINED FILE PROCESS: " + index + " " + Date.now());
+
         return update.in(
             main,
             ["fileProcessPool", "items", index],
@@ -121,5 +124,8 @@ function toRootSuite({ title, children })
 
     return Node.Suite({ block, children, mode: Node.Suite.Mode.Concurrent });
 }
+
+module.exports.Log = Log;
+
 
 

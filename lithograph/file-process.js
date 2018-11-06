@@ -4,6 +4,7 @@ const { Cause, IO, field, event, update } = require("@cause/cause");
 const FileExecution = require("./file-execution");
 const GarbageCollector = require("./garbage-collector");
 const Result = require("@lithograph/status/result");
+const Log = require("./log");
 
 
 const FileProcess = Cause("FileProcess",
@@ -17,6 +18,9 @@ const FileProcess = Cause("FileProcess",
     [event.on (Cause.Start)]: event.ignore,
 
     [field `fileExecution`]: -1,
+
+    [event._on(Log)]: (fileProcess, log) =>
+        [fileProcess, [log.update("fromKeyPath", () => undefined)]],
 
     [event.in `Execute`]: { path:-1 },
     [event.on `Execute`]: (fileProcess, { path }) =>

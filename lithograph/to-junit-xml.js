@@ -2,6 +2,7 @@ const { dirname } = require("path");
 const { spawnSync } = require("child_process");
 const { is, union } = require("@algebraic/type");
 const { Result } = require("@lithograph/status");
+const { Reason } = Result.Failure;
 const JUnitSkipped = union `JUnitSkipped` (Result.Skipped, Result.Omitted);
 
 const { openSync: open, writeSync: write, closeSync: close } = require("fs");
@@ -46,15 +47,25 @@ function toXML(fd, result, tabs)
         null :
         is (JUnitSkipped, result) ?
             () => tag(fd, tabs + 1, "skipped") :
-            () => tag(fd, tabs + 1, "failure",
-                { message: result.reason.message || "", type: "FATAL" },
-                () => write(fd, escape(result.reason.stack || "") + "\n"));
+            () => failure(fd, tabs + 1, result.reason);
     const time = !is(JUnitSkipped, result) ?
         result.duration.end - result.duration.start :
         0;
 
     return tag(fd, tabs, "testcase",
         { name: title, id, time }, children);
+}
+
+function failure(fd, tabs, reason)
+{
+    const isError = is(Reason.Error, reason);
+    const message = isError ? reason.message : reason.stringified;
+    const contents = isError ? reason.stack : reason.stringified;
+    const type = isError ? reason.name : "<unknown>";
+
+    return tag(fd, tabs, "failure",
+        { message, type },
+        () => write(fd, escape(contents) + "\n"));
 }
 
 function tag(fd, tabs, name, attributes = { }, children)

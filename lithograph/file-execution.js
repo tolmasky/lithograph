@@ -4,6 +4,7 @@ const { Cause, IO, field, event, update } = require("@cause/cause");
 const { Test, Suite, fromMarkdown } = require("@lithograph/ast");
 const { Status, Result } = require("@lithograph/status");
 const { Reason } = Result.Failure;
+const Log = require("./log");
 
 const Pool = require("@cause/pool");
 const compile = require("./compile");
@@ -80,34 +81,44 @@ const FileExecution = Cause("FileExecution",
         return [fileExecution, [event.update("fromKeyPath", fromKeyPath => fromKeyPath.next)]]
     },
 
-    [event.in `Report`]: { testPath:-1, test:-1, index: -1, report:-1 },
+    [event.in `Report`]: { testPath:-1, test:-1, index: -1, report:-1, start:-1 },
     [event.on `Report`]: testFinished
 });
 
 function testFinished(fileExecution, event)
 {
-    const { testPath, test, index, report } = event;
+    const { testPath, test, index, report, start } = event;
     const { status } = fileExecution;
     const { status: updatedStatus, unblocked, scopes } =
         Status.updateTestPathWithReport(status, testPath, report);
     const withUpdatedStatus = fileExecution
         .set("status", updatedStatus)
         .removeIn(["running", test.block.id]);
+
     const [withUpdatedHelpers, events] = update.in.reduce(withUpdatedStatus,
     [
         ["garbageCollector", GarbageCollector.ScopesExited({ scopes })],
         ["pool", Pool.Release({ indexes: [index] })]
     ]);
-    const finished = is(Status.Result, withUpdatedHelpers.status);
+
+    // We should just get the test result back from update...
+    const duration = report.end - start;
+    const message = is(Status.Report.Success, report) ?
+        `✓ SUCCESS: ${test.block.title} (${duration}ms)` :
+        `✕ FAILURE: ${test.block.title} (${duration}ms)\n` +
+            (is(Reason.Error, report.reason) ?
+                report.reason.stack :
+                report.reason.stringified);
+    const withLog = [...events, Log({ message })];
 
     // If we exited the root scope, then we're done.
-    if (finished)
-        return [withUpdatedHelpers, [...events, withUpdatedHelpers.status]];
+    if (is(Result, withUpdatedHelpers.status))
+        return [withUpdatedHelpers, [...withLog, withUpdatedHelpers.status]];
 
     const [enqueued, fromEnqueueEvents] =
         update.in(withUpdatedHelpers, "pool", Pool.Enqueue({ requests: unblocked }));
 
-    return [enqueued, [...events, ...fromEnqueueEvents]];
+    return [enqueued, [...withLog, ...fromEnqueueEvents]];
 }
 
 module.exports = FileExecution;
@@ -118,7 +129,8 @@ async function testRun({ functions, test, testPath, index })
     const { id, title } = test.block;
     const f = functions.get(id);
 
-    console.log("RUN " + test.block.id + " -> " + title + " " + Date.now());
+    // FIXME: Would be nice to use Log() here...
+    console.log("  STARTED: " + title);
 
     const [succeeded, error] = await f()
         .then(() => [true])
@@ -131,10 +143,8 @@ async function testRun({ functions, test, testPath, index })
             end,
             reason: error instanceof Error ?
                 Reason.Error(error) :
-                Reason.Value({ stringified: JSON.stringified(error) })
+                Reason.Value({ stringified: JSON.stringify(error) })
         });
 
-    console.log("finished " + id + " -> " + title + " " + succeeded);
-
-    return FileExecution.Report({ testPath, test, index, end, report });
+    return FileExecution.Report({ testPath, test, index, start, end, report });
 }
