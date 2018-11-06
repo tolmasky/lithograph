@@ -1,6 +1,5 @@
 require("source-map-support").install({ hookRequire: true });
 
-const { List, Map } = require("immutable");
 const { Cause, IO, field, event, update } = require("@cause/cause");
 const FileExecution = require("./file-execution");
 const GarbageCollector = require("./garbage-collector");
@@ -21,7 +20,7 @@ const FileProcess = Cause("FileProcess",
 
     [event.in `Execute`]: { path:-1 },
     [event.on `Execute`]: (fileProcess, { path }) =>
-    {console.log("EXECUTING!!!! " + Date.now());
+    {
         const fileExecution = FileExecution.create({ path });
 
         return update.in(

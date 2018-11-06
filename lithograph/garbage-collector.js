@@ -56,15 +56,15 @@ const GarbageCollector = Cause("GarbageCollector",
 
     [event.in `ScopesExited`]: { scopes: -1 },
     [event.on `ScopesExited`](collector, { scopes })
-    {console.log("SCOPES EXITED: ", scopes);
+    {
         const updated = collector.update("allocations",
             allocations => scopes.reduce(
                 (allocations, scope) => allocations.delete(scope),
                 allocations));
         const allocations = scopes
             .map(scope => collector.allocations.get(scope, List()))
-            .flatten();console.log(allocations);
-        console.log("DEALLOCATE:", allocations);
+            .flatten();
+
         const events =
             allocations.size > 0 &&
             [GarbageCollector.Deallocate({ ids:allocations.toList() })];
