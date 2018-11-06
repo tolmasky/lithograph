@@ -1,15 +1,14 @@
-const { is, serialize, deserialize } = require("@algebraic/type");
-const { Record, List, Map, Range, Set } = require("immutable");
+const { is } = require("@algebraic/type");
+const { Map } = require("immutable");
 const { Cause, IO, field, event, update } = require("@cause/cause");
 const { Test, Suite, fromMarkdown } = require("@lithograph/ast");
-const Status = require("@lithograph/status");
-const { Reason } = Status.Result.Failure;
+const { Status, Result } = require("@lithograph/status");
+const { Reason } = Result.Failure;
 
 const Pool = require("@cause/pool");
 const compile = require("./compile");
 const GarbageCollector = require("./garbage-collector");
 const toEnvironment = require("./file-execution/to-environment");
-const Result = Record({ statuses:Map(), root:-1 }, "FileExecution.Result");
 
 
 require("./magic-ws-puppeteer");
@@ -18,7 +17,6 @@ require("./test-worker/static");
 
 const FileExecution = Cause("FileExecution",
 {
-    [field `path`]: -1,
     [field `root`]: -1,
     [field `pool`]: Pool.create({ count: 100 }),
     [field `running`]: Map(),
@@ -31,7 +29,7 @@ const FileExecution = Cause("FileExecution",
         const root = fromMarkdown(path);
         const garbageCollector = GarbageCollector.create({ node: root });
 
-        return { path, root, garbageCollector };
+        return { root, garbageCollector };
     },
 
     [event.on (Cause.Ready) .from `garbageCollector`](fileExecution)
@@ -82,13 +80,9 @@ const FileExecution = Cause("FileExecution",
         return [fileExecution, [event.update("fromKeyPath", fromKeyPath => fromKeyPath.next)]]
     },
 
-    [event.out `Finished`]: { result: -1 },
-
     [event.in `Report`]: { testPath:-1, test:-1, index: -1, report:-1 },
     [event.on `Report`]: testFinished
 });
-
-FileExecution.Result = Result;
 
 function testFinished(fileExecution, event)
 {
@@ -143,26 +137,4 @@ async function testRun({ functions, test, testPath, index })
     console.log("finished " + id + " -> " + title + " " + succeeded);
 
     return FileExecution.Report({ testPath, test, index, end, report });
-}
-
-function toObject(node, reports)
-{
-    const { title, disabled } = node.metadata;
-    const isTest = node instanceof Test
-    const type = isTest ? "test" : "suite";
-    const report = reports.get(node.metadata.id);
-    const outcome = report.outcome instanceof Report.Success ?
-        { type: "success" } :
-        { type: "failure", reason: toErrorObject(report.outcome.reason) };
-    const reportObject = { duration: report.duration, outcome };
-    const common = { title, disabled, type, report: reportObject };
-    const children = !isTest &&
-        node.children.map(node => toObject(node, reports));
-
-    return { ...common, ...(children && { children }) };
-}
-
-function toErrorObject(error)
-{
-    return { message: error.message, stack: error.stack };
 }

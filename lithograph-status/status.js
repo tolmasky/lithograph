@@ -77,7 +77,6 @@ function updateTestPathToRunning(inStatus, testPath, start)
 
     const updatedRunning = running.set(index, updatedChild);
     const updatedWaiting = isRunningChild ? waiting : waiting.remove(index);
-    if (updatedWaiting.size < waiting.size) console.log("REMOVED " + index);
     const status = Running.Suite(
         { ...inStatus, running: updatedRunning, waiting: updatedWaiting });
 
