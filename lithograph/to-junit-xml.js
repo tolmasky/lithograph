@@ -49,9 +49,12 @@ function toXML(fd, result, tabs)
             () => tag(fd, tabs + 1, "failure",
                 { message: result.reason.message || "", type: "FATAL" },
                 () => write(fd, escape(result.reason.stack || "") + "\n"));
+    const time = !is(JUnitSkipped, result) ?
+        result.duration.end - result.duration.start :
+        0;
 
     return tag(fd, tabs, "testcase",
-        { name: title, id }, children);
+        { name: title, id, time }, children);
 }
 
 function tag(fd, tabs, name, attributes = { }, children)
