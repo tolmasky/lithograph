@@ -2,16 +2,14 @@ const { is, serialize, deserialize } = require("@algebraic/type");
 const { Record, List, Map, Range, Set } = require("immutable");
 const { Cause, IO, field, event, update } = require("@cause/cause");
 const { Test, Suite, fromMarkdown } = require("@lithograph/ast");
-const Status = require("@lithograph/status/status-tree");
+const Status = require("@lithograph/status");
 const { Reason } = Status.Result.Failure;
 
-//const Status = require("@lithograph/status");
 const Pool = require("@cause/pool");
 const compile = require("./compile");
 const GarbageCollector = require("./garbage-collector");
 const toEnvironment = require("./file-execution/to-environment");
 const Result = Record({ statuses:Map(), root:-1 }, "FileExecution.Result");
-//const S = require("@lithograph/status/status[.js");
 
 
 require("./magic-ws-puppeteer");
