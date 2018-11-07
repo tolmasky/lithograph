@@ -2,6 +2,9 @@ const { is, data, number, string } = require("@algebraic/type");
 const { List, Map, Stack } = require("@algebraic/collections");
 const { Node, Block, Source, Test, Suite, Fragment } = require("./node");
 
+const { dirname } = require("path");
+const Module = require("module");
+
 const NodeList = List(Node);
 
 const Placeholder = data `Placeholder` (
@@ -13,7 +16,7 @@ const Placeholder = data `Placeholder` (
 const State = data `State` (
     stack => Stack(Placeholder),
     id => number,
-    filename => string );
+    module => Module );
 
 const swaptop = (item, stack) =>
     stack.peek() === item ? stack : stack.pop().push(item);
@@ -47,7 +50,7 @@ const toPlaceholder = (function ()
     return function toPlaceholder(state, heading)
     {
         const id = state.id;
-        const source = getSourceFromSyntaxNode(heading, state.filename);
+        const source = getSourceFromSyntaxNode(heading, state.module.filename);
         const disabled = isEntirelyCrossedOut(heading);
         const [title, mode] = parse(getInnerText(heading));
         const depth = heading.depth;
@@ -117,7 +120,7 @@ const markdown =
 {
     code(state, code)
     {
-        const source = getSourceFromSyntaxNode(code, state.filename);
+        const source = getSourceFromSyntaxNode(code, state.module.filename);
         const fragment = Fragment({ source, value: code.value });
         const parent = state.stack.peek();
         const fragments = parent.fragments.push(fragment);
@@ -143,10 +146,24 @@ const markdown =
 
     blockquote(state, { children })
     {
-        if (children.length !== 2 || children[1].type !== "code")
+        if (children.length !== 2 ||
+            children[0].type !== "paragraph")
             return state;
 
         const name = getInnerText(children[0]);
+
+        if (name.startsWith("plugin:"))
+        {
+            const pluginPath = name.match(/^plugin:\s+(.*$)/)[1];
+            const plugin = state.module.require(pluginPath);
+            const result = plugin(children.slice(1));
+
+            return state;
+        }
+
+        if (children.length !== 2 || children[1].type !== "code")
+            return state;
+
         const contents = children[1].value;
         const placeholder = state.stack.peek();
         const block = placeholder.block;
@@ -161,6 +178,10 @@ const markdown =
 
 function fromDocument(document, filename)
 {
+    const paths = Module._nodeModulePaths(dirname(filename));
+    const module = Object.assign(
+        new Module(filename),
+        { filename, paths, loaded: true });
     const source = getSourceFromSyntaxNode(document, filename);
     const title = filename;
     const block = Block({ id:0, source, title, depth:0 });
@@ -171,7 +192,7 @@ function fromDocument(document, filename)
     const EOF = { type:"heading", position, depth:1, children:[] };
     const state = [...document.children, EOF].reduce(
         (state, node) => (markdown[node.type] || (x => x))(state, node),
-        State({ id: 1, stack: Stack(Placeholder)([start]), filename }));
+        State({ id: 1, stack: Stack(Placeholder)([start]), module }));
     // The top of the stack will always be our EOF marker.
     const top = toConcrete(state.stack.pop().peek());
     const root = is(Test, top) ?
