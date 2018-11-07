@@ -59,7 +59,7 @@ PagePrototype.static = async function (HTML)
     this.on("request", listener);
 
     const captureScope = message =>
-    {
+    {console.log("captured...");
         this.testScope = message.args()[0];
         this.removeListener("console", captureScope);
     }
@@ -69,7 +69,7 @@ PagePrototype.static = async function (HTML)
     await this.evaluateOnNewDocument(
         `${getPreloadSource()};\n` +
         `const { preload, expect, fetch, mock } = require("test-environment-preload");\n` +
-        `console.log([expect, fetch, mock]);\n` +
+        `console.log([expect, fetch, mock,"pizza"]);\n` +
         `preload([${(this._preloadScripts || []).join(",")}])`);
 
     this._preloadScripts = [];

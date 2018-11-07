@@ -5,7 +5,7 @@ const FileExecution = require("./file-execution");
 const GarbageCollector = require("./garbage-collector");
 const Result = require("@lithograph/status/result");
 const Log = require("./log");
-
+Error.stackTraceLimit = Infinity;
 
 const FileProcess = Cause("FileProcess",
 {

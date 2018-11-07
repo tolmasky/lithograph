@@ -50,6 +50,8 @@ const Main = Cause("Main",
             main.update("results", results => results.push(result)),
             "fileProcessPool",
             Pool.Release({ indexes: [index] }));
+            
+            //check browser pool full.
         const { results } = updated;
         const finished = results.size === main.paths.size;
 

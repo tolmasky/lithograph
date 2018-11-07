@@ -10,8 +10,8 @@ module.exports = function toEnvironment(allocate)
     {
         const browserWSEndpoint = await allocate("endpoint");
         const puppeteer = require("puppeteer");
-
-        return await puppeteer.connect({ browserWSEndpoint });
+global.b = await puppeteer.connect({ browserWSEndpoint });
+        return await global.b;//puppeteer.connect({ browserWSEndpoint });
     }
 
     async function getBrowserContext()

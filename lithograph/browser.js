@@ -37,6 +37,8 @@ module.exports = Browser;
 
 async function reset(browser)
 {
+console.log("RESET " + Date.now());
+
     await Promise.all(
         (await browser.pages())
             .map(page => page.close()));

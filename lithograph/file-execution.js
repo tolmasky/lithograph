@@ -104,7 +104,7 @@ function testFinished(fileExecution, event)
     // We should just get the test result back from update...
     const duration = report.end - start;
     const message = is(Status.Report.Success, report) ?
-        `✓ SUCCESS: ${test.block.title} (${duration}ms)` :
+        `✓ SUCCESS: ${test.block.title} (${duration}ms)` + Date.now() :
         `✕ FAILURE: ${test.block.title} (${duration}ms)\n` +
             (is(Reason.Error, report.reason) ?
                 report.reason.stack :
@@ -130,7 +130,7 @@ async function testRun({ functions, test, testPath, index })
     const f = functions.get(id);
 
     // FIXME: Would be nice to use Log() here...
-    console.log("  STARTED: " + title);
+    console.log("  STARTED: " + title + " " + Date.now());
 
     const [succeeded, error] = await f()
         .then(() => [true])

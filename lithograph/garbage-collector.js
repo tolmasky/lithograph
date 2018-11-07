@@ -68,7 +68,7 @@ const GarbageCollector = Cause("GarbageCollector",
         const events =
             allocations.size > 0 &&
             [GarbageCollector.Deallocate({ ids:allocations.toList() })];
-
+if (allocations.size ){ console.log(global.b.disconnect()); console.log("DISCONNECTED") };
         return [updated, events || []];
     }
 });

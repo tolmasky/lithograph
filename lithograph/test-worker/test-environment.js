@@ -30,7 +30,7 @@ module.exports.expect = function expect(expected)
 
                         return await expectation[key](received);
                     }
-                    catch (error) { console.log(error); }
+                    catch (error) { console.log("!!!"+error); }
 
                     await delay(50);
                 }
