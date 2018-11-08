@@ -1,7 +1,9 @@
 const { is, data, number, string } = require("@algebraic/type");
 const { List, Map, Stack } = require("@algebraic/collections");
 const { Node, Block, Source, Test, Suite, Fragment } = require("./node");
+const MDList = require("./from-markdown/md-list");
 
+const { readFileSync } = require("fs");
 const { dirname } = require("path");
 const Module = require("module");
 
@@ -15,6 +17,7 @@ const Placeholder = data `Placeholder` (
 
 const State = data `State` (
     stack => Stack(Placeholder),
+    next => MDList.MDNext,
     id => number,
     module => Module );
 
@@ -156,9 +159,11 @@ const markdown =
         {
             const pluginPath = name.match(/^plugin:\s+(.*$)/)[1];
             const plugin = state.module.require(pluginPath);
-            const result = plugin(children.slice(1));
+            const contents = plugin(children.slice(1));
+            const { document, children: next } =
+                MDList.parse(contents, state.next);
 
-            return state;
+            return State({ ...state, next });
         }
 
         if (children.length !== 2 || children[1].type !== "code")
@@ -176,24 +181,31 @@ const markdown =
     }
 }
 
-function fromDocument(document, filename)
+module.exports = function fromMarkdown(filename)
 {
+    const position = { start: { line:1, column:1 }, end: { line:1, column:1 } };
+    const EOF = { type:"heading", position, depth:1, children:[] };
+    const EOFList = MDList({ node: EOF, next: MDList.End });
+    const { document, children } = MDList.parse(readFileSync(filename), EOFList);
+
     const paths = Module._nodeModulePaths(dirname(filename));
     const module = Object.assign(
         new Module(filename),
         { filename, paths, loaded: true });
+
     const source = getSourceFromSyntaxNode(document, filename);
     const title = filename;
     const block = Block({ id:0, source, title, depth:0 });
     const mode = Suite.Mode.Concurrent;
-    const start = Placeholder({ block, mode });
+    const stack = Stack(Placeholder).of(Placeholder({ block, mode }));
 
-    const position = { start: { line:1, column:1 }, end: { line:1, column:1 } };
-    const EOF = { type:"heading", position, depth:1, children:[] };
-    const state = [...document.children, EOF].reduce(
-        (state, node) => (markdown[node.type] || (x => x))(state, node),
-        State({ id: 1, stack: Stack(Placeholder)([start]), module }));
-    // The top of the stack will always be our EOF marker.
+    const state = reduceWhile(
+        state => state.next !== MDList.End,
+        ({ next: { node, next }, ...state }) =>
+            (markdown[node.type] || (x => x))
+            (State({ ...state, next }), node),
+        State({ id:1, stack, next:children, module }));
+
     const top = toConcrete(state.stack.pop().peek());
     const root = is(Test, top) ?
         Suite({ block, mode, children:NodeList.of(top) }) :
@@ -202,16 +214,10 @@ function fromDocument(document, filename)
     return root;
 }
 
-module.exports = (function ()
+function reduceWhile(condition, iterate, start)
 {
-    const { parse } = require("remark");
-    const { readFileSync } = require("fs");
+    while (condition(start))
+        start = iterate(start);
 
-    return function fromMarkdown(filename)
-    {
-        const contents = readFileSync(filename, "utf-8");
-        const document = parse(contents);
-
-        return fromDocument(document, filename);
-    }
-})();
+    return start;
+}
