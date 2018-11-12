@@ -148,13 +148,45 @@ const parseFragment = (function ()
 
     return function parseFragment({ source, value })
     {
-        // Add one because of the triple-ticks.
-        const startLine = source.start.line + 1;
-        const sourceFilename = source.filename;
-        const options =
-            { startLine, allowAwaitOutsideFunction, sourceFilename };
+        try
+        {
+            // Add one because of the triple-ticks.
+            const startLine = source.start.line + 1;
+            const sourceFilename = source.filename;
+            const options =
+                { startLine, allowAwaitOutsideFunction, sourceFilename };
 
-        return parse(value, options).program.body;
+            return parse(value, options).program.body;
+        }
+        catch (error)
+        {
+            if (!(error instanceof SyntaxError))
+                throw error;
+
+            // Unfortunately, @babel/parse doesn't take into account
+            // the `startLine`, so we have to do it ourselves.
+            // https://github.com/babel/babel/issues/9015
+            const { line: unmapped, column } = error.loc;
+            const { filename, start } = source;
+            const line = unmapped + start.line;
+            const message = error.message.replace(/\d+(?=:\d+\)$)/, line);
+
+            const snippet = value.split("\n")[unmapped - 1];
+            const marker = snippet
+                .split("\n")
+                .slice(0, column - 1)
+                .map(ch => /s/.test(ch) ? ch : " ")
+                .join("") + "^";
+            const stack =
+                `${filename}:${line}:${column}\n` +
+                `${snippet}\n` +
+                `${marker}\n` +
+                `SyntaxError: ${message}\n` +
+                `    at ${filename}:${line}:${column}`;
+            const mapped = SyntaxError(message, filename, line);
+
+            throw Object.assign(mapped, { stack });
+        }
     }
 })();
 
