@@ -26,10 +26,10 @@ const FieldsLIStyle =
 }
 
 const Field = ({ label, value }) =>
-    [
-        <span style = { FieldLabelStyle } >{ label }:</span>,
-        <input value = { value } style = { FieldValueStyle } />
-    ];
+<React.Fragment>
+    <span style = { FieldLabelStyle } >{ label }:</span>
+    <input value = { value } style = { FieldValueStyle } readOnly = { true } />
+</React.Fragment>;
 
 const FieldLabelStyle =
 {

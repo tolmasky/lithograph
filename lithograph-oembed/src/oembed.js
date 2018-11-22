@@ -36,7 +36,7 @@ const OEmbed = Object.assign(props => OEmbed[props.data.state](props),
 
     loaded: ({ data, update, keyPath }) =>
         <section className = "oembed" >
-                <OEmbedContainer { ...{ data, keyPath, update } } />
+            <OEmbedContainer { ...{ data, keyPath, update } } />
         </section>
 });
 

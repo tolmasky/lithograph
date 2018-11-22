@@ -27,7 +27,8 @@ const adoptIn = (key, child, parent) =>
     parent.update(key, list => list.push(child));
 
 const addf = f => (x, y) => x + f(y);
-const getInnerText = node => node.type === "text" ?
+const getInnerText = node =>
+    node.type === "text" || node.type === "inlineCode" ?
     node.value : node.children.reduce(addf(getInnerText), "");
 
 

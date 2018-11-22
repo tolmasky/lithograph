@@ -39,6 +39,9 @@ PagePrototype.goto = function (URL)
 
 PagePrototype.static = async function (HTML)
 {
+    if (this.logs)
+        return await goto.call(this, "https://lithograph/static");;
+
     this.logs = [];
 
     const status = 200;
