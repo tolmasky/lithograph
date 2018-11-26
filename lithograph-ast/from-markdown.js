@@ -1,7 +1,8 @@
 const { is, data, number, string } = require("@algebraic/type");
 const { List, Map, Stack } = require("@algebraic/collections");
 const { Node, Block, Source, Test, Suite, Fragment } = require("./node");
-const MDList = require("./from-markdown/md-list");
+const transform = require("@lithograph/plugin");
+const MDList = require("@lithograph/remark/md-list");
 
 const { readFileSync } = require("fs");
 const { dirname } = require("path");
@@ -133,8 +134,9 @@ const markdown =
         return State({ ...state, stack: swaptop(updated, state.stack) });
     },
 
-    heading(state, heading)
+    heading(state, node)
     {
+        const { heading, next } = transform(node, state.next, state.module);
         const { stack } = state;
         const shallower = ({ block }) => heading.depth > block.depth;
         const count = stack.findIndex(shallower) + 1;
@@ -144,9 +146,8 @@ const markdown =
                 children: parent.children.concat(toConcrete(child)) }));
         const [updated, placeholder] = toPlaceholder(state, heading);
         const appended = remaining.push(collapsed).push(placeholder);
-        const part2 = _(updated);
 
-        return State({ ...part2, stack: appended });
+        return State({ ...state, next, stack: appended });
     },
 
     blockquote(state, { children })
@@ -214,7 +215,7 @@ function _(state, depth)
     {
         while (
             next !== MDList.End &&
-            (next.node.type !== "heading" || next.node.depth < depth))
+            (next.node.type !== "heading" || next.node.depth > depth))
         {
             children.push(next.node);
             next = next.next;
@@ -241,6 +242,15 @@ function _(state, depth)
 
             return State({ ...state, next });
     */
+}
+
+MDList.parse = function MDListParse(contents, next = MDList.End)
+{
+    const document = require("remark").parse(contents);
+    const children = document.children.reverse()
+        .reduce((next, node) => MDList({ node, next }), next);
+
+    return { document, children };
 }
 
 module.exports = function fromMarkdown(filename)

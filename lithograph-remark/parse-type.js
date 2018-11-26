@@ -9,12 +9,13 @@ const fail = (type, message) => [Failure(type)({ message }), MDList.End];
 
 
 module.exports = parse;
+module.exports.Failure = Failure;
 
 function parse(type, node, many)
 {
     const list = MDList.fromArray(node.children);
     const [result, rest] =  (many ? parse.many : parse.one)(type, list);
-console.log("--->", result);
+
     if (parameterized.belongs(Failure, result))
         throw TypeError(result.message);
 

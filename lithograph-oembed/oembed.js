@@ -11,14 +11,15 @@ const OEmbedArguments = data `OEmbedArguments` (
     maxwidths => Set(number),
     supportedURLs => Set(URL) );
 
-
-
-module.exports = function (elements)
+module.exports = function (list)
 {
+/*
     const args = fromTable(OEmbedArguments, elements[0]);
 
     console.log(args);
     console.log(elements);
 
-    return `# A simple test`;
+    return `# A simple test`;*/
+
+    return list;
 }
