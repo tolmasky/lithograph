@@ -1,6 +1,5 @@
-const { getKind, union, data, is, primitives, parameterized, getUnscopedTypename, getTypename } =
+const { getKind, union, data, is, string, primitives, parameterized, getUnscopedTypename, getTypename } =
     require("@algebraic/type");
-const { List, Set } = require("@algebraic/collections");
 const MDList = require("@lithograph/remark/md-list");
 const { hasOwnProperty } = Object;
 
@@ -8,13 +7,17 @@ const Failure = parameterized (T =>
     data `Failed <${T}>` (message => string));
 const fail = (type, message) => [Failure(type)({ message }), MDList.End];
 
+
 module.exports = parse;
 
 function parse(type, node, many)
 {
     const list = MDList.fromArray(node.children);
     const [result, rest] =  (many ? parse.many : parse.one)(type, list);
-console.log(result, rest);
+console.log("--->", result);
+    if (parameterized.belongs(Failure, result))
+        throw TypeError(result.message);
+
     if (rest !== MDList.End)
         throw TypeError(`Too much markdown`);
 
@@ -89,7 +92,7 @@ function transformEnum(...args)
         const quoted = Object.keys(values).map(value => `"${value}"`);
         const message = `${type} must be one of either ${quoted.join(", or ")}`;
 
-        return fail(type, message);
+        return Failure(type)({ message });
     }, ...rest);
 }
 
@@ -97,7 +100,7 @@ function transformInlineCode(...args)
 {
     if (args.length < 3)
         return (...more) => transformInlineCode(...args, ...more);
-console.log(args)
+
     const [f, type, list] = args;
     const { node, next } = list;
 
@@ -126,46 +129,6 @@ parse.URL = function parseURL(type, list)
     return fail(type, message);
 }
 
-function _parse(type, node)
-{
-    const children = node.children || [node];
-    const typename = getTypename(type);
-
-    if (hasBase(List, type) || hasBase(Set, type))
-    {
-        const parameter = getParameters(type)[0];
-
-        return children.reduce((collection, node) =>
-            node.type === "text" ?
-                collection :
-                collection.concat(parseInlineCode(parameter, node)),
-            type());
-    }
-
-    if (children.length > 1 || children.length <= 0)
-        throw TypeError(
-            `${typename} expects a single inline code markdown element`);
-
-    return parseInlineCode(type, children[0]);
-}
-
-function parseInlineCode(type, node)
-{
-    if (node.type !== "inlineCode")
-        throw TypeError(
-            `${typename} expects a single inline code markdown element`);
-
-    const kind = getKind(type);
-
-    if (kind === union)
-        return parseUnion(type, node);
-
-    if (kind === data)
-        return parseData(type, node);
-
-    throw "OH NO";
-}
-
 parse.union = function parseUnion(type, list)
 {
     for (const component of union.components(type))
@@ -189,59 +152,3 @@ parse.data = function parseData(type, list)
 
     return transformEnum({ [typename]: type }, type, list);
 }
-
-
-/*
-
-
-/*
-    if (node.type !== "inlineCode")
-        throw TypeError(
-            `${getTypename(type)} expects a single inline `+
-            `code markdown element, but instead got ${node.type}`);
-    const kind = getKind(type);
-
-    if (kind === union)
-        return parseUnion(type, node);
-
-    if (kind === data)
-        return parseData(type, node);
-
-    if (type === URL)
-        return parse.URL(type, node);
-
-    const primitive = Object.keys(primitives)
-        .find(key => primitives[key] === type);
-
-    if (primitive)
-        return parse[primitive](node.value);
-
-    throw TypeError(type+"");
-
-function parseInlineCode(node)
-{
-    if (node.type !== `inlineCode`)
-        throw TypeError(
-            `Expected inline code but instead got ${node.type}`);
-
-    
-}
-
-function parseBoolean(name, children)
-{
-    if (children.length !== 1)
-        throw TypeError();
-
-    if (children.type !== `inlineCode`)
-        throw TypeError(``);
-    
-    const innerText = getInnerText(children[0]);
-    
-    if (innerText === "true")
-        return true;
-
-    if (innerText !== "false")
-        throw TypeError(``);
-
-    return false;
-}*/
