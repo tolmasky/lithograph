@@ -6,24 +6,39 @@ const { hasOwnProperty } = Object;
 
 const Failure = parameterized (T =>
     data `Failed <${T}>` (message => string));
+const fail = (type, message) => [Failure(type)({ message }), MDList.End];
 
 module.exports = parse;
 
 function parse(type, node, many)
 {
     const list = MDList.fromArray(node.children);
-    const [first, rest] = parse.one(type, list);
-
-    if (many)
-        return MDList.reduce(
-            (every, list) =>
-                every.concat([parse.one(type, list)]),
-            rest, [first]);
-
+    const [result, rest] =  (many ? parse.many : parse.one)(type, list);
+console.log(result, rest);
     if (rest !== MDList.End)
         throw TypeError(`Too much markdown`);
 
-    return first;
+    return result;
+}
+
+parse.many = function (type, list)
+{
+    const array = MDList.reduce(function (array, list)
+    {
+        if (list.node.type === `text`)
+            return [array, list.next];
+
+        const [result, rest] = parse.one(type, list);
+
+        return parameterized.belongs(Failure, result) ?
+            [result, rest] :
+            [array.concat([result]), rest];
+    }, list, []);
+
+    if (parameterized.belongs(Failure, array) || array.length > 0)
+        return [array, MDList.End];
+
+    return fail(type, `Found no instances of ${type}`);
 }
 
 parse.one = function (type, list)
@@ -74,7 +89,7 @@ function transformEnum(...args)
         const quoted = Object.keys(values).map(value => `"${value}"`);
         const message = `${type} must be one of either ${quoted.join(", or ")}`;
 
-        return Failure(type)({ message });
+        return fail(type, message);
     }, ...rest);
 }
 
@@ -82,7 +97,7 @@ function transformInlineCode(...args)
 {
     if (args.length < 3)
         return (...more) => transformInlineCode(...args, ...more);
-
+console.log(args)
     const [f, type, list] = args;
     const { node, next } = list;
 
@@ -93,7 +108,7 @@ function transformInlineCode(...args)
         `${getTypename(type)} expects a single inline ` +
         `code markdown element, but instead found ${node.type}`
 
-    return Failure(type)({ message });
+    return fail(type, message);
 }
 
 parse.URL = function parseURL(type, list)
@@ -108,7 +123,7 @@ parse.URL = function parseURL(type, list)
 
     const message = `URL can only be a link or inline code markdown element.`;
 
-    return Failure(type)({ message });
+    return fail(type, message);
 }
 
 function _parse(type, node)
@@ -155,13 +170,13 @@ parse.union = function parseUnion(type, list)
 {
     for (const component of union.components(type))
     {
-        const result = parse.one(component, list);
+        const [result, next] = parse.one(component, list);
 
-        if (!is(Failure(component), result))
-            return result;
+        if (!parameterized.belongs(Failure, result))
+            return [result, next];
     }
 
-    return Failure(type)({ message: `Did not match any member of "${type}"` });
+    return fail(type, `Did not match any member of "${type}"`);
 }
 
 parse.data = function parseData(type, list)

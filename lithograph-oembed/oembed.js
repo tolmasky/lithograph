@@ -1,6 +1,6 @@
 const { data, string, union, parameterized, is } = require("@algebraic/type");
 const { List, Set } = require("@algebraic/collections");
-const Strategy = require("./strategy");
+const { Strategy, Reduction } = require("./strategy");
 const parse = require("@lithograph/remark/parse-type");
 
 URL.prototype.equals = function (rhs)
@@ -76,20 +76,17 @@ function _(type, table)
 
         const { field } = strategy;
         const [type, reduction] = parameterized.parameters(strategy);
+        const atom = reduction === Reduction.Set ?
+            type : parameterized.parameters(type)[0];
+        const value = parse(atom, valueColumn, Reduction.AppendMany);
 
-        if (reduction === Strategy.Set)
-        {
-            const value = parse(type, valueColumn, false);
-
+        if (reduction === Reduction.Set)
             return WorkingArguments({ ...working, [field]: value });
-        }
 
-        const etype = parameterized.parameters(type)[0];
-        const values = parse(etype, valueColumn, true);
         const existing = working[field];
         const appended = is(Unset, existing) ?
-            type(values) :
-            existing.concat(values);
+            type(value) :
+            existing.concat(value);
 
         return WorkingArguments({ ...working, [field]: appended });
     }, WorkingArguments({}));
