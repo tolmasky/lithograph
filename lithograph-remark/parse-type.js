@@ -1,4 +1,4 @@
-const { getKind, union, data, getTypename, getUnscopedTypename } =
+const { getKind, union, data, primitives, getUnscopedTypename, getTypename } =
     require("@algebraic/type");
 const { List, Set, hasBase, getParameters } = require("@algebraic/collections");
 const ParseFailed = data `ParseFailed` ();
@@ -6,6 +6,55 @@ const ParseFailed = data `ParseFailed` ();
 module.exports = parse;
 
 function parse(type, node)
+{/*
+    if (node.type !== "inlineCode")
+        throw TypeError(
+            `${getTypename(type)} expects a single inline `+
+            `code markdown element, but instead got ${node.type}`);
+*/
+    const kind = getKind(type);
+
+    if (kind === union)
+        return parseUnion(type, node);
+
+    if (kind === data)
+        return parseData(type, node);
+
+    if (type === URL)
+        return parse.URL(type, node);
+
+    const primitive = Object.keys(primitives)
+        .find(key => primitives[key] === type);
+
+    if (primitive)
+        return parse[primitive](node.value);
+
+    throw TypeError(type+"");
+}
+
+parse.boolean = value =>
+    value === "true" ? true :
+    value === "false" ? false :
+    (() => { throw TypeError(`Booleans can only be "true" or "false"`) })(); 
+parse.string = value => value;
+parse.number = value => +value;
+parse.regexp = value =>
+    (([, pattern, flags]) => new RegExp(pattern, flags))
+    (value.match(/\/(.*)\/([gimuy]*)$/));
+
+parse.URL = function parseURL(type, node)
+{
+    if (node.type === "link")
+        return new URL(node.url);
+
+     if (node.type === "inlineCode")
+        return new URL(node.value);
+
+    throw TypeError(
+        `URL can only be a link or inline code markdown element`);
+}
+
+function _parse(type, node)
 {
     const children = node.children || [node];
     const typename = getTypename(type);

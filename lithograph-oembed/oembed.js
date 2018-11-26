@@ -1,7 +1,7 @@
 const { data, string, union, parameterized, is } = require("@algebraic/type");
 const { List, Set } = require("@algebraic/collections");
 const Strategy = require("./strategy");
-const parse = require("@lithograph/remark/parse-type");
+const parseInlineCode = require("@lithograph/remark/parse-type");
 
 const Format = union `Format` (
     data `JSON` (),
@@ -9,7 +9,7 @@ const Format = union `Format` (
 
 const OEmbedArguments = data `OEmbedArguments` (
     supportedFormats => Set(Format),
-    supportedURLs => Set(string) );
+    supportedURLs => Set(URL) );
 
 //console.log(getStrategies.for(OEmbedArguments));
 
@@ -59,7 +59,6 @@ function _(type, table)
     {
         const columns = row.children;
         const match = getInnerText(columns[0]);
-        const value = getInnerText(columns[1]);
         const strategy = strategies[match];
 
         if (!strategy)
@@ -67,6 +66,8 @@ function _(type, table)
 
         const { field } = strategy;
         const [type, reduction] = parameterized.parameters(strategy);
+        const rtype = parameterized.parameters(type)[0];
+        const value = parseInlineCode(rtype, columns[1].children[0]);
 
         if (reduction === Strategy.Set)
             return WorkingArguments({ ...working, [field]: value });
