@@ -1,27 +1,47 @@
-const { getKind, union, data, primitives, getUnscopedTypename, getTypename } =
+const { getKind, union, data, is, primitives, parameterized, getUnscopedTypename, getTypename } =
     require("@algebraic/type");
-const { List, Set, hasBase, getParameters } = require("@algebraic/collections");
-const ParseFailed = data `ParseFailed` ();
+const { List, Set } = require("@algebraic/collections");
+const MDList = require("@lithograph/remark/md-list");
+const { hasOwnProperty } = Object;
+
+const Failure = parameterized (T =>
+    data `Failed <${T}>` (message => string));
 
 module.exports = parse;
 
-function parse(type, node)
-{/*
-    if (node.type !== "inlineCode")
+function parse(type, node, many)
+{
+    const list = MDList.fromArray(node.children);
+    const [first, rest] = parse.one(type, list);
+
+    if (many)
+        return MDList.reduce(
+            (every, list) =>
+                every.concat([parse.one(type, list)]),
+            rest, [first]);
+
+    if (rest !== MDList.End)
+        throw TypeError(`Too much markdown`);
+
+    return first;
+}
+
+parse.one = function (type, list)
+{
+    if (list === MDList.End)
         throw TypeError(
-            `${getTypename(type)} expects a single inline `+
-            `code markdown element, but instead got ${node.type}`);
-*/
+            `Unexpected empty markdown when looking for ${getTypename(type)}`);
+
+    if (type === URL)
+        return parse.URL(type, list);
+
     const kind = getKind(type);
 
     if (kind === union)
-        return parseUnion(type, node);
+        return parse.union(type, list);
 
     if (kind === data)
-        return parseData(type, node);
-
-    if (type === URL)
-        return parse.URL(type, node);
+        return parse.data(type, list);
 
     const primitive = Object.keys(primitives)
         .find(key => primitives[key] === type);
@@ -29,29 +49,66 @@ function parse(type, node)
     if (primitive)
         return parse[primitive](node.value);
 
-    throw TypeError(type+"");
+    throw TypeError("Don't know how to parse " + getTypename(type));
 }
 
-parse.boolean = value =>
-    value === "true" ? true :
-    value === "false" ? false :
-    (() => { throw TypeError(`Booleans can only be "true" or "false"`) })(); 
-parse.string = value => value;
-parse.number = value => +value;
-parse.regexp = value =>
+parse.boolean = transformEnum({ true: true, false: false });
+parse.string = transformInlineCode((_, value) => value);
+parse.number = transformInlineCode((_, value) => +value);
+parse.regexp = transformInlineCode((_, value) =>
     (([, pattern, flags]) => new RegExp(pattern, flags))
-    (value.match(/\/(.*)\/([gimuy]*)$/));
+    (value.match(/\/(.*)\/([gimuy]*)$/)));
 
-parse.URL = function parseURL(type, node)
+function transformEnum(...args)
 {
+    if (args.length < 3)
+        return (...more) => transformEnum(...args, ...more);
+
+    const [values, ...rest] = args;
+
+    return transformInlineCode(function (type, value)
+    {
+        if (hasOwnProperty.call(values, value))
+            return values[value];
+
+        const quoted = Object.keys(values).map(value => `"${value}"`);
+        const message = `${type} must be one of either ${quoted.join(", or ")}`;
+
+        return Failure(type)({ message });
+    }, ...rest);
+}
+
+function transformInlineCode(...args)
+{
+    if (args.length < 3)
+        return (...more) => transformInlineCode(...args, ...more);
+
+    const [f, type, list] = args;
+    const { node, next } = list;
+
+    if (node.type === "inlineCode")
+        return [f(type, node.value), next];
+
+    const message =
+        `${getTypename(type)} expects a single inline ` +
+        `code markdown element, but instead found ${node.type}`
+
+    return Failure(type)({ message });
+}
+
+parse.URL = function parseURL(type, list)
+{
+    const { node, next } = list;
+
     if (node.type === "link")
-        return new URL(node.url);
+        return [new URL(node.url), next];
 
-     if (node.type === "inlineCode")
-        return new URL(node.value);
+    if (node.type === "inlineCode")
+        return [new URL(node.value), next];
 
-    throw TypeError(
-        `URL can only be a link or inline code markdown element`);
+    const message = `URL can only be a link or inline code markdown element.`;
+
+    return Failure(type)({ message });
 }
 
 function _parse(type, node)
@@ -94,32 +151,58 @@ function parseInlineCode(type, node)
     throw "OH NO";
 }
 
-function parseUnion(type, inlineCode)
-{console.log("here....");
+parse.union = function parseUnion(type, list)
+{
     for (const component of union.components(type))
     {
-        const result = parse(component, inlineCode);
+        const result = parse.one(component, list);
 
-        if (result !== ParseFailed)
+        if (!is(Failure(component), result))
             return result;
     }
 
-    return ParseFailed;
+    return Failure(type)({ message: `Did not match any member of "${type}"` });
 }
 
-function parseData(type, inlineCode)
+parse.data = function parseData(type, list)
 {
     if (data.fields(type).length > 0)
         throw TypeError(
             `Cannot parse non-nullary data type ${getTypename(type)}`);
- 
+
     const typename = getUnscopedTypename(type);
 
-    return inlineCode.value === typename ? type : ParseFailed;
+    return transformEnum({ [typename]: type }, type, list);
 }
 
 
 /*
+
+
+/*
+    if (node.type !== "inlineCode")
+        throw TypeError(
+            `${getTypename(type)} expects a single inline `+
+            `code markdown element, but instead got ${node.type}`);
+    const kind = getKind(type);
+
+    if (kind === union)
+        return parseUnion(type, node);
+
+    if (kind === data)
+        return parseData(type, node);
+
+    if (type === URL)
+        return parse.URL(type, node);
+
+    const primitive = Object.keys(primitives)
+        .find(key => primitives[key] === type);
+
+    if (primitive)
+        return parse[primitive](node.value);
+
+    throw TypeError(type+"");
+
 function parseInlineCode(node)
 {
     if (node.type !== `inlineCode`)

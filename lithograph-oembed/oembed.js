@@ -1,7 +1,17 @@
 const { data, string, union, parameterized, is } = require("@algebraic/type");
 const { List, Set } = require("@algebraic/collections");
 const Strategy = require("./strategy");
-const parseInlineCode = require("@lithograph/remark/parse-type");
+const parse = require("@lithograph/remark/parse-type");
+
+URL.prototype.equals = function (rhs)
+{
+    return this === rhs || this.hashCode() === rhs.hashCode();
+}
+
+URL.prototype.hashCode = function ()
+{
+    return this.href;
+}
 
 const Format = union `Format` (
     data `JSON` (),
@@ -57,8 +67,8 @@ function _(type, table)
     const rows = table.children || [];
     const working = rows.slice(1).reduce(function (working, row)
     {
-        const columns = row.children;
-        const match = getInnerText(columns[0]);
+        const [keyColumn, valueColumn] = row.children;
+        const match = getInnerText(keyColumn);
         const strategy = strategies[match];
 
         if (!strategy)
@@ -66,15 +76,20 @@ function _(type, table)
 
         const { field } = strategy;
         const [type, reduction] = parameterized.parameters(strategy);
-        const rtype = parameterized.parameters(type)[0];
-        const value = parseInlineCode(rtype, columns[1].children[0]);
 
         if (reduction === Strategy.Set)
-            return WorkingArguments({ ...working, [field]: value });
+        {
+            const value = parse(type, valueColumn, false);
 
+            return WorkingArguments({ ...working, [field]: value });
+        }
+
+        const etype = parameterized.parameters(type)[0];
+        const values = parse(etype, valueColumn, true);
         const existing = working[field];
-        const appended = (is(Unset, existing) ? type() : existing)
-            .concat(value);
+        const appended = is(Unset, existing) ?
+            type(values) :
+            existing.concat(values);
 
         return WorkingArguments({ ...working, [field]: appended });
     }, WorkingArguments({}));
