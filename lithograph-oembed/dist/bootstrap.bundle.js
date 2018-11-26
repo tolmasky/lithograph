@@ -28454,7 +28454,6 @@ const update = ((data, updating) => function update(...args) {
 })(Application.Data({ URL: window.location.href }));
 
 update();
-console.log("hello!");
 
 },{"./application":18,"react":11,"react-dom":8}],20:[function(require,module,exports){
 var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
@@ -28600,9 +28599,11 @@ const OEmbed = Object.assign(props => OEmbed[props.data.state](props), {
 });
 
 const OEmbedContainer = function ({ data, keyPath, update }) {
+    console.log("set up.");
     window.addEventListener("message", function ({ data }) {
+        console.log("???");
         const { context, height } = JSON.parse(data);
-
+        console.log("HEREERER");
         if (context !== "iframe.resize") return;
 
         update([...keyPath, "height"], () => height);

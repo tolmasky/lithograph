@@ -145,6 +145,8 @@ const markdown =
         const [updated, placeholder] = toPlaceholder(state, heading);
         const appended = remaining.push(collapsed).push(placeholder);
 
+        _(updated);
+
         return State({ ...updated, stack: appended });
     },
 
@@ -180,6 +182,65 @@ const markdown =
 
         return State({ ...state, stack: swaptop(updatedPlaceholder, state.stack) });
     }
+}
+
+function _(state, depth)
+{
+    if (state.next === MDList.End)
+        return state;
+
+    const { next: { node, next } } = state;
+
+    if (node.type !== "table")
+        return state;
+
+    const rows = node.children;
+    const rowCount = rows && rows.length;
+
+    if (rowCount !== 1)
+        return state;
+
+    const columns = rows[0].children;
+    const columnCount = columns && columns.length;
+
+    if (columnCount !== 2)
+        return state;
+
+    if (getInnerText(columns[0]) !== "plugin")
+        return state;
+
+    const pluginPath = getInnerText(columns[1]);
+    const plugin = state.module.require(pluginPath);
+    const [children, tail] = (function (next, children = [])
+    {
+        while (
+            next !== MDList.End &&
+            (next.node.type !== "heading" || next.node.depth < depth))
+        {
+            children.push(next.node);
+            next = next.next;
+        }
+
+        return [children, next];
+    })(next);
+
+    const contents = plugin(children);
+    
+    
+    
+    
+    /*
+    const { document, children: next } =
+        MDList.parse(contents, state.next);
+
+    console.log(plugin);
+*/
+    /*const contents = plugin(children.slice(1));
+            const { document, children: next } =
+                MDList.parse(contents, state.next);
+
+            return State({ ...state, next });
+    */
 }
 
 module.exports = function fromMarkdown(filename)

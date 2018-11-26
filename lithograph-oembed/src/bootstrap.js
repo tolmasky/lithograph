@@ -21,4 +21,3 @@ const update = ((data, updating) => function update(...args)
 })(Application.Data({ URL: window.location.href }));
         
 update();
-console.log("hello!");
