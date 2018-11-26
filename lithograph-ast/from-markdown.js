@@ -13,7 +13,7 @@ const Placeholder = data `Placeholder` (
     mode => Suite.Mode,
     block => Block,
     fragments => [List(Fragment), List(Fragment)()],
-    children => [List(Node), List(Node)()] );
+    children => [NodeList, NodeList()] );
 
 const State = data `State` (
     stack => Stack(Placeholder),
@@ -80,7 +80,7 @@ function toConcrete(placeholder)
     const hasChildren = children.size > 0;
 
     if (!hasFragments && !hasChildren)
-        return false;
+        return NodeList();
 
     const first = placeholder.block.source;
     const last = hasChildren ?
@@ -115,7 +115,7 @@ function toConcrete(placeholder)
         id: id + 0.2
     });
     const content = Node.Suite({ block: contentBlock, mode, children });
-    const nested = List(Node)([before, content]);
+    const nested = NodeList([before, content]);
 
     return Node.Suite({ block, mode:Suite.Mode.Serial, children:nested });
 }
@@ -141,13 +141,12 @@ const markdown =
         const remaining = stack.skip(count);
         const collapsed = stack.take(count)
             .reduce((child, parent) => Placeholder({ ...parent,
-                children: parent.children.push(toConcrete(child)) }));
+                children: parent.children.concat(toConcrete(child)) }));
         const [updated, placeholder] = toPlaceholder(state, heading);
         const appended = remaining.push(collapsed).push(placeholder);
+        const part2 = _(updated);
 
-        _(updated);
-
-        return State({ ...updated, stack: appended });
+        return State({ ...part2, stack: appended });
     },
 
     blockquote(state, { children })
@@ -225,7 +224,8 @@ function _(state, depth)
     })(next);
 
     const contents = plugin(children);
-    
+
+    return State({ ...state, next: tail });
     
     
     
@@ -269,6 +269,10 @@ module.exports = function fromMarkdown(filename)
         State({ id:1, stack, next:children, module }));
 
     const top = toConcrete(state.stack.pop().peek());
+
+    if (top.size <= 0)
+        return Suite({ block, mode, children:NodeList() });
+
     const root = is(Test, top) ?
         Suite({ block, mode, children:NodeList.of(top) }) :
         top;

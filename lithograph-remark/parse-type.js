@@ -65,7 +65,7 @@ parse.one = function (type, list)
         .find(key => primitives[key] === type);
 
     if (primitive)
-        return parse[primitive](node.value);
+        return parse[primitive](type, list);
 
     throw TypeError("Don't know how to parse " + getTypename(type));
 }
