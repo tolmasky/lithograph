@@ -1,18 +1,26 @@
-const { data, union, number } = require("@algebraic/type");
+const { data, union, number, parameterized } = require("@algebraic/type");
 const { Set } = require("@algebraic/collections");
 const fromTable = require("@lithograph/plugin/from-table");
+const { Failure } = require("@lithograph/remark/parse-type");
 
 const Format = union `Format` (
     data `JSON` (),
     data `XML` () );
 
-const OEmbedArguments = data `OEmbedArguments` (
-    supportedFormats => Set(Format),
-    maxwidths => Set(number),
-    supportedURLs => Set(URL) );
+const OEmbedConfiguration = data `OEmbedConfiguration` (
+    formats => Set(Format),
+    maxwidths => Set(number) );
 
-module.exports = function (list)
+
+module.exports = function OEmbedPlugin(list)
 {
+    const table = list.next.node;
+    const configuration = fromTable(OEmbedConfiguration, table);
+
+    if (parameterized.belongs(Failure, configuration))
+        throw TypeError(configuration.message);
+
+    console.log(configuration);
 /*
     const args = fromTable(OEmbedArguments, elements[0]);
 
@@ -21,5 +29,5 @@ module.exports = function (list)
 
     return `# A simple test`;*/
 
-    return list;
+    return list.next;
 }

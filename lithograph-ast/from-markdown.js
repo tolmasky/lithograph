@@ -159,21 +159,6 @@ const markdown =
             return state;
 
         const name = getInnerText(children[0]);
-
-        if (name.startsWith("plugin:"))
-        {
-            const pluginPath = name.match(/^plugin:\s+(.*$)/)[1];
-            const plugin = state.module.require(pluginPath);
-            const contents = plugin(children.slice(1));
-            const { document, children: next } =
-                MDList.parse(contents, state.next);
-
-            return State({ ...state, next });
-        }
-
-        if (children.length !== 2 || children[1].type !== "code")
-            return state;
-
         const contents = children[1].value;
         const placeholder = state.stack.peek();
         const block = placeholder.block;
@@ -220,7 +205,7 @@ module.exports = function fromMarkdown(filename)
         return Suite({ block, mode, children:NodeList() });
 
     const root = is(Test, top) ?
-        Suite({ block, mode, children:NodeList.of(top) }) :
+        Suite({ block, mode, children:top }) :
         top;
 
     return root;

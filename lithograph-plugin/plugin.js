@@ -6,7 +6,7 @@ const { Failure } = require("@lithograph/remark/parse-type");
 const Configuration = data `Configuration` (plugin => string);
 
 
-module.exports = function _(heading, next, module)
+module.exports = function transform(heading, next, module)
 {
     if (next === MDList.End)
         return { heading, next };

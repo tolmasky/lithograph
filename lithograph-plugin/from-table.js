@@ -36,8 +36,7 @@ module.exports = function fromTable(type, table, { headers = false } = { })
         const [type, reduction] = parameterized.parameters(strategy);
         const atom = reduction === Reduction.Set ?
             type : parameterized.parameters(type)[0];
-        const value = parse(atom, valueColumn,
-            reduction === Reduction.AppendMany);
+        const value = parse(atom, valueColumn, reduction !== Reduction.Set);
 
         if (reduction === Reduction.Set)
             return WorkingArguments({ ...working, [field]: value });
