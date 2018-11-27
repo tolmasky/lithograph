@@ -1,26 +1,41 @@
-const { data, number } = require("@algebraic/type");
+const { data, number, string } = require("@algebraic/type");
 const { List, Stack } = require("@algebraic/collections");
+const { readFileSync } = require("fs");
+const { parse } = require("remark");
 
 const Section = data `Section` (
     depth => number,
     heading => Object,
     preamble => [List(Object), List(Object)()],
-    subsections => [List(Section), List(Section)()] );
+    subsections => [SectionList, SectionList()] );
+const SectionList = List(Section);
 
 const adopt = (key, item, { [key]: list, ...rest }) =>
     Section({ ...rest, [key]: list.push(item) });
 const toSection = heading => Section({ depth: heading.depth, heading });
+const toHeading = value =>
+    ({ type: "heading", depth:0, children:[{ type: "text", value }] });
 
-Section.from = function (nodes)
+Section.parse = function (filename)
 {
-    const stack = nodes.reduce((stack, node) =>
+    const document = parse(readFileSync(filename));
+    const stack = document.children.reduce((stack, node) =>
         node.type !== "heading" ?
             stack.pop().push(adopt("preamble", node, stack.peek())) :
             collapse(node.depth, stack).push(toSection(node)),
-        Stack(Section).of(Section({ depth:0, heading:{} })));
+        Stack(Section).of(toSection(toHeading(filename))));
 
-    return collapse(0, stack).pop();
+    return collapse(1, stack).peek();
 }
+
+/*
+-__1 1 0 Stack []
+-__2 1 1 Stack [ -1 ]
+-__3 2 1 Stack [ -1 ]
+-__3 2 1 Stack [ -1 ]
+-__3 2 1 Stack [ -1 ]
+-__3 3 0 Stack []
+*/
 
 module.exports = Section;
 
