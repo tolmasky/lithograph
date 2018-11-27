@@ -1,6 +1,8 @@
 const { is, data, number, string } = require("@algebraic/type");
 const { List, Map, Stack } = require("@algebraic/collections");
 const { Node, Block, Source, Test, Suite, Fragment } = require("./node");
+const { parse } = require("remark");
+
 const transform = require("@lithograph/plugin");
 const MDList = require("@lithograph/remark/md-list");
 
@@ -184,81 +186,15 @@ const markdown =
     }
 }
 
-function _(state, depth)
-{
-    if (state.next === MDList.End)
-        return state;
-
-    const { next: { node, next } } = state;
-
-    if (node.type !== "table")
-        return state;
-
-    const rows = node.children;
-    const rowCount = rows && rows.length;
-
-    if (rowCount !== 1)
-        return state;
-
-    const columns = rows[0].children;
-    const columnCount = columns && columns.length;
-
-    if (columnCount !== 2)
-        return state;
-
-    if (getInnerText(columns[0]) !== "plugin")
-        return state;
-
-    const pluginPath = getInnerText(columns[1]);
-    const plugin = state.module.require(pluginPath);
-    const [children, tail] = (function (next, children = [])
-    {
-        while (
-            next !== MDList.End &&
-            (next.node.type !== "heading" || next.node.depth > depth))
-        {
-            children.push(next.node);
-            next = next.next;
-        }
-
-        return [children, next];
-    })(next);
-
-    const contents = plugin(children);
-
-    return State({ ...state, next: tail });
-    
-    
-    
-    /*
-    const { document, children: next } =
-        MDList.parse(contents, state.next);
-
-    console.log(plugin);
-*/
-    /*const contents = plugin(children.slice(1));
-            const { document, children: next } =
-                MDList.parse(contents, state.next);
-
-            return State({ ...state, next });
-    */
-}
-
-MDList.parse = function MDListParse(contents, next = MDList.End)
-{
-    const document = require("remark").parse(contents);
-    const children = document.children.reverse()
-        .reduce((next, node) => MDList({ node, next }), next);
-
-    return { document, children };
-}
-
 module.exports = function fromMarkdown(filename)
 {
     const position = { start: { line:1, column:1 }, end: { line:1, column:1 } };
     const EOF = { type:"heading", position, depth:1, children:[] };
     const EOFList = MDList({ node: EOF, next: MDList.End });
-    const { document, children } = MDList.parse(readFileSync(filename), EOFList);
+
+    const document = parse(readFileSync(filename));
+    const children = document.children.reverse()
+        .reduce((next, node) => MDList({ node, next }), EOFList);
 
     const paths = Module._nodeModulePaths(dirname(filename));
     const module = Object.assign(
