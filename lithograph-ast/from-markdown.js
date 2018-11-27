@@ -149,7 +149,7 @@ const markdown =
         const [updated, placeholder] = toPlaceholder(state, heading);
         const appended = remaining.push(collapsed).push(placeholder);
 
-        return State({ ...state, next, stack: appended });
+        return State({ ...updated, next, stack: appended });
     },
 
     blockquote(state, { children })
