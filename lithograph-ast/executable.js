@@ -1,5 +1,6 @@
 const { data, union, is, boolean, string, number } = require("@algebraic/type");
 const { Map, List } = require("@algebraic/collections");
+const getInnerText = require("@lithograph/remark/get-inner-text");
 
 const Section = require("./section");
 const Source = require("./source");
@@ -64,7 +65,7 @@ Executable.fromMarkdown = (function ()
             { filename, paths, loaded: true });
         const section = Section.fromMarkdown(filename);
 
-        return Executable.fromSection(section);
+        return Executable.fromSection(section, module)[0];
     }
 })();
 
@@ -79,40 +80,40 @@ Executable.fromSection = (function ()
         (([title, key = "Concurrent"], disabled) =>
             ({ disabled, title, mode: Suite.Mode[key] }))
         (getInnerText(heading).split(modeRegExp), isCrossedOut(heading));
-    const fromPreamble = preamble =>
+    const fromPreamble = (preamble, { filename }) =>
         preamble.reduce(function (accumulated, node)
         {
             const fragments = ((fragment, fragments) =>
                 fragment ? fragments.push(fragment) : fragments)
-                (Fragment.fromMarkdownNode(node), accumulated[0]);
+                (Fragment.fromMarkdownNode(node, filename), accumulated[0]);
             const resources = ((resource, resources) => resource ?
                 resources.set(resource.name, resource.content) : resources)
-                (Resource.fromMarkdownNode(node), accumulated[1]);
+                (Resource.fromMarkdownNode(node, filename), accumulated[1]);
     
             return [fragments, resources];
         }, [Fragment.List(), ResourceMap()]);
-    const mergeSources = items =>
-        Source.union(items.toSeq().map(item => item.source));
 
-    return function (section, id)
+    return function fromSection(section, module, id = 0)
     {
         const { preamble, subsections } = section;
         
-        const [fragments, resources] = fromPreamble(preamble);
+        const [fragments, resources] = fromPreamble(preamble, module);
         const hasTest = fragments.size > 0;
 
         const [children, next] = subsections.reduce(([children, id], section) =>
             (([executable, id]) =>
                 [executable ? children.push(executable) : children, id])
-            (Executable.fromSection(section, id)),
+            (fromSection(section, module, id)),
             [Executable.List(), hasTest ? id + 3 : id]);
         const hasChildren = children.size > 0;
 
         if (!hasTest && !hasChildren)
             return [false, id];
     
-        const beforeSource = mergeSources(fragments);
-        const contentSource = mergeSources(children);
+        const beforeSource = Source.union(
+            fragments.map(fragment => fragment.source));
+        const contentSource = Source.union(
+            children.map(child => child.block.source));
         const source = Source.union([beforeSource, contentSource]);
 
         const { disabled, title, mode } = fromHeading(section.heading);

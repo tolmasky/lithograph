@@ -26,21 +26,21 @@ const Source = data `Source` (
 Source.union = (function ()
 {
     const empty = Ranges();
-    const filenames = (lhs, rhs) =>
-        Set(lhs.keySeq()).concat(rhs.keySeq());
+    const union = rhs => lhs =>
+        lhs.isEmpty() ? rhs : lhs.union(rhs).sort(Range.compare);
 
     return fNamed(`Source.union`, sources =>
-        sources.reduce((accumulated, source) =>
-            accumulated.ranges.isEmpty() ?
-                source : Source({ ranges:
-                    filenames(accumulated, source).reduce((ranges, filename) =>
-                        source.ranges.get(filename, empty)
-                            .union(source.ranges.get(filename, empty))
-                    .           sort(Range.compare)) }),
-            Source({ })));
+        (ranges => Source({ ranges }))
+        (sources.reduce((lhs, { ranges: rhs }) =>
+            lhs.isEmpty() ?
+                rhs :
+                rhs.reduce((lhs, rhs, filename) =>
+                    lhs.update(filename, empty, union(rhs)),
+                    lhs),
+            RangesMap())));
 })();
 
-Source.fromMarkdownNode = function ({ position }, filename)
+Source.fromMarkdownNode = function ({ position }, filename = "FILENAME")
 {
     const start = Source.Position(position.start);
     const end = Source.Position(position.end);
