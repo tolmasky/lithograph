@@ -25,7 +25,7 @@ module.exports = function OEmbedPlugin(list)
     const { formats, maxwidths } = configuration;
 
     console.log(configuration);
-    console.log(Section.from(MDList.toArray(list.next.next)));
+    //console.log(Section.from(MDList.toArray(list.next.next)));
 /*
     const args = fromTable(OEmbedArguments, elements[0]);
 

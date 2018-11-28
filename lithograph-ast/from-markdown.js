@@ -2,6 +2,7 @@ const { is, data, number, string } = require("@algebraic/type");
 const { List, Map, Stack } = require("@algebraic/collections");
 const { Node, Block, Source, Test, Suite, Fragment } = require("./node");
 const { parse } = require("remark");
+const Section = require("./section");
 
 const transform = require("@lithograph/plugin");
 const MDList = require("@lithograph/remark/md-list");
@@ -171,21 +172,94 @@ const markdown =
     }
 }
 
+function to_(section)
+{
+    const { preamble, subsections } = section;
+    const [fragments, resources] = preamble.reduce(function (accumulated, node)
+    {
+        const fragments = ((fragment, fragments) =>
+            fragment ? fragments.push(fragment) : fragments)
+            (Fragment.fromMarkdownNode(node));
+        const resources = ((resource, resources) => resource ?
+            resources.set(resource.name, resource.content) : resources)
+            (Resource.fromMarkdownNode(node));
+
+        return [fragments, resources];
+    }
+    
+        if (fragment)
+        return node.type === "code" ?
+            [fragments.push(Fragment.fromMarkdownCode(node)), resources] :
+            [fragments, 
+        const { type } = node;
+        const isResource =
+            type === "blockquote" &&
+            node.children.length === 2 &&
+            children[0].type === "paragraph";
+
+        const fragments = type !== "code" ?
+            accumulated[0] :
+            accumulated[0].push(toFragment(node));
+        const resources = !isResource ?
+            accumulated[1] :
+            accumulated[1].set(getInnerText(children[0], children[1].value));
+
+        return [fragments, resources];
+    }, [FragmentList(), ResourceMap()]);
+    const children = subsections.reduce(function (children, section)
+    {
+        toElement();
+    })
+    
+}
+
 module.exports = function fromMarkdown(filename)
 {
-    const position = { start: { line:1, column:1 }, end: { line:1, column:1 } };
-    const EOF = { type:"heading", position, depth:1, children:[] };
-    const EOFList = MDList({ node: EOF, next: MDList.End });
-
-    const document = parse(readFileSync(filename));
-    const children = document.children.reverse()
-        .reduce((next, node) => MDList({ node, next }), EOFList);
-
     const paths = Module._nodeModulePaths(dirname(filename));
     const module = Object.assign(
         new Module(filename),
         { filename, paths, loaded: true });
 
+    const root = Section.parse(filename);
+
+    const Undetermined = data `Undetermined` (
+        mode => Suite.Mode,
+        block => Block,
+        fragments => [List(Fragment), List(Fragment)()],
+        children => [NodeList, NodeList()] );
+    )
+
+    const replacement = plugin(section);
+    if (replacement !== section)
+        blah(replacement);
+
+    fragments = preamble.map().filter();
+    children = subsections.map().filter();
+
+    if (fragments && !children)
+        return Test({ id })
+
+    if (fragments && children)
+        Suite({ children:[Test{id},Suite(children)] })
+
+    if (children && !fragments)
+        Suite({ id, children });
+    
+    return false;
+
+    while (???)
+    {
+        const remaining = collapse(stack);
+        const top = remaining.peek();
+
+        UNDETERMINED(plugin(top));
+        
+        
+        
+        if (stack.peek())
+    }
+
+/*
     const source = getSourceFromSyntaxNode(document, filename);
     const title = filename;
     const block = Block({ id:0, source, title, depth:0 });
@@ -208,7 +282,7 @@ module.exports = function fromMarkdown(filename)
         Suite({ block, mode, children:top }) :
         top;
 
-    return root;
+    return root;*/
 }
 
 function reduceWhile(condition, iterate, start)

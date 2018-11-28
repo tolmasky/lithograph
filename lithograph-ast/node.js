@@ -1,23 +1,12 @@
 const { data, union, is, boolean, string, number } = require("@algebraic/type");
-const { List, Map } = require("@algebraic/collections");
+const { Map, List } = require("@algebraic/collections");
+const Source = require("./source");
 
-
-const Position = data `Position` (
-    line        => number,
-    column      => number );
-
-const Source = data `Source` (
-    filename    => string,
-    start       => Position,
-    end         => Position );
-
-Source.Position = Position;
 
 const Block = data `Block` (
     id          => number,
     source      => Source,
     title       => string,
-    depth       => number,
     disabled    => [boolean, false],
     resources   => [Map(string, string), Map(string, string)()] );
 
@@ -86,6 +75,19 @@ Node.fromMarkdown = function fromMarkdown (filename)
     return require("./from-markdown")(filename);
 }
 
+const { parameterized } = require("@algebraic/type");
+const Maybe = parameterized (T =>
+    union `Maybe <${T}>` (
+        data `Just` (value => T),
+        data `Nothing` () ));
+
+const Resource = data `Resource` (
+    name => string,
+    content => string);
+
+Resource.Maybe = Maybe(Resource);
+
+
 Node.Node = Node;
 Node.Source = Source;
 Node.Block = Block;
@@ -94,3 +96,115 @@ Node.Path = NodePath;
 Node.NodePath = Node.Path;
 
 module.exports = Node;
+
+
+
+Node.fromSection = (function ()
+{
+    const modes = Object.keys(Suite.Mode).join("|");
+    const modeRegExp = new RegExp(`\\s*\\((${modes})\\)$`);
+    const isCrossedOut = heading =>
+        heading.children.length === 1 &&
+        heading.children[0].type === "delete";
+    const fromHeading = heading =>
+        (([title, key = "Concurrent"], disabled) =>
+            ({ disabled, title, mode: Suite.Mode[key] }))
+        (getInnerText(heading).split(modeRegExp), isCrossedOut(heading));
+    const fromPreamble = preamble =>
+        preamble.reduce(function (accumulated, node)
+        {
+            const fragments = ((fragment, fragments) =>
+                fragment ? fragments.push(fragment) : fragments)
+                (Fragment.fromMarkdownNode(node), accumulated[0]);
+            const resources = ((resource, resources) => resource ?
+                resources.set(resource.name, resource.content) : resources)
+                (Resource.fromMarkdownNode(node), accumulated[1]);
+
+            return [fragments, resources];
+        }, [Fragment.List(), ResourceMap()]);
+    const mergeSources = items =>
+        Source.union(Seq(items).map(item => item.source));
+
+    return function (section, id)
+    {
+        const { preamble, subsections } = section;
+
+        const [fragments, resources] = fromPreamble(preamble);
+        const hasTest = fragments.size > 0;
+
+        const [children, next] = subsections.reduce(([children, id], section) =>
+            ((element, id) =>
+                [element ? children.push(element) : children, id])
+            (...Node.fromSelection(selection, hasTest ? id + 3 : id));
+        const hasChildren = children.size > 0;
+
+        if (!hasTest && !hasChildren)
+            return [false, id];
+
+        const beforeSource = mergeSource(fragments);
+        const contentSource = mergeSource(children);
+        const source = Source.union([testSource, childrenSource]);
+
+        const { disabled, title, mode } = fromHeading(section.heading);
+        const block = Block({ id, source, title, disabled, resources });
+
+        if (!hasChildren)
+            return [Test({ block, fragments }), id + 1];
+
+        if (!hasTest)
+            return [Suite({ block, mode, children }), id + 1];
+
+        const { title, id } = block;
+        const toBlock = (source, postfix, offset, id = id + offset) =>
+            Block({ ...block, source, title: `${title} (${postfix})`, id });
+
+        const beforeBlock = toBlock(beforeSource, "Before", 1);
+        const before = Test({ block: beforeBlock, fragments });
+
+        const contentBlock = toBlock(contentSource, "Content", 2);
+        const content = Suite({ block: contentBlock, mode, children });
+
+        const asChildren = List([before, content]);
+        const suite = Suite({ block, mode: Mode.Serial, children: asChildren });
+
+        return [suite, next];
+    }
+})();
+
+Fragment.fromMarkdownNode = function (node, filename)
+{
+    if (node.type !== "code")
+        return false;
+
+    const source = Source.fromMarkdownNode(node, filename);
+    const { value } = node;
+
+    return Fragment({ source, value });
+}
+
+Resource.fromMarkdownNode = function (node)
+{
+    if (node.type === "blockquote" &&
+        node.children.length === 2 &&
+        children[0].type === "paragraph")
+        return false;
+
+    const name = getInnerText(children[0]);
+    const content = children[1].value;
+
+    return Resource({ name, content });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

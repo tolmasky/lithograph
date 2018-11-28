@@ -1,7 +1,5 @@
 const { data, number, string } = require("@algebraic/type");
 const { List, Stack } = require("@algebraic/collections");
-const { readFileSync } = require("fs");
-const { parse } = require("remark");
 
 const Section = data `Section` (
     depth => number,
@@ -16,26 +14,23 @@ const toSection = heading => Section({ depth: heading.depth, heading });
 const toHeading = value =>
     ({ type: "heading", depth:0, children:[{ type: "text", value }] });
 
-Section.parse = function (filename)
+Section.fromMarkdown = (function ()
 {
-    const document = parse(readFileSync(filename));
-    const stack = document.children.reduce((stack, node) =>
-        node.type !== "heading" ?
-            stack.pop().push(adopt("preamble", node, stack.peek())) :
-            collapse(node.depth, stack).push(toSection(node)),
-        Stack(Section).of(toSection(toHeading(filename))));
+    const { readFileSync } = require("fs");
+    const { parse } = require("remark");
 
-    return collapse(1, stack).peek();
-}
+    return function (filename)
+    {
+        const document = parse(readFileSync(filename));
+        const stack = document.children.reduce((stack, node) =>
+            node.type !== "heading" ?
+                stack.pop().push(adopt("preamble", node, stack.peek())) :
+                collapse(node.depth, stack).push(toSection(node)),
+            Stack(Section).of(toSection(toHeading(filename))));
 
-/*
--__1 1 0 Stack []
--__2 1 1 Stack [ -1 ]
--__3 2 1 Stack [ -1 ]
--__3 2 1 Stack [ -1 ]
--__3 2 1 Stack [ -1 ]
--__3 3 0 Stack []
-*/
+        return collapse(1, stack).peek();
+    };
+})();
 
 module.exports = Section;
 
