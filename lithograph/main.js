@@ -7,6 +7,7 @@ const FileExecution = require("./file-execution");
 const Browser = require("./browser");
 
 const Node = require("@lithograph/ast");
+const { RangeMap } = require("@lithograph/ast/source");
 const Result = require("@lithograph/status/result");
 const Log = require("./log");
 
@@ -118,9 +119,7 @@ const Main = Cause("Main",
 
 function toRootSuite({ title, children })
 {
-    const empty = Node.Source.Position({ line:-1, column:-1 });
-    const source = Node.Source({ filename: "", start: empty, end: empty });
-    const block = Node.Block({ id: -1, title, depth: -1, source });
+    const block = Node.Block({ id: -1, title, depth: -1, ranges: RangeMap() });
 
     return Node.Suite({ block, children, mode: Node.Suite.Mode.Concurrent });
 }

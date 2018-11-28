@@ -5,7 +5,8 @@ const fMap = Map(number, ftype);
 const Pair = declare({ is: () => true });
 const PairList = List(declare({ is: () => true }));
 
-const { Test, Suite, NodePath, fromMarkdown } = require("@lithograph/ast");
+const { Test, Suite } = require("@lithograph/ast");
+const NodePath = require("./compile/node-path");
 const toExpression = require("./compile/value-to-expression");
 
 
@@ -24,7 +25,7 @@ module.exports = (function()
             Buffer.from(JSON.stringify(map), "utf-8").toString("base64");
         const parameters = Object.keys(environment);
         const source = `return (${parameters}) => (${code});\n${mapComment}`;
-        const { filename } = suite.block.source;
+        const filename = suite.block.ranges.keySeq().get(0);
         const module = new Module(filename);
 
         module.filename = filename;
@@ -146,13 +147,13 @@ const parseFragment = (function ()
     const { parse } = require("@babel/parser");
     const allowAwaitOutsideFunction = true;
 
-    return function parseFragment({ source, value })
+    return function parseFragment({ range, value })
     {
         try
         {
             // Add one because of the triple-ticks.
-            const startLine = source.start.line + 1;
-            const sourceFilename = source.filename;
+            const startLine = range.start.line + 1;
+            const sourceFilename = range.filename;
             const options =
                 { startLine, allowAwaitOutsideFunction, sourceFilename };
 
@@ -167,7 +168,7 @@ const parseFragment = (function ()
             // the `startLine`, so we have to do it ourselves.
             // https://github.com/babel/babel/issues/9015
             const { line: unmapped, column } = error.loc;
-            const { filename, start } = source;
+            const { filename, start } = range;
             const line = unmapped + start.line;
             const message = error.message.replace(/\d+(?=:\d+\)$)/, line);
 

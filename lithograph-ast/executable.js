@@ -3,21 +3,21 @@ const { Map, List } = require("@algebraic/collections");
 const getInnerText = require("@lithograph/remark/get-inner-text");
 
 const Section = require("./section");
-const Source = require("./source");
+const { Range, RangeMap } = require("./source");
 const Resource = require("./resource");
 
 const ResourceMap = Map(string, Resource);
 
 const Block = data `Block` (
     id          => number,
-    source      => Source,
+    ranges      => RangeMap,
     title       => string,
     disabled    => [boolean, false],
     resources   => [ResourceMap, ResourceMap()] );
 
 const Fragment = data `Fragment` (
-    source      => Source,
-    value       => string );
+    range       => Range,
+    value       => string);
 
 Fragment.List = List(Fragment);
 
@@ -26,10 +26,10 @@ Fragment.fromMarkdownNode = function (node, filename)
     if (node.type !== "code")
         return false;
 
-    const source = Source.fromMarkdownNode(node, filename);
+    const range = Range.fromMarkdownNode(node, filename);
     const { value } = node;
 
-    return Fragment({ source, value });
+    return Fragment({ range, value });
 }
 
 const Mode = union `Mode` (
@@ -50,6 +50,7 @@ const { Test, Suite } = Executable;
 
 Executable.List = List(Executable);
 
+Executable.Block = Block;
 Executable.Suite.Mode = Mode;
 
 Executable.fromMarkdown = (function ()
@@ -110,14 +111,14 @@ Executable.fromSection = (function ()
         if (!hasTest && !hasChildren)
             return [false, id];
     
-        const beforeSource = Source.union(
-            fragments.map(fragment => fragment.source));
-        const contentSource = Source.union(
-            children.map(child => child.block.source));
-        const source = Source.union([beforeSource, contentSource]);
+        const beforeRanges = RangeMap.fromRanges(
+            fragments.map(fragment => fragment.range));
+        const contentRanges = RangeMap.union(
+            children.map(child => child.block.ranges));
+        const ranges = RangeMap.union([beforeRanges, contentRanges]);
 
         const { disabled, title, mode } = fromHeading(section.heading);
-        const block = Block({ id, source, title, disabled, resources });
+        const block = Block({ id, ranges, title, disabled, resources });
 
         if (!hasChildren)
             return [Test({ block, fragments }), id + 1];
@@ -125,13 +126,13 @@ Executable.fromSection = (function ()
         if (!hasTest)
             return [Suite({ block, mode, children }), id + 1];
 
-        const toBlock = (source, postfix, offset, id = block.id + offset) =>
-            Block({ ...block, source, title: `${title} (${postfix})`, id });
+        const toBlock = (ranges, postfix, offset, id = block.id + offset) =>
+            Block({ ...block, ranges, title: `${title} (${postfix})`, id });
 
-        const beforeBlock = toBlock(beforeSource, "Before", 1);
+        const beforeBlock = toBlock(beforeRanges, "Before", 1);
         const before = Test({ block: beforeBlock, fragments });
     
-        const contentBlock = toBlock(contentSource, "Content", 2);
+        const contentBlock = toBlock(contentRanges, "Content", 2);
         const content = Suite({ block: contentBlock, mode, children });
 
         const asChildren = List([before, content]);
@@ -140,5 +141,7 @@ Executable.fromSection = (function ()
         return [suite, next];
     }
 })();
+
+
 
 module.exports = Executable;

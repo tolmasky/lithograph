@@ -1,5 +1,5 @@
 const { data, number, string, fNamed } = require("@algebraic/type");
-const { Map, List, OrderedSet } = require("@algebraic/collections");
+const { Map, List, Seq, OrderedSet } = require("@algebraic/collections");
 
 
 const Position = data `Position` (
@@ -9,7 +9,9 @@ const Position = data `Position` (
 Position.compare = (lhs, rhs) =>
     lhs.line - rhs.line || lhs.column - rhs.column;
 
+// Ideally, this would actually be Range<filename>.
 const Range = data `Range` (
+    filename    => string,
     start       => Position,
     end         => Position );
 
@@ -17,40 +19,42 @@ Range.compare = (lhs, rhs) =>
     Position.compare(lhs.start, rhs.start) ||
     Position.compare(lhs.end, rhs.end);
 
-const Ranges = OrderedSet(Range);
-const RangesMap = Map(string, Ranges);
-
-const Source = data `Source` (
-    ranges      => [RangesMap, RangesMap()] );
-
-Source.union = (function ()
+Range.fromMarkdownNode = function ({ position }, filename)
 {
-    const empty = Ranges();
+    const start = Position(position.start);
+    const end = Position(position.end);
+
+    return Range({ start, end, filename });
+}
+
+const RangeMap = Map(string, OrderedSet(Range));
+
+RangeMap.fromRanges = function (ranges)
+{
+    return ranges
+        .groupBy(range => range.filename)
+        .map(ranges => OrderedSet(Range)(ranges.sort(Range.compare)));
+}
+
+RangeMap.union = (function ()
+{
+    const empty = RangeMap();
     const union = rhs => lhs =>
         lhs.isEmpty() ? rhs : lhs.union(rhs).sort(Range.compare);
 
-    return fNamed(`Source.union`, sources =>
-        (ranges => Source({ ranges }))
-        (sources.reduce((lhs, { ranges: rhs }) =>
-            lhs.isEmpty() ?
-                rhs :
-                rhs.reduce((lhs, rhs, filename) =>
-                    lhs.update(filename, empty, union(rhs)),
-                    lhs),
-            RangesMap())));
+    return rangeMaps => rangeMaps.reduce((lhsRangeMaps, rhsRangeMaps) =>
+        lhsRangeMaps.isEmpty() ?
+            rhsRangeMaps :
+            rhsRangeMaps.reduce((lhsRangeMaps, rhsRanges, filename) =>
+                lhsRangeMaps.update(filename, empty, union(rhsRanges)),
+                lhsRangeMaps),
+            RangeMap());
 })();
 
-Source.fromMarkdownNode = function ({ position }, filename = "FILENAME")
-{
-    const start = Source.Position(position.start);
-    const end = Source.Position(position.end);
-    const range = Range({ start, end });
-    const ranges = RangesMap({ [filename]: Ranges.of(range) });
 
-    return Source({ ranges });
-}
 
-Source.Position = Position;
-Source.Range = Range;
+Range.Position = Position;
+Range.Range = Range;
+Range.RangeMap = RangeMap;
 
-module.exports = Source;
+module.exports = Range;
