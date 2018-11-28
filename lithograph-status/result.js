@@ -1,6 +1,6 @@
 const { is, data, union, string, number, declare } = require("@algebraic/type");
 const { List } = require("@algebraic/collections");
-const Node = require("@lithograph/ast");
+const { Test, Suite } = require("@lithograph/ast");
 const FIXME_ANY = declare({ is: () => true, serialize:[()=>0,true],deserialize:()=>undefined });
 
 
@@ -9,11 +9,11 @@ const result = ([name]) =>
         data `Test` (
             ...testFields,
             fromKeyPath => [FIXME_ANY, null],
-            test => Node.Test ),
+            test => Test ),
         data `Suite` (
             ...suiteFields,
             fromKeyPath => [FIXME_ANY, null],
-            suite => Node.Suite) );
+            suite => Suite) );
 
 const Reason = union `Reason` (
     data `Error` (

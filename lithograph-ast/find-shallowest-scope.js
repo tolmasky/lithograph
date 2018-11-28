@@ -1,6 +1,6 @@
 const { is } = require("@algebraic/type");
 const { Seq } = require("immutable");
-const { Test, Suite } = require("./node");
+const { Test, Suite } = require("./executable");
 
 const isSerial = suite => suite.mode === Suite.Mode.Serial;
 const isConcurrent = suite => suite.mode === Suite.Mode.Concurrent;

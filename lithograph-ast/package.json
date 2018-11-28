@@ -2,7 +2,7 @@
   "name": "@lithograph/ast",
   "version": "1.0.0-alpha.16",
   "description": "",
-  "main": "node.js",
+  "main": "executable.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

@@ -1,6 +1,7 @@
 const { data, union, is, string, number } = require("@algebraic/type");
 const { List, OrderedMap, Map } = require("@algebraic/collections");
-const { Node, Suite: { Mode } } = require("@lithograph/ast");
+const { Test, Suite } = require("@lithograph/ast");
+const { Mode } = Suite;
 const IndexPath = require("./index-path");
 const Result = require("./result");
 const getResultId = result => (is(Result.Suite, result) ?
@@ -13,18 +14,18 @@ const ScopeList = List(number);
 const Status = union `Status` (
     union `Running` (
         data `Test` (
-            test => Node.Test,
+            test => Test,
             start => number ),
         data `Suite` (
-            suite => Node.Suite,
+            suite => Suite,
             running => RunningMap,
             waiting => WaitingMap,
             completed => [ResultMap, ResultMap()] ) ),
     union `Waiting` (
         data `Test` (
-            test => Node.Test),
+            test => Test),
         data `Suite` (
-            suite => Node.Suite,
+            suite => Suite,
             completed => ResultMap,
             waiting => WaitingMap) ),
     Result );
@@ -47,7 +48,7 @@ const RunningMap = OrderedMap(number, Status.Running);
 
 function initialStatusOfNode(node)
 {
-    return is(Node.Test, node) ?
+    return is(Test, node) ?
         initialStatusOfTest(node) :
         initialStatusOfSuite(node);
 }
@@ -212,7 +213,7 @@ function updateNodeToOmitted(node, origin)
 
 function assignOriginResultForNode(node, result, origin)
 {
-    if (is(Node.Test, node))
+    if (is(Test, node))
         return result.Test({ test: node, origin });
 
     const children = node.children

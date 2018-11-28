@@ -141,24 +141,4 @@ Executable.fromSection = (function ()
     }
 })();
 
-
-
-
 module.exports = Executable;
-
-
-
-/*
-const { parameterized } = require("@algebraic/type");
-const Maybe = parameterized (T =>
-    union `Maybe <${T}>` (
-        data `Just` (value => T),
-        data `Nothing` () ));
-*/
-
-
-
-
-
-
-
