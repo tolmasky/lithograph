@@ -28,7 +28,7 @@ const FileExecution = Cause("FileExecution",
     init: ({ path }) =>
     {
         const root = fromMarkdown(path);
-        const garbageCollector = GarbageCollector.create({ node: root });
+        const garbageCollector = GarbageCollector.create({ });
 
         return { root, garbageCollector };
     },
@@ -38,9 +38,14 @@ const FileExecution = Cause("FileExecution",
         const { root, garbageCollector } = fileExecution;
         const { unblocked, status } =
             Status.initialStatusOfNode(fileExecution.root);
+
         const { allocate } = garbageCollector;
+        const { functions, findShallowestScope } =
+            compile(toEnvironment(type =>
+                allocate(findShallowestScope(), type)), root);
+
         const outFileExecution = fileExecution
-            .set("functions", compile(toEnvironment(allocate), root))
+            .set("functions", functions)
             .set("status", status);
 
         return update.in(

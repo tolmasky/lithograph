@@ -131,7 +131,7 @@ Executable.fromSection = (function ()
 
         const beforeBlock = toBlock(beforeRanges, "Before", 1);
         const before = Test({ block: beforeBlock, fragments });
-    
+
         const contentBlock = toBlock(contentRanges, "Content", 2);
         const content = Suite({ block: contentBlock, mode, children });
 

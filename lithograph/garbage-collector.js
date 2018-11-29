@@ -12,7 +12,8 @@ const GarbageCollector = Cause("GarbageCollector",
     [field `allocate`]: -1,
     [field `allocateIO`]: -1,
 
-    init: ({ node }) => ({ allocateIO: toAllocateIO(node) }),
+    init: ({ findShallowestScope }) =>
+        ({ allocateIO: IO.start(toAllocateIO) }),
 
     [event.in `AllocateReady`]: { allocate: -1 },
     [event.on `AllocateReady`]: (endpoints, { allocate }) =>
@@ -75,20 +76,15 @@ const GarbageCollector = Cause("GarbageCollector",
 
 module.exports = GarbageCollector;
 
-function toAllocateIO(node, push)
+function toAllocateIO(push)
 {
-    if (!push)
-        return IO.start(push => toAllocateIO(node, push));
-
     push(GarbageCollector.AllocateReady({ allocate }));
 
-    function allocate(type)
+    function allocate(scope, type)
     {
         return new Promise(function (resolve, reject)
         {
-            const backtrace = getBacktrace();
-            const scope = findShallowestScope(backtrace, node);
-
+console.log("THE SCOPE IS" + scope);
             // If for whatever reason we don't find a matching scope, we'll have
             // to return an error immediately.
             if (scope === false)

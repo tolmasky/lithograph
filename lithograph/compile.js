@@ -35,7 +35,10 @@ module.exports = (function()
         const toGenerator = module._compile(source, filename);
         const args = parameters.map(key => environment[key]);
 
-        return fMap(toPairs(toGenerator(...args)));
+        const functions = fMap(toPairs(toGenerator(...args)));
+        const findShallowestScope = toFindShallowestScope(functions);
+
+        return { functions, findShallowestScope };
     }
 })();
 
@@ -220,7 +223,7 @@ const builders =
         return pairs.concat(next);
     },
 
-    test: (key, f) => [PairList.of(key, f)]
+    test: (key, f) => [PairList.of(key, Object.assign(f, {SCOPE:key}))]
 }
 
 function toAsync(iterator)
@@ -247,3 +250,38 @@ function toAsync(iterator)
         })("next", void 0);
     });
 }
+
+function toFindShallowestScope(functions)
+{
+    const scopes = new WeakMap();
+
+    functions.map((f, id) => scopes.set(f, id));
+
+    return function findShallowestScope()
+    {
+        const prepareStackTrace = Error.prepareStackTrace;
+        Error.prepareStackTrace = (_, backtrace) => backtrace;
+
+        const backtrace = Error().stack;
+
+        Error.prepareStackTrace = prepareStackTrace;
+
+        const index = backtrace.findIndex(callsite =>
+            scopes.get(callsite.getFunction()) !== void(0));
+
+        return index === -1 ?
+            false :
+            scopes.get(backtrace[index].getFunction());
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
