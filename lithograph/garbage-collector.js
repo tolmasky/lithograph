@@ -95,25 +95,3 @@ console.log("THE SCOPE IS" + scope);
         });
     }
 }
-
-const getBacktrace = (function ()
-{
-    const ErrorRegExp = /(?:(?:^Error\n\s+)|(?:\n\s+))at\s+/;
-    const FrameRegExp = /\(([^\(]+):(\d+):(\d+)\)$/;
-    const toInt = string => parseInt(string, 10);
-
-    return function getBacktrace()
-    {
-        const { stackTraceLimit } = Error;
-        Error.stackTraceLimit = Infinity;
-        const frames = Error().stack.split(ErrorRegExp)
-            .map(frame => frame.match(FrameRegExp))
-            .filter(frame => !!frame)
-            .map(([, filename, line, column]) =>
-                ({ filename, line: toInt(line), column: toInt(column) }))
-            .slice(1);
-        Error.stackTraceLimit = stackTraceLimit;
-
-        return frames;
-    }
-})();

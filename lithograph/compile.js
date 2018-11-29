@@ -1,21 +1,36 @@
-const { is, data, number, boolean, string, ftype, declare } = require("@algebraic/type");
+const { is, data, union, number, boolean, parameterized, ftype } = require("@algebraic/type");
 const { Map, List } = require("@algebraic/collections");
-const IndexPath = require("@lithograph/status/index-path");
+const { ResourceMap } = require("@lithograph/ast");
 
 const fMap = Map(number, ftype);
 const ScopeMap = Map(ftype, number);
-
+Error.stackTraceLimit = 1000;
 const Compilation = data `Compilation` (
     scope       => number,
     id          => number,
     f           => ftype,
     fscope      => ftype);
 
-const Pair = declare({ is: () => true });
-const PairList = List(declare({ is: () => true }));
+const Path = parameterized (T =>
+    data `Path <${T}>` (
+        parent => T === Test ?
+            Path(Suite) :
+            [union `` (Path(Suite), Path.Root), Path.Root],
+        T === Test ? test => T : suite => T ) );
+Path.Root = data `Path.Root` ();
+Path.child = (index, parent) =>
+    (executable => is(Test, executable) ?
+        Path(Test)({ test: executable, parent }) :
+        Path(Suite)({ suite: executable, parent }))
+    (parent.suite.children.get(index));
+
+const ResourcePath = union `ResourcePath` (
+    data `Child` (
+        resources   => ResourceMap,
+        parent      => ResourcePath ),
+    data `Root` ( ) );
 
 const { Test, Suite } = require("@lithograph/ast");
-const NodePath = require("./compile/node-path");
 const toExpression = require("./compile/value-to-expression");
 
 
@@ -27,7 +42,7 @@ module.exports = (function()
 
     return function (environment, suite)
     {
-        const fragment = fromSuite(suite);
+        const fragment = fromSuite(Path(Suite)({ suite }));
         const { code, map } = generate(fragment, { sourceMaps: true });
         const mapComment =
             "//# sourceMappingURL=data:application/json;charset=utf-8;base64," +
@@ -54,20 +69,22 @@ module.exports = (function()
     }
 })();
 
-function fromExecutable(executable)
+function fromExecutable(executablePath)
 {
-    return is(Test, executable) ?
-        fromTest(executable) :
-        fromSuite(executable);
+    return is(Path(Test), executablePath) ?
+        fromTest(executablePath) :
+        fromSuite(executablePath);
 }
 
-function fromSuite(suite)
+function fromSuite(suitePath)
 {
+    const { suite } = suitePath;
+
     return suite.children.size === 1 ?
-        fromExecutable(suite.children.get(0)) :
+        fromExecutable(Path.child(0, suitePath)) :
         suite.mode === Suite.Mode.Serial ?
-            fromSerial(suite, 0) :
-            fromConcurrent(suite);
+            fromSerial(suitePath, 0) :
+            fromConcurrent(suitePath);
 }
 
 const ftemplate = (function ()
@@ -87,12 +104,12 @@ const fromTest = (function ()
         return (yield "test")($id, async () => { $statements });
     });
 
-    return function fromTest(test)
+    return function fromTest(testPath)
     {
-        const { block: { id }, fragments } = test;
-        const $statements = inlineStatementsFromTest(test, false);
+        const $id = toExpression(testPath.test.block.id);
+        const $statements = inlineStatementsFromTest(testPath);
 
-        return template({ $id: toExpression(id), $statements });
+        return template({ $id, $statements });
     }
 })();
 
@@ -102,16 +119,13 @@ const inlineStatementsFromTest = (function ()
     const fromTopLevelAwait = argument => yieldExpression(argument);
     const transformStatements = require("./compile/transform-statements");
 
-    return function inlineStatementsFromTest(test, toYield)
+    return function inlineStatementsFromTest(testPath)
     {
-        const { block: { id }, fragments } = test;
+        const { fragments } = testPath.test;
         const concatenated = fragments.flatMap(parseFragment);
-        
-        return transformStatements(concatenated,
-        {
-            getResource: URL => getResource(test, URL),
-            fromTopLevelAwait: toYield && fromTopLevelAwait
-        });
+        const getResource = URL => getResource(testPath, URL);
+
+        return transformStatements(concatenated, { getResource });
     }
 })();
 
@@ -120,31 +134,31 @@ const fromSerial = (function ()
 {
     const SERIAL_TEMPLATE = ftemplate(function * ()
     {
-        return (yield "serial")(async function PIZZA()
+        return (yield "serial")(async function ()
         {
             await this($children);
             $statements;
         });
     });
 
-    return function fromSerial(suite, index)
+    return function fromSerial(suitePath, index)
     {
-        const { children } = suite;
-        const child = children.get(index);
-        const isTest = is(Test, child);
-    
-        const scope = suite.block.id;
-        const next =  index < children.size - 1 ?
-            [fromSerial(suite, index + 1)] :
+        const childPath = Path.child(index, suitePath);
+        const isTestPath = is(Path(Test), childPath);
+
+        const { suite: { block, children } } = suitePath;
+        const scope = block.id;
+        const next = index < children.size - 1 ?
+            [fromSerial(suitePath, index + 1)] :
             [];
-        const current = isTest ?
-            toExpression(child.block.id) :
-            fromExecutable(child);
-    
-        const $statements = isTest ?
-            inlineStatementsFromTest(child, false) : [];
+        const current = isTestPath ?
+            toExpression(childPath.test.block.id) :
+            fromExecutable(childPath);
+
+        const $statements = isTestPath ?
+            inlineStatementsFromTest(childPath) : [];
         const $children = toExpression([scope, current, ...next]);
-    
+
         return SERIAL_TEMPLATE({ $statements, $children });
     }
 })();
@@ -154,25 +168,27 @@ const fromConcurrent = (function ()
     const template = ftemplate(function * ()
         { return (yield "concurrent")($children); });
 
-    return function fromConcurrent({ children })
+    return function fromConcurrent(suitePath)
     {
-        const $children = toExpression(children.map(fromExecutable));
+        const { suite: { children } } = suitePath;
+        const paths = children.map((_, index) => Path.child(index, suitePath));
+        const $children = toExpression(paths.map(fromExecutable));
 
         return template({ $children });
     }
 })();
 
-function getResource(nodePath, URL)
+function getResource(executablePath, URL)
 {
-    const { resources } = NodePath.block(nodePath);
+    if (executablePath === Path.Root)
+        throw ReferenceError(`Resource "${URL}" is not defined.`);
+
+    const { resources } = executablePath.executable;
 
     if (resources.has(URL))
         return resources.get(URL);
 
-    if (!path.parent)
-        throw ReferenceError(`Resource "${URL}" is not defined.`);
-
-    return getResource(nodePath.parent, URL);
+    return getResource(executablePath.parent, URL);
 }
 
 const parseFragment = (function ()
@@ -260,31 +276,6 @@ const builders =
     test: (id, f) => [Compilation({ id, scope: id, f, fscope:f })]
 }
 
-function toAsync(iterator)
-{
-    return () => new Promise(function (resolve, reject)
-    {
-        (function step(method, input)
-        {
-            try
-            {
-                const { done, value } = iterator[method](input);
-
-                if (done)
-                    return resolve();
-
-                Promise.resolve(value)
-                    .then(value => step("next", value))
-                    .catch(value => step("throw", value));
-            }
-            catch (error)
-            {
-                reject(error);
-            }
-        })("next", void 0);
-    });
-}
-
 function toFindShallowestScope(scopes)
 {
     return function findShallowestScope()
@@ -297,18 +288,10 @@ function toFindShallowestScope(scopes)
         const backtrace = Error().stack;
 
         Error.prepareStackTrace = prepareStackTrace;
-console.log(scopes);
+
         const index = backtrace.findIndex(callsite =>
             scopes.get(callsite.getFunction()) !== void(0));
 
-if (index>=0)
-console.log(index, backtrace[index].getFunction());//backtrace.map(callsite => callsite.getFunctionName()));
-else{
-console.log(index, backtrace.map(callsite => callsite.getFunction()))
-console.log(index, backtrace.map(callsite => callsite.getFunctionName()))}
-console.log(Error().stack);
-console.log(scopes.keySeq().toList());
- console.log(scopes.keySeq().toList().map(x => x === backtrace[4].getFunction()));
         return index === -1 ?
             false :
             scopes.get(backtrace[index].getFunction());
