@@ -1,7 +1,7 @@
 const { is } = require("@algebraic/type");
 const { Map } = require("immutable");
 const { Cause, IO, field, event, update } = require("@cause/cause");
-const { Test, Suite, fromMarkdown } = require("@lithograph/ast");
+const { Test, Suite } = require("@lithograph/ast");
 const { Status, Result } = require("@lithograph/status");
 const { Reason } = Result.Failure;
 const Log = require("./log");
@@ -18,34 +18,34 @@ require("./test-worker/static");
 
 const FileExecution = Cause("FileExecution",
 {
-    [field `root`]: -1,
-    [field `pool`]: Pool.create({ count: 100 }),
+    [field `filename`]: -1,
+    [field `suite`]: -1,
+    [field `status`]: -1,
+
     [field `running`]: Map(),
     [field `functions`]: Map(),
     [field `garbageCollector`]: -1,
-    [field `status`]: -1,
-    [field `filename`]: -1,
 
-    init: ({ path }) =>
+    [field `pool`]: Pool.create({ count: 100 }),
+
+    init: ({ path: filename }) =>
     {
-        const root = fromMarkdown(path);
+        const suite = Suite.fromMarkdown(filename);
         const garbageCollector = GarbageCollector.create({ });
 
-        return { root, garbageCollector, filename: path };
+        return { suite, garbageCollector, filename };
     },
 
     [event.on (Cause.Ready) .from `garbageCollector`](fileExecution)
     {
-        const { root, garbageCollector } = fileExecution;
-        const { unblocked, status } =
-            Status.initialStatusOfNode(fileExecution.root);
+        const { suite, filename, garbageCollector } = fileExecution;
+        const { unblocked, status } = Status.initialStatusOfNode(suite);
 
         const { allocate } = garbageCollector;
         const { functions, findShallowestScope } =
             compile(toEnvironment(type =>
                 allocate(findShallowestScope(), type)),
-            root,
-            fileExecution.filename);
+            suite, filename);
 
         const outFileExecution = fileExecution
             .set("functions", functions)

@@ -59,7 +59,7 @@ Executable.List = List(Executable);
 Executable.Block = Block;
 Executable.Suite.Mode = Mode;
 
-Executable.fromMarkdown = (function ()
+Suite.fromMarkdown = (function ()
 {
     const Module = require("module");
     const { dirname } = require("path");
