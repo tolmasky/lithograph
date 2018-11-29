@@ -6,8 +6,7 @@ const FileProcess = require("./file-process");
 const FileExecution = require("./file-execution");
 const Browser = require("./browser");
 
-const Node = require("@lithograph/ast");
-const { RangeMap } = require("@lithograph/ast/source");
+const { Suite, Block } = require("@lithograph/ast");
 const Result = require("@lithograph/status/result");
 const Log = require("./log");
 
@@ -119,9 +118,9 @@ const Main = Cause("Main",
 
 function toRootSuite({ title, children })
 {
-    const block = Node.Block({ id: -1, title, depth: -1, ranges: RangeMap() });
+    const block = Block({ id: -1, title, depth: -1 });
 
-    return Node.Suite({ block, children, mode: Node.Suite.Mode.Concurrent });
+    return Suite({ block, children, mode: Suite.Mode.Concurrent });
 }
 
 module.exports.Log = Log;

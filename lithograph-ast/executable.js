@@ -3,7 +3,6 @@ const { Map, List } = require("@algebraic/collections");
 const getInnerText = require("@lithograph/remark/get-inner-text");
 
 const Section = require("./section");
-const { Range, RangeMap } = require("./source");
 const Resource = require("./resource");
 
 const ResourceMap = Map(string, Resource);
