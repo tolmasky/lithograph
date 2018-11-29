@@ -1,6 +1,7 @@
 const { data, union, is, boolean, string, number } = require("@algebraic/type");
 const { Map, List } = require("@algebraic/collections");
 const getInnerText = require("@lithograph/remark/get-inner-text");
+const plugin = require("@lithograph/plugin");
 
 const Section = require("./section");
 const Resource = require("./resource");
@@ -102,8 +103,8 @@ Executable.fromSection = (function ()
 
     return function fromSection(section, module, id = 0)
     {
-        const { preamble, subsections } = section;
-        
+        const { preamble, subsections } = plugin(section, module);
+
         const [fragments, resources] = fromPreamble(preamble, module);
         const hasTest = fragments.size > 0;
 

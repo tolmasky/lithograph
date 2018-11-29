@@ -5,10 +5,15 @@ const { hasOwnProperty } = Object;
 
 const Failure = parameterized (T =>
     data `Failed <${T}>` (message => string));
+
+Failure.is = failure => parameterized.belongs(Failure, failure);
+
 const fail = (type, message) => [Failure(type)({ message }), MDList.End];
 
 
 module.exports = parse;
+
+module.exports.parse = parse;
 module.exports.Failure = Failure;
 
 function parse(type, node, many)

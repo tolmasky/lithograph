@@ -1,40 +1,33 @@
 const { data, string, parameterized } = require("@algebraic/type");
-const MDList = require("@lithograph/remark/md-list");
+const { List } = require("@algebraic/collections");
+const Section = require("@lithograph/ast/section");
 
 const fromTable = require("./from-table");
 const { Failure } = require("@lithograph/remark/parse-type");
 const Configuration = data `Configuration` (plugin => string);
+const NodeList = List(Object);
 
 
-module.exports = function transform(heading, next, module)
+module.exports = function transform(section, module)
 {
-    if (next === MDList.End)
-        return { heading, next };
+    const { preamble, subsections } = section;
 
-    const table = next.node;
+    if (preamble.size <= 0)
+        return section;
+
+    const [table, ...rest] = preamble;
 
     if (table.type !== "table")
-        return { heading, next };
+        return section;
 
     const configuration = fromTable(Configuration, table, { headers: true });
 
     if (parameterized.belongs(Failure, configuration))
-        return { heading, next };
+        return section;
 
-    const depth = heading.depth;
-    const [children, rest] = MDList.takeWhile(
-        node => node.type !== "heading" || node.depth > depth,
-        next.next);
-    const withHeading = MDList({ node: heading, next: children });
     const plugin = module.require(configuration.plugin);
-    const transformed = MDList.concat(plugin(withHeading), rest);
+    const withoutConfiguration =
+        Section({ ...section, preamble: NodeList(rest) });
 
-    if (transformed === MDList.End ||
-        transformed.node.type !== "heading" ||
-        transformed.node.depth > heading.depth)
-        return { heading, next: transformed.next };
-
-    return { heading: transformed.node, next: transformed.next };
+    return transform(plugin(withoutConfiguration), module);
 }
-
-

@@ -3,7 +3,6 @@ const { Set } = require("@algebraic/collections");
 const fromTable = require("@lithograph/plugin/from-table");
 const { Failure } = require("@lithograph/remark/parse-type");
 const Section = require("@lithograph/ast/section");
-const MDList = require("@lithograph/remark/md-list");
 
 const Format = union `Format` (
     data `JSON` (),
@@ -14,9 +13,10 @@ const OEmbedConfiguration = data `OEmbedConfiguration` (
     maxwidths => Set(number) );
 
 
-module.exports = function OEmbedPlugin(list)
+module.exports = function OEmbedPlugin(section)
 {
-    const table = list.next.node;
+    const { preamble, subsections } = section;
+    const table = preamble.get(0);
     const configuration = fromTable(OEmbedConfiguration, table);
 
     if (parameterized.belongs(Failure, configuration))
@@ -34,7 +34,7 @@ module.exports = function OEmbedPlugin(list)
 
     return `# A simple test`;*/
 
-    return list.next;
+    return section;
 }
 
 

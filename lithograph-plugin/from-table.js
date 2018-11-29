@@ -1,7 +1,7 @@
 const { data, string, union, parameterized, is } = require("@algebraic/type");
 const { List, Set } = require("@algebraic/collections");
 const { ParseStrategy, Reduction } = require("./from-table/parse-strategy");
-const parse = require("@lithograph/remark/parse-type");
+const { parse, Failure } = require("@lithograph/remark/parse-type");
 const getInnerText = require("@lithograph/remark/get-inner-text");
 
 const Unset = data `Unset` ();
@@ -18,6 +18,10 @@ const WorkingArgumentsOf = parameterized (A =>
 
 module.exports = function fromTable(type, table, { headers = false } = { })
 {
+    if (!table || table.type !== "table")
+        return Failure(type)({ message:
+            `fromTable expected a table element, but instead found ${table}` });
+
     const strategies = ParseStrategy.for(type);
     const WorkingArguments = WorkingArgumentsOf(type);
 
@@ -25,17 +29,20 @@ module.exports = function fromTable(type, table, { headers = false } = { })
     const usable = headers ? rows : rows.slice(1);
     const working = usable.reduce(function (working, row)
     {
+        if (Failure.is(working))
+            return working;
+
         const [keyColumn, valueColumn] = row.children;
         const match = getInnerText(keyColumn);
         const strategy = strategies[match];
 
         if (!strategy)
-            throw TypeError(`Unrecognized table field "${match}".`);
+            return Failure(type)({ message: `Unrecognized table field "${match}".` });
 
         const { field } = strategy;
-        const [type, reduction] = parameterized.parameters(strategy);
+        const [fieldType, reduction] = parameterized.parameters(strategy);
         const atom = reduction === Reduction.Set ?
-            type : parameterized.parameters(type)[0];
+            fieldType : parameterized.parameters(fieldType)[0];
         const value = parse(atom, valueColumn, reduction !== Reduction.Set);
 
         if (reduction === Reduction.Set)
@@ -43,11 +50,11 @@ module.exports = function fromTable(type, table, { headers = false } = { })
 
         const existing = working[field];
         const appended = is(Unset, existing) ?
-            type(value) :
+            fieldType(value) :
             existing.concat(value);
 
         return WorkingArguments({ ...working, [field]: appended });
     }, WorkingArguments({}));
 
-    return type(working);
+    return Failure.is(working) ? working : type(working);
 }
