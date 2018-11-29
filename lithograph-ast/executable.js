@@ -135,7 +135,7 @@ Executable.fromSection = (function ()
         const contentBlock = toBlock(contentRanges, "Content", 2);
         const content = Suite({ block: contentBlock, mode, children });
 
-        const asChildren = List([before, content]);
+        const asChildren = List(Executable)([before, content]);
         const suite = Suite({ block, mode: Mode.Serial, children: asChildren });
 
         return [suite, next];

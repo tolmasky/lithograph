@@ -1,6 +1,5 @@
 const { Seq, Record, List, Map } = require("immutable");
 const { Cause, IO, field, event, update } = require("@cause/cause");
-const findShallowestScope = require("@lithograph/ast/find-shallowest-scope");
 
 const Request = Record({ id:-1, resolve:-1 }, "Request");
 const Allocation = Record({ id:-1, type:-1 }, "Allocation");
@@ -10,10 +9,7 @@ const GarbageCollector = Cause("GarbageCollector",
 {
     [field `ready`]: false,
     [field `allocate`]: -1,
-    [field `allocateIO`]: -1,
-
-    init: ({ findShallowestScope }) =>
-        ({ allocateIO: IO.start(toAllocateIO) }),
+    [field `allocateIO`]: IO.start(toAllocateIO),
 
     [event.in `AllocateReady`]: { allocate: -1 },
     [event.on `AllocateReady`]: (endpoints, { allocate }) =>

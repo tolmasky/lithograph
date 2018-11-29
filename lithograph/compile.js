@@ -1,7 +1,16 @@
-const { is, data, number, string, ftype, declare } = require("@algebraic/type");
+const { is, data, number, boolean, string, ftype, declare } = require("@algebraic/type");
 const { Map, List } = require("@algebraic/collections");
+const IndexPath = require("@lithograph/status/index-path");
 
 const fMap = Map(number, ftype);
+const ScopeMap = Map(ftype, number);
+
+const Compilation = data `Compilation` (
+    scope       => number,
+    id          => number,
+    f           => ftype,
+    fscope      => ftype);
+
 const Pair = declare({ is: () => true });
 const PairList = List(declare({ is: () => true }));
 
@@ -18,7 +27,7 @@ module.exports = (function()
 
     return function (environment, suite)
     {
-        const fragment = fromPath(NodePath.Suite.Root({ suite }));
+        const fragment = fromSuite(suite);
         const { code, map } = generate(fragment, { sourceMaps: true });
         const mapComment =
             "//# sourceMappingURL=data:application/json;charset=utf-8;base64," +
@@ -35,20 +44,30 @@ module.exports = (function()
         const toGenerator = module._compile(source, filename);
         const args = parameters.map(key => environment[key]);
 
-        const functions = fMap(toPairs(toGenerator(...args)));
-        const findShallowestScope = toFindShallowestScope(functions);
+        const compilations = toCompilations(toGenerator(...args));
+        const functions = fMap(compilations.map(({ id, f }) => [id, f]));
+
+        const scopes = ScopeMap(compilations.map(({ fscope, scope }) => [fscope, scope]));
+        const findShallowestScope = toFindShallowestScope(scopes);
 
         return { functions, findShallowestScope };
     }
 })();
 
-function fromPath(nodePath, wrap)
+function fromExecutable(executable)
 {
-    return is(NodePath.Test, nodePath) ?
-        fromTest(nodePath, wrap) :
-        nodePath.suite.mode === Suite.Mode.Serial ?
-            fromSerial(nodePath, 0) :
-            fromConcurrent(nodePath);
+    return is(Test, executable) ?
+        fromTest(executable) :
+        fromSuite(executable);
+}
+
+function fromSuite(suite)
+{
+    return suite.children.size === 1 ?
+        fromExecutable(suite.children.get(0)) :
+        suite.mode === Suite.Mode.Serial ?
+            fromSerial(suite, 0) :
+            fromConcurrent(suite);
 }
 
 const ftemplate = (function ()
@@ -63,70 +82,81 @@ const ftemplate = (function ()
 
 const fromTest = (function ()
 {
-    const { yieldExpression } = require("@babel/types");
-    const fromTopLevelAwait = argument => yieldExpression(argument);
-    const transformStatements = require("./compile/transform-statements");
     const template = ftemplate(function * ()
     {
         return (yield "test")($id, async () => { $statements });
     });
 
-    return function fromTest(testPath, wrap)
+    return function fromTest(test)
     {
-        const { block: { id }, fragments } = testPath.test;
-        const concatenated = fragments.flatMap(parseFragment);
-        const $statements = transformStatements(concatenated,
-        {
-            getResource: URL => getResource(testPath, URL),
-            fromTopLevelAwait: !wrap && fromTopLevelAwait
-        });
+        const { block: { id }, fragments } = test;
+        const $statements = inlineStatementsFromTest(test, false);
 
-        return !wrap ?
-            $statements :
-            template({ $id: toExpression(id), $statements });
+        return template({ $id: toExpression(id), $statements });
     }
 })();
 
-function fromSerial(suitePath, index)
+const inlineStatementsFromTest = (function ()
 {
-    const { children } = suitePath.suite;
-    const childPath = NodePath.Suite.child(index, suitePath);
+    const { yieldExpression } = require("@babel/types");
+    const fromTopLevelAwait = argument => yieldExpression(argument);
+    const transformStatements = require("./compile/transform-statements");
 
-    if (index === children.size - 1)
-        return fromPath(childPath, true);
-
-    const isTestPath = is(NodePath.Test, childPath);
-    const $statements = isTestPath ?
-        fromTest(childPath, false) : [];
-
-    const next = fromSerial(suitePath, index + 1);
-    const current = isTestPath ?
-        toExpression(childPath.test.block.id) :
-        fromPath(childPath, false);
-    const $children = toExpression([next, current]);
-
-    return SERIAL_TEMPLATE({ $statements, $children });
-}
-
-const SERIAL_TEMPLATE = ftemplate(function * ()
-{
-    return (yield "serial")(function * ()
+    return function inlineStatementsFromTest(test, toYield)
     {
-        yield $children;
-        $statements;
-    }());
-});
+        const { block: { id }, fragments } = test;
+        const concatenated = fragments.flatMap(parseFragment);
+        
+        return transformStatements(concatenated,
+        {
+            getResource: URL => getResource(test, URL),
+            fromTopLevelAwait: toYield && fromTopLevelAwait
+        });
+    }
+})();
+
+
+const fromSerial = (function ()
+{
+    const SERIAL_TEMPLATE = ftemplate(function * ()
+    {
+        return (yield "serial")(async function PIZZA()
+        {
+            await this($children);
+            $statements;
+        });
+    });
+
+    return function fromSerial(suite, index)
+    {
+        const { children } = suite;
+        const child = children.get(index);
+        const isTest = is(Test, child);
+    
+        const scope = suite.block.id;
+        const next =  index < children.size - 1 ?
+            [fromSerial(suite, index + 1)] :
+            [];
+        const current = isTest ?
+            toExpression(child.block.id) :
+            fromExecutable(child);
+    
+        const $statements = isTest ?
+            inlineStatementsFromTest(child, false) : [];
+        const $children = toExpression([scope, current, ...next]);
+    
+        return SERIAL_TEMPLATE({ $statements, $children });
+    }
+})();
 
 const fromConcurrent = (function ()
 {
     const template = ftemplate(function * ()
         { return (yield "concurrent")($children); });
 
-    return function fromConcurrent(suitePath)
+    return function fromConcurrent({ children })
     {
-        const $children = toExpression(
-            NodePath.Suite.children(suitePath)
-                .map(nodePath => fromPath(nodePath, true)));
+        const $children = toExpression(children.map(fromExecutable));
 
         return template({ $children });
     }
@@ -194,7 +224,7 @@ const parseFragment = (function ()
     }
 })();
 
-function toPairs(generator)
+function toCompilations(generator)
 {
     const iterator = generator();
     const type = iterator.next().value;
@@ -205,25 +235,29 @@ function toPairs(generator)
 const builders =
 {
     concurrent: children =>
-        [].concat(...children.map(toPairs)),
+        [].concat(...children.map(toCompilations)),
 
-    serial(iterator)
+    serial(fInspect)
     {
-        const children = iterator.next().value;
-        const next = toPairs(children[0]);
+        const fData = { };
+        const fPromise = fInspect.apply(function ([scope, current, next])
+        {
+            fData.current = current;
+            fData.next = next;
+            fData.scope = scope;
 
-        if (children.length === 1)
-            return next;
-
-        const current = children[1];
+            return new Promise(resolve => fData.resolve = resolve);
+        });
+        const { current, next, scope, resolve } = fData;
+        const f = () => (resolve(), fPromise);
         const pairs = typeof current === "number" ?
-            [PairList.of(current, toAsync(iterator))] :
-            toPairs(current);
+            [Compilation({ id: current, scope, fscope:fInspect, f })] :
+            toCompilations(current);
 
-        return pairs.concat(next);
+        return next ? pairs.concat(toCompilations(next)) : pairs;
     },
 
-    test: (key, f) => [PairList.of(key, Object.assign(f, {SCOPE:key}))]
+    test: (id, f) => [Compilation({ id, scope: id, f, fscope:f })]
 }
 
 function toAsync(iterator)
@@ -251,24 +285,30 @@ function toAsync(iterator)
     });
 }
 
-function toFindShallowestScope(functions)
+function toFindShallowestScope(scopes)
 {
-    const scopes = new WeakMap();
-
-    functions.map((f, id) => scopes.set(f, id));
-
     return function findShallowestScope()
     {
+        const { stackTraceLimit } = Error;
+        Error.stackTraceLimit = Infinity;
         const prepareStackTrace = Error.prepareStackTrace;
         Error.prepareStackTrace = (_, backtrace) => backtrace;
 
         const backtrace = Error().stack;
 
         Error.prepareStackTrace = prepareStackTrace;
-
+console.log(scopes);
         const index = backtrace.findIndex(callsite =>
             scopes.get(callsite.getFunction()) !== void(0));
 
+if (index>=0)
+console.log(index, backtrace[index].getFunction());//backtrace.map(callsite => callsite.getFunctionName()));
+else{
+console.log(index, backtrace.map(callsite => callsite.getFunction()))
+console.log(index, backtrace.map(callsite => callsite.getFunctionName()))}
+console.log(Error().stack);
+console.log(scopes.keySeq().toList());
+ console.log(scopes.keySeq().toList().map(x => x === backtrace[4].getFunction()));
         return index === -1 ?
             false :
             scopes.get(backtrace[index].getFunction());
