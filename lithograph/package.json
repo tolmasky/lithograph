@@ -1,6 +1,6 @@
 {
   "name": "lithograph",
-  "version": "1.0.0-alpha.16",
+  "version": "1.0.0-alpha.17",
   "description": "Puppeteer-First Super Fast Testing",
   "main": "lithograph.js",
   "bin": {
@@ -18,17 +18,17 @@
     "url": "https://github.com/runkitdev/lithograph.git"
   },
   "dependencies": {
-    "@algebraic/collections": "1.0.0-alpha.3",
-    "@algebraic/type": "1.0.0-alpha.3",
+    "@algebraic/collections": "1.0.0-alpha.4",
+    "@algebraic/type": "1.0.0-alpha.4",
     "@babel/parser": "^7.0.0",
     "@babel/template": "^7.0.0",
     "@babel/types": "^7.0.0",
-    "@cause/cause": "1.0.0-alpha.5",
-    "@cause/fork": "1.0.0-alpha.5",
-    "@cause/pool": "1.0.0-alpha.5",
-    "@cause/process": "1.0.0-alpha.5",
-    "@lithograph/ast": "1.0.0-alpha.16",
-    "@lithograph/status": "1.0.0-alpha.16",
+    "@cause/cause": "1.0.0-alpha.6",
+    "@cause/fork": "1.0.0-alpha.6",
+    "@cause/pool": "1.0.0-alpha.6",
+    "@cause/process": "1.0.0-alpha.6",
+    "@lithograph/ast": "1.0.0-alpha.17",
+    "@lithograph/status": "1.0.0-alpha.17",
     "babel-core": "^6.26.3",
     "babel-template": "^6.26.0",
     "commander": "^2.15.1",

@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/oembed",
-  "version": "1.0.0-alpha.16",
+  "version": "1.0.0-alpha.17",
   "description": "",
   "main": "oembed.js",
   "scripts": {
@@ -10,6 +10,11 @@
   "author": "Francisco Ryan Tolmasky I",
   "license": "MIT",
   "dependencies": {},
+  "peerDependencies": {
+    "@algebraic/type": "1.0.0-alpha.4",
+    "@algebraic/collections": "1.0.0-alpha.4",
+    "@lithograph/oembed": "1.0.0-alpha.17"
+  },
   "devDependencies": {
     "babel-core": "^6.26.3",
     "babel-plugin-transform-object-rest-spread": "^6.26.0",

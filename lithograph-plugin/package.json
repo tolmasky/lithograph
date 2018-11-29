@@ -1,12 +1,18 @@
 {
   "name": "@lithograph/plugin",
-  "version": "1.0.0",
+  "version": "1.0.0-alpha.17",
   "description": "",
   "main": "./plugin.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
-  "license": "MIT"
+  "author": "Francisco Ryan Tolmasky I",
+  "license": "MIT",
+  "peerDependencies": {
+    "@algebraic/type": "1.0.0-alpha.4",
+    "@algebraic/collections": "1.0.0-alpha.4",
+    "@lithograph/remark": "1.0.0-alpha.17",
+    "@lithograph/ast": "1.0.0-alpha.17"
+  }
 }

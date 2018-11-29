@@ -1,6 +1,6 @@
 const { getKind, union, data, is, string, primitives, parameterized, getUnscopedTypename, getTypename } =
     require("@algebraic/type");
-const MDList = require("@lithograph/remark/md-list");
+const MDList = require("./md-list");
 const { hasOwnProperty } = Object;
 
 const Failure = parameterized (T =>
