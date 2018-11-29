@@ -297,14 +297,3 @@ function toFindShallowestScope(scopes)
             scopes.get(backtrace[index].getFunction());
     }
 }
-
-
-
-
-
-
-
-
-
-
-
