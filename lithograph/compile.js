@@ -40,7 +40,7 @@ module.exports = (function()
     const { dirname } = require("path");
     const generate = require("babel-generator").default;
 
-    return function (environment, suite)
+    return function (environment, suite, filename)
     {
         const fragment = fromSuite(Path(Suite)({ suite }));
         const { code, map } = generate(fragment, { sourceMaps: true });
@@ -49,7 +49,6 @@ module.exports = (function()
             Buffer.from(JSON.stringify(map), "utf-8").toString("base64");
         const parameters = Object.keys(environment);
         const source = `return (${parameters}) => (${code});\n${mapComment}`;
-        const filename = suite.block.ranges.keySeq().get(0);
         const module = new Module(filename);
 
         module.filename = filename;
@@ -196,13 +195,13 @@ const parseFragment = (function ()
     const { parse } = require("@babel/parser");
     const allowAwaitOutsideFunction = true;
 
-    return function parseFragment({ range, value })
+    return function parseFragment({ start, filename, value })
     {
         try
         {
             // Add one because of the triple-ticks.
-            const startLine = range.start.line + 1;
-            const sourceFilename = range.filename;
+            const startLine = start.line + 1;
+            const sourceFilename = filename;
             const options =
                 { startLine, allowAwaitOutsideFunction, sourceFilename };
 

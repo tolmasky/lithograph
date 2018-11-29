@@ -24,13 +24,14 @@ const FileExecution = Cause("FileExecution",
     [field `functions`]: Map(),
     [field `garbageCollector`]: -1,
     [field `status`]: -1,
+    [field `filename`]: -1,
 
     init: ({ path }) =>
     {
         const root = fromMarkdown(path);
         const garbageCollector = GarbageCollector.create({ });
 
-        return { root, garbageCollector };
+        return { root, garbageCollector, filename: path };
     },
 
     [event.on (Cause.Ready) .from `garbageCollector`](fileExecution)
@@ -42,7 +43,9 @@ const FileExecution = Cause("FileExecution",
         const { allocate } = garbageCollector;
         const { functions, findShallowestScope } =
             compile(toEnvironment(type =>
-                allocate(findShallowestScope(), type)), root);
+                allocate(findShallowestScope(), type)),
+            root,
+            fileExecution.filename);
 
         const outFileExecution = fileExecution
             .set("functions", functions)

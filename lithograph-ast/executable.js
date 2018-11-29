@@ -10,13 +10,18 @@ const ResourceMap = Map(string, Resource);
 
 const Block = data `Block` (
     id          => number,
-    ranges      => RangeMap,
     title       => string,
     disabled    => [boolean, false],
     resources   => [ResourceMap, ResourceMap()] );
 
+const Position = data `Position` (
+    line        => number,
+    column      => number );
+
 const Fragment = data `Fragment` (
-    range       => Range,
+    filename    => string,
+    start       => Position,
+    end         => Position,
     value       => string);
 
 Fragment.List = List(Fragment);
@@ -26,10 +31,12 @@ Fragment.fromMarkdownNode = function (node, filename)
     if (node.type !== "code")
         return false;
 
-    const range = Range.fromMarkdownNode(node, filename);
+    const { position } = node;
+    const start = Position(position.start);
+    const end = Position(position.end);
     const { value } = node;
 
-    return Fragment({ range, value });
+    return Fragment({ value, filename, start, end });
 }
 
 const Mode = union `Mode` (
@@ -111,14 +118,8 @@ Executable.fromSection = (function ()
         if (!hasTest && !hasChildren)
             return [false, id];
     
-        const beforeRanges = RangeMap.fromRanges(
-            fragments.map(fragment => fragment.range));
-        const contentRanges = RangeMap.union(
-            children.map(child => child.block.ranges));
-        const ranges = RangeMap.union([beforeRanges, contentRanges]);
-
         const { disabled, title, mode } = fromHeading(section.heading);
-        const block = Block({ id, ranges, title, disabled, resources });
+        const block = Block({ id, title, disabled, resources });
 
         if (!hasChildren)
             return [Test({ block, fragments }), id + 1];
@@ -126,13 +127,13 @@ Executable.fromSection = (function ()
         if (!hasTest)
             return [Suite({ block, mode, children }), id + 1];
 
-        const toBlock = (ranges, postfix, offset, id = block.id + offset) =>
-            Block({ ...block, ranges, title: `${title} (${postfix})`, id });
+        const toBlock = (postfix, offset, id = block.id + offset) =>
+            Block({ ...block, title: `${title} (${postfix})`, id });
 
-        const beforeBlock = toBlock(beforeRanges, "Before", 1);
+        const beforeBlock = toBlock("Before", 1);
         const before = Test({ block: beforeBlock, fragments });
 
-        const contentBlock = toBlock(contentRanges, "Content", 2);
+        const contentBlock = toBlock("Content", 2);
         const content = Suite({ block: contentBlock, mode, children });
 
         const asChildren = List(Executable)([before, content]);
