@@ -122,7 +122,7 @@ Executable.fromSection = (function ()
         const block = Block({ id, title, disabled, resources });
 
         if (!hasChildren)
-            return [Test({ block, fragments }), id + 1];
+            return [Test({ block, fragments }), next];
 
         if (!hasTest)
             return [Suite({ block, mode, children }), next];
