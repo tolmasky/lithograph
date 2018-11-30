@@ -52,7 +52,7 @@ const Main = Cause("Main",
             Pool.Release({ indexes: [index] }));
         const { results } = updated;
         const finished = results.size === main.paths.size;
-
+console.log("FINISHED " + result.suite.block.title + " " + (main.paths.size - results.size));
         if (!finished)
             return [updated, events];
 
@@ -66,7 +66,7 @@ const Main = Cause("Main",
     [event.on (Pool.Retained) .from `fileProcessPool`](main, event)
     {
         const { request: path, index } = event;
-
+console.log("STARTING " + path);
         return update.in(
             main,
             ["fileProcessPool", "items", index],
@@ -100,15 +100,17 @@ const Main = Cause("Main",
             indexes.map(index => [["browserPool", "items", index], Browser.Reset()]));
     },
 
-    [event.on (Browser.DidReset)]: (main, { fromKeyPath: [,,index] }) =>
-        update.in(main, "browserPool", Pool.Release({ indexes: [index] })),
-
+    [event.on (Browser.DidReset)]: (main, { fromKeyPath: [,,index] }) => {
+//        console.log("(R) WILL NOW HAVE " + (main.browserPool.free.size + 1));
+//        console.log("    " + main.browserPool.items);
+        return update.in(main, "browserPool", Pool.Release({ indexes: [index] }));
+},
     [event.on (Pool.Retained) .from `browserPool`](main, event)
     {
         const { request, index } = event;
         const [fromFileProcess, id] = request;
         const { endpoint } = main.browserPool.items.get(index);
-
+//console.log("(A) WILL NOW HAVE " + main.browserPool.free.size);
         return update.in(
             main,
             ["fileProcessPool", "items", fromFileProcess],

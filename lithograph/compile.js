@@ -34,6 +34,17 @@ const { Test, Suite } = require("@lithograph/ast");
 const toExpression = require("./compile/value-to-expression");
 
 
+function printSuite(suite, nest = "")
+{
+    console.log(nest + suite.block.title + " (" + suite.block.id + ") " + suite.mode);
+
+    for (const child of suite.children)
+        if (is(Test, child))
+            console.log(nest + "    " + child.block.title  + " (" + child.block.id + ") ");
+        else
+            printSuite(child, nest + "    ");
+}
+
 module.exports = (function()
 {
     const Module = require("module");

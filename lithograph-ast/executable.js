@@ -112,7 +112,7 @@ Executable.fromSection = (function ()
             (([executable, id]) =>
                 [executable ? children.push(executable) : children, id])
             (fromSection(section, module, id)),
-            [Executable.List(), hasTest ? id + 3 : id]);
+            [Executable.List(), hasTest ? id + 3 : id + 1]);
         const hasChildren = children.size > 0;
 
         if (!hasTest && !hasChildren)
@@ -125,7 +125,7 @@ Executable.fromSection = (function ()
             return [Test({ block, fragments }), id + 1];
 
         if (!hasTest)
-            return [Suite({ block, mode, children }), id + 1];
+            return [Suite({ block, mode, children }), next];
 
         const toBlock = (postfix, offset, id = block.id + offset) =>
             Block({ ...block, title: `${title} (${postfix})`, id });
