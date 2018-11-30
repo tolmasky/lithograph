@@ -49,6 +49,8 @@ function fromCamelCaseToSpaces(string)
     return string
         .replace(/([^A-Z]|^)([A-Z])(?![A-Z])/g, (_, lowercase, uppercase) =>
             `${!!lowercase ? `${lowercase} ` : ''}${uppercase.toLowerCase()}`)
-        .replace(/([A-Z]+)(s?$)?/g, (_, string, rest, offset) =>
-            `${offset !== 0 ? ' ' : ''}${string}${rest || ' '}`);
+        .replace(/([A-Z]+)([A-Z])(?![sA-Z]|$)/g, (_, string, rest, offset) =>
+            `${offset !== 0 ? ' ' : ''}${string} ${rest.toLowerCase()}`)
+        .replace(/([A-Z]+)(s?)$/g, (_, string, rest, offset) =>
+            `${offset !== 0 ? ' ' : ''}${string}${rest}`);
 }
