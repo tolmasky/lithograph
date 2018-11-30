@@ -97,7 +97,8 @@ const Main = Cause("Main",
 
         return update.in.reduce(
             main,
-            indexes.map(index => [["browserPool", "items", index], Browser.Reset()])),
+            indexes.map(index => [["browserPool", "items", index], Browser.Reset()]));
+    },
 
     [event.on (Browser.DidReset)]: (main, { fromKeyPath: [,,index] }) =>
         update.in(main, "browserPool", Pool.Release({ indexes: [index] })),
