@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/status",
-  "version": "1.0.0-alpha.17",
+  "version": "1.0.0-alpha.18",
   "description": "",
   "main": "status.js",
   "scripts": {
