@@ -12,7 +12,7 @@
   "peerDependencies": {
     "@algebraic/type": "1.0.0-alpha.4",
     "@algebraic/collections": "1.0.0-alpha.4",
-    "@lithograph/ast": "1.0.0-alpha.17",
+    "@lithograph/ast": "1.0.0-alpha.18",
     "immutable": "^3.8.2"
   }
 }
