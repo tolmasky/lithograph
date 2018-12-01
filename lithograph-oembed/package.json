@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/oembed",
-  "version": "1.0.0-alpha.18",
+  "version": "1.0.0-alpha.19",
   "description": "",
   "main": "oembed.js",
   "scripts": {
@@ -13,7 +13,7 @@
   "peerDependencies": {
     "@algebraic/type": "1.0.0-alpha.4",
     "@algebraic/collections": "1.0.0-alpha.4",
-    "@lithograph/oembed": "1.0.0-alpha.18"
+    "@lithograph/oembed": "1.0.0-alpha.19"
   },
   "devDependencies": {
     "babel-core": "^6.26.3",
