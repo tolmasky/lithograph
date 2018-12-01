@@ -32,7 +32,6 @@ const GarbageCollector = Cause("GarbageCollector",
         return [updated, [allocate]];
     },
 
-    [field `node`]: -1,
     [field `requests`]: Map({ id: 0 }),
     [field `allocations`]: Map(),
     [field `resolutions`]: List(),
@@ -80,7 +79,6 @@ function toAllocateIO(push)
     {
         return new Promise(function (resolve, reject)
         {
-console.log("THE SCOPE IS" + scope);
             // If for whatever reason we don't find a matching scope, we'll have
             // to return an error immediately.
             if (scope === false)
