@@ -1,9 +1,9 @@
 const { data, union, boolean, string, number, parameterized } = require("@algebraic/type");
 const { Set } = require("@algebraic/collections");
 const fromTable = require("@lithograph/plugin/from-table");
-const { Failure } = require("@lithograph/remark/parse-type");
+const { Failure, Variable } = require("@lithograph/remark/parse-type");
 const Section = require("@lithograph/ast/section");
-
+console.log(Variable);
 const Format = union `Format` (
     data `JSON` (),
     data `XML` () );
@@ -26,25 +26,17 @@ module.exports = function OEmbedPlugin(section)
     const transformed = subsections.map(transformCase);
 
     console.log(configuration);
-    //console.log(Section.from(MDList.toArray(list.next.next)));
-/*
-    const args = fromTable(OEmbedArguments, elements[0]);
 
-    console.log(args);
-    console.log(elements);
-
-    return `# A simple test`;*/
-
-    return section;
+    return Section({ ...section, subsections: transformed });
 }
 
 
 const transformCase = (function ()
 {
-    const URLtype = URL;
+    const URLVariable = Variable(string);
     const URLTestCase = data `URLTestCase` (
-        URL => string,
-        succeeds => [boolean, true]);
+        URL         => URLVariable,
+        succeeds    => [boolean, true]);
 
     return function transformCase(section)
     {
@@ -56,6 +48,25 @@ const transformCase = (function ()
 
         const configuration = fromTable(URLTestCase, table);
 
-        return section;
+        if (Failure.is(configuration))
+            throw TypeError(configuration.message);
+
+        const child = Section.fromMarkdown(`${__dirname}/test-cases/json-response-implemented.md`);
+        const { subsections } = section;
+
+        return Section({ ...section, subsections: subsections.push(child) });
     }
 })();
+
+
+
+
+
+
+
+
+
+
+
+
+

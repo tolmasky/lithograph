@@ -5,6 +5,8 @@ const { hasOwnProperty } = Object;
 
 const Failure = parameterized (T =>
     data `Failed <${T}>` (message => string));
+const Variable = parameterized (T =>
+    data `Variable <${T}>` (name => string));
 
 Failure.is = failure => parameterized.belongs(Failure, failure);
 
@@ -15,6 +17,7 @@ module.exports = parse;
 
 module.exports.parse = parse;
 module.exports.Failure = Failure;
+module.exports.Variable = Variable;
 
 function parse(type, node, many)
 {
@@ -64,6 +67,9 @@ parse.one = function (type, list)
     if (kind === union)
         return parse.union(type, list);
 
+    if (parameterized.is(Variable, type))
+        return parse.variable(type, list);
+
     if (kind === data)
         return parse.data(type, list);
 
@@ -82,6 +88,13 @@ parse.number = transformInlineCode((_, value) => +value);
 parse.regexp = transformInlineCode((_, value) =>
     (([, pattern, flags]) => new RegExp(pattern, flags))
     (value.match(/\/(.*)\/([gimuy]*)$/)));
+
+parse.variable = transformInlineCode(function (type, value)
+{
+    return /^[$A-Z_][0-9A-Z_$]*$/i.test(value) ?
+        type({ name: value }) :
+        fail(type, `Expected variable, but instead got ${value}`);
+});
 
 function transformEnum(...args)
 {
