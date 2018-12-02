@@ -1,5 +1,5 @@
 const t = require("@babel/types");
-const { transformFromAst } = require("babel-core");
+const { transformFromAst: transformFromAstSync } = require("babel-core");
 const plugin = { visitor: { TaggedTemplateExpression } };
 const options = { plugins: [plugin] };
 const valueToExpression = require("@lithograph/ast/value-to-expression");
@@ -11,7 +11,7 @@ module.exports = function (statements, callbacks)
     const statementArray = isArray(statements) ?
         statements : Array.from(statements);
 
-    return transformFromAst(
+    return transformFromAstSync(
         Object.assign(t.program(statementArray), callbacks),
         "",
         options).ast.program.body;

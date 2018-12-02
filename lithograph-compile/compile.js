@@ -47,7 +47,7 @@ module.exports = (function()
 {
     const Module = require("module");
     const { dirname } = require("path");
-    const generate = require("babel-generator").default;
+    const generate = require("@babel/generator").default;
 
     return function (environment, suite, filename)
     {
@@ -66,7 +66,8 @@ module.exports = (function()
 
         const toGenerator = module._compile(source, filename);
         const args = parameters.map(key => environment[key]);
-
+printSuite(suite);
+console.log(toGenerator(...args)+"");
         const compilations = toCompilations(toGenerator(...args));
         const functions = fMap(compilations.map(({ id, f }) => [id, f]));
 
@@ -91,7 +92,9 @@ function fromSuite(suitePath)
     return suite.children.size === 1 ?
         fromExecutable(Path.child(0, suitePath)) :
         suite.mode === Suite.Mode.Serial ?
-            fromSerial(suitePath, 0) :
+            suite.inserted ?
+                fromInserted(suitePath) :
+                fromSerial(suitePath, 0) :
             fromConcurrent(suitePath);
 }
 
@@ -125,7 +128,7 @@ const inlineStatementsFromTest = (function ()
 {
     const { yieldExpression } = require("@babel/types");
     const fromTopLevelAwait = argument => yieldExpression(argument);
-    const transformStatements = require("./compile/transform-statements");
+    const transformStatements = require("./transform-statements");
 
     return function inlineStatementsFromTest(testPath)
     {
@@ -138,7 +141,7 @@ const inlineStatementsFromTest = (function ()
 })();
 
 
-const fromSerial = (function ()
+const { fromSerial, fromInserted } = (function ()
 {
     const SERIAL_TEMPLATE = ftemplate(function * ()
     {
@@ -149,11 +152,24 @@ const fromSerial = (function ()
         });
     });
 
-    return function fromSerial(suitePath, index)
+    return { fromSerial, fromInserted };
+
+    function fromInserted(suitePath)
+    {
+        const scope = suitePath.parent.suite.block.id;
+        const $statements =
+            inlineStatementsFromTest(Path.child(0, suitePath));
+        const $children = toExpression([scope,
+            fromExecutable(Path.child(1, suitePath))]);
+
+        return SERIAL_TEMPLATE({ $statements, $children });
+    }
+
+    function fromSerial(suitePath, index)
     {
         const childPath = Path.child(index, suitePath);
         const isTestPath = is(Path(Test), childPath);
-
+        const isImplicitPath = !isTestPath && childPath.suite.implicit;
         const { suite: { block, children } } = suitePath;
         const scope = block.id;
         const next = index < children.size - 1 ?
@@ -163,13 +179,17 @@ const fromSerial = (function ()
             toExpression(childPath.test.block.id) :
             fromExecutable(childPath);
 
-        const $statements = isTestPath ?
-            inlineStatementsFromTest(childPath) : [];
+        const $statements =
+            isTestPath ? inlineStatementsFromTest(childPath) :
+            isImplicitPath ? inlineStatementsFromTest(childPath.suite.test) :
+            [];
         const $children = toExpression([scope, current, ...next]);
 
         return SERIAL_TEMPLATE({ $statements, $children });
     }
 })();
+
+
 
 const fromConcurrent = (function ()
 {
