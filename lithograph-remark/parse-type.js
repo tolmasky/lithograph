@@ -84,7 +84,6 @@ parse.one = function (type, list)
 }
 
 parse.boolean = transformEnum({ true: true, false: false });
-parse.string = transformInlineCode((_, value) => value);
 parse.number = transformInlineCode((_, value) => +value);
 parse.regexp = transformInlineCode((_, value) =>
     (([, pattern, flags]) => new RegExp(pattern, flags))
@@ -130,6 +129,21 @@ function transformInlineCode(...args)
     const message =
         `${getTypename(type)} expects a single inline ` +
         `code markdown element, but instead found ${node.type}`
+
+    return fail(type, message);
+}
+
+parse.string = function parseString(type, list)
+{
+    const { node, next } = list;
+
+    if (node.type === "link")
+        return [node.url, next];
+
+    if (node.type === "inlineCode")
+        return [node.value, next];
+
+    const message = `string can only be a link or inline code markdown element.`;
 
     return fail(type, message);
 }

@@ -3,20 +3,6 @@ const { data, string, getKind, parameterized, primitives } = require("@algebraic
 const { List, Map, Set } = require("@algebraic/collections");
 const { Variable } = require("@lithograph/remark/parse-type");
 
-
-/*const toFlattenedEntries = (T, object, prefix = "") =>
-    [].concat(...Object.keys(object)
-        .map(key =>
-            [`${prefix ? prefix + "." : ""}${key}`, object[key]])
-        .map(([key, value]) =>
-            (value && typeof value === "object") ?
-                typeof value.toObject === "function" ?
-                    value instanceof Set(Object) ?
-                        toFlattenedEntries(value.toArray(), key) :
-                        toFlattenedEntries(value.toObject(), key) : 
-                    toFlattenedEntries(value, key) :
-                [[key, Variable.is(value) ? value.name : value]]));*/
-
 const isSetOrList = type => 
     parameterized.is(Set, type) || parameterized.is(List, type);
 const append = (path, key) => path ? `${path}.${key}` : key;
@@ -35,19 +21,6 @@ const flattenedData = (type, value, path) =>
         .map(([path, type, value]) =>
             flattened(type, value, path)));
 
-/*
-const toFlattenedEntries = (object, prefix = "") =>
-    [].concat(...Object.keys(object)
-        .map(key =>
-            [`${prefix ? prefix + "." : ""}${key}`, object[key]])
-        .map(([key, value]) =>
-            (value && typeof value === "object") ?
-                typeof value.toObject === "function" ?
-                    value instanceof Set(Object) ?
-                        toFlattenedEntries(value.toArray(), key) :
-                        toFlattenedEntries(value.toObject(), key) : 
-                    toFlattenedEntries(value, key) :
-                [[key, Variable.is(value) ? value.name : value]]));*/
 
 module.exports = function (type, templateArguments = false)
 {
@@ -69,8 +42,8 @@ module.exports = function (type, templateArguments = false)
 
         const entries = flattened(type, templateArguments);
         const syntax = new RegExp(`{%(${entries
-            .map(([path]) => path.replace(/\./g, "_"))
-            .join("|")})%}`, "g");
+            .map(([path]) => path.replace(/\./g, "\\."))
+            .join("|")})%}`, "g");console.log(syntax);
         const replacements = Map(string, Object)
             (entries.map(([key, value]) =>
                 [toIdentifier(key), value]));
@@ -90,24 +63,6 @@ module.exports = function (type, templateArguments = false)
         return { ...node, value };
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     

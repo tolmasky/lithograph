@@ -9,8 +9,9 @@ const Format = union `Format` (
     data `XML` () );
 
 const Specification = data `Specification` (
+    APIEndpoint     => string,
     providerName    => string,
-    providerURL     => URL,
+    providerURL     => string,
     formats         => Set(Format),
     maxwidths       => Set(number) );
 
@@ -40,10 +41,9 @@ const transformCase = (function ()
 
     return function transformCase(section, specification)
     {
-        const URLVariable = Variable(string);
         const x = specification;
         const URLTestCase = data `URLTestCase` (
-            URL             => URLVariable,
+            URL             => Variable(string),
             specification   => [Specification, x]);
     
         const { preamble } = section;
