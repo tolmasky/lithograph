@@ -8,7 +8,7 @@ const Format = union `Format` (
     data `JSON` (),
     data `XML` () );
 
-const OEmbedConfiguration = data `OEmbedConfiguration` (
+const Specification = data `Specification` (
     providerName    => string,
     providerURL     => URL,
     formats         => Set(Format),
@@ -19,15 +19,16 @@ module.exports = function OEmbedPlugin(section)
 {
     const { preamble, subsections } = section;
     const table = preamble.get(0);
-    const configuration = fromTable(OEmbedConfiguration, table);
+    const specification = fromTable(Specification, table);
 
-    if (Failure.is(configuration))
-        throw TypeError(configuration.message);
+    if (Failure.is(specification))
+        throw TypeError(specification.message);
 
-    const { formats, maxwidths } = configuration;
-    const transformed = subsections.map(transformCase);
+    const { formats, maxwidths } = specification;
+    const transformed = subsections.map(subsection =>
+        transformCase(subsection, specification));
 
-    console.log(configuration);
+    console.log(specification);
 
     return Section({ ...section, subsections: transformed });
 }
@@ -35,14 +36,16 @@ module.exports = function OEmbedPlugin(section)
 
 const transformCase = (function ()
 {
-    const URLVariable = Variable(string);
-    
-    
-    const URLTestCase = data `URLTestCase` (
-        URL         => URLVariable);
 
-    return function transformCase(section)
+
+    return function transformCase(section, specification)
     {
+        const URLVariable = Variable(string);
+        const x = specification;
+        const URLTestCase = data `URLTestCase` (
+            URL             => URLVariable,
+            specification   => [Specification, x]);
+    
         const { preamble } = section;
         const table = preamble.last();
 
@@ -54,7 +57,7 @@ const transformCase = (function ()
         if (Failure.is(testCaseArguments))
             throw TypeError(testCaseArguments.message);
 
-        const child = Section.fromMarkdown(`${__dirname}/test-cases/json-response-implemented.md`, testCaseArguments);
+        const child = Section.fromMarkdown(`${__dirname}/test-cases/json-response-implemented.md`, URLTestCase, testCaseArguments);
         const { subsections } = section;
 
         return Section({ ...section, subsections: subsections.push(child) });

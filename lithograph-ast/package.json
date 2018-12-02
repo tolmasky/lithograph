@@ -10,6 +10,7 @@
   "author": "Francisco Ryan Tolmasky I",
   "license": "MIT",
   "dependencies": {
+    "@babel/generator": "^7.1.6",
     "@babel/template": "^7.1.2",
     "remark": "^10.0.1"
   },

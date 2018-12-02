@@ -1,41 +1,113 @@
-const { statements } = require("@babel/template");
-const { string } = require("@algebraic/type");
-const { Map } = require("@algebraic/collections");
+const { program } = require("@babel/template");
+const { data, string, getKind, parameterized, primitives } = require("@algebraic/type");
+const { List, Map, Set } = require("@algebraic/collections");
+const { Variable } = require("@lithograph/remark/parse-type");
 
-const prefix = "FIXME_TEMPLATE_";
 
+/*const toFlattenedEntries = (T, object, prefix = "") =>
+    [].concat(...Object.keys(object)
+        .map(key =>
+            [`${prefix ? prefix + "." : ""}${key}`, object[key]])
+        .map(([key, value]) =>
+            (value && typeof value === "object") ?
+                typeof value.toObject === "function" ?
+                    value instanceof Set(Object) ?
+                        toFlattenedEntries(value.toArray(), key) :
+                        toFlattenedEntries(value.toObject(), key) : 
+                    toFlattenedEntries(value, key) :
+                [[key, Variable.is(value) ? value.name : value]]));*/
 
-module.exports = function (templateArguments = false)
+const isSetOrList = type => 
+    parameterized.is(Set, type) || parameterized.is(List, type);
+const append = (path, key) => path ? `${path}.${key}` : key;
+const flattened = (type, value, path = "") =>
+    isSetOrList(type) ? [] :
+        //value.toArray().map(key => [path, value]) :
+    Variable.is(value) ? [[path, value.name]] :
+    getKind(type) === data ? flattenedData(type, value, path) :
+    type === primitives.string ? [[path, `"${value}"`]] :
+    type === URL ? [[path, `new URL("${value}")`]] :
+    [[path, value]];
+const flattenedData = (type, value, path) =>
+    [].concat(...data.fields(type)
+        .map(([key, type]) =>
+            [append(path, key), type, value[key]])
+        .map(([path, type, value]) =>
+            flattened(type, value, path)));
+
+/*
+const toFlattenedEntries = (object, prefix = "") =>
+    [].concat(...Object.keys(object)
+        .map(key =>
+            [`${prefix ? prefix + "." : ""}${key}`, object[key]])
+        .map(([key, value]) =>
+            (value && typeof value === "object") ?
+                typeof value.toObject === "function" ?
+                    value instanceof Set(Object) ?
+                        toFlattenedEntries(value.toArray(), key) :
+                        toFlattenedEntries(value.toObject(), key) : 
+                    toFlattenedEntries(value, key) :
+                [[key, Variable.is(value) ? value.name : value]]));*/
+
+module.exports = function (type, templateArguments = false)
 {
     if (templateArguments === false) 
         return node => node;
 
+    const toIdentifier = keyPath =>
+        `FIXME_TEMPLATE_${keyPath.replace(/\./g, "_")}`;
+    const { default: generate } = require("@babel/generator");
+
     return function (node)
     {
-        const { type, meta, value } = node;
+        const { value: original } = node;
 
-        if (type !== "code" ||
-            meta !== "(templated)" ||
-            value.indexOf("{%") === -1)
+        if (node.type !== "code" ||
+            node.meta !== "(templated)" ||
+            original.indexOf("{%") === -1)
             return node;
 
-        const fields = Object.keys(templateArguments);
-        const union = fields.join("|");console.log(union);
-        const code = value.replace(
-            new RegExp(`{%(${union})%}`, "g"),
-            (_, name) => `${prefix}${name}`);
+        const entries = flattened(type, templateArguments);
+        const syntax = new RegExp(`{%(${entries
+            .map(([path]) => path.replace(/\./g, "_"))
+            .join("|")})%}`, "g");
         const replacements = Map(string, Object)
-            (templateArguments)
-                .mapEntries(([key, value]) => [`${prefix}${key}`, value.name]).toJS();
-                console.log(code);
-        const transformed = statements(code,
+            (entries.map(([key, value]) =>
+                [toIdentifier(key), value]));
+        const fixedSyntax = original.replace(syntax,
+            (_, name) => toIdentifier(name)) +
+            `\n(()=>(${replacements.keySeq().join(",")}))`;
+        const placeholderPattern =
+            new RegExp(`^${replacements.keySeq().join("|")}$`);console.log(replacements.toObject());
+        const transformed = program(fixedSyntax,
         {
             allowAwaitOutsideFunction: true,
             preserveComments: true,
-            placeholderPattern: new RegExp(`^${prefix}${union}$`)
-        })(replacements);
+            placeholderPattern
+        })(replacements.toObject());console.log(transformed);
+        const value = generate(transformed).code;
 
-        return { ...node, value: transformed };
+        return { ...node, value };
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     

@@ -9,6 +9,7 @@ const Variable = parameterized (T =>
     data `Variable <${T}>` (name => string));
 
 Failure.is = failure => parameterized.belongs(Failure, failure);
+Variable.is = variable => parameterized.belongs(Variable, variable);
 
 const fail = (type, message) => [Failure(type)({ message }), MDList.End];
 

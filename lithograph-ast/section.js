@@ -20,11 +20,11 @@ Section.fromMarkdown = (function ()
     const { readFileSync } = require("fs");
     const { parse } = require("remark");
 
-    return function (filename, templateArguments = false)
+    return function (filename, templateType, templateArguments = false)
     {
         const document = parse(readFileSync(filename));
         const stack = document.children
-            .map(template(templateArguments))
+            .map(template(templateType, templateArguments))
             .reduce((stack, node) => node.type !== "heading" ?
                 stack.pop().push(adopt("preamble", node, stack.peek())) :
                 collapse(node.depth, stack).push(toSection(node)),

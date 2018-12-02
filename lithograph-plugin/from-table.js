@@ -1,5 +1,5 @@
 const { data, string, union, parameterized, is } = require("@algebraic/type");
-const { List, Set } = require("@algebraic/collections");
+const { List, Map, Set } = require("@algebraic/collections");
 const { ParseStrategy, Reduction } = require("./from-table/parse-strategy");
 const { parse, Failure } = require("@lithograph/remark/parse-type");
 const getInnerText = require("@lithograph/remark/get-inner-text");
@@ -56,5 +56,8 @@ module.exports = function fromTable(type, table, { headers = false } = { })
         return WorkingArguments({ ...working, [field]: appended });
     }, WorkingArguments({}));
 
-    return Failure.is(working) ? working : type(working);
+    return Failure.is(working) ?
+        working :
+        type(Map(string, Object)(working)
+            .filter(value => value !== Unset).toObject());
 }
