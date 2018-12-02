@@ -11,8 +11,8 @@ const WorkingArgumentsOf = parameterized (A =>
     data `WorkingArgumentsOf <${A}>` (
         ...data.fields(A)
         .map(([name, type]) => new Function(
-            "type", "Unset",
-            `return ${name} => [type, Unset]`)
+            "__type", "__Unset",
+            `return ${name} => [__type, __Unset]`)
             (WorkingArgumentOf(type), Unset))));
 
 

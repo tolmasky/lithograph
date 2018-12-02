@@ -30,6 +30,9 @@ Section.fromMarkdown = (function ()
                 collapse(node.depth, stack).push(toSection(node)),
                 Stack(Section).of(toSection(toHeading(filename))));
 
+        if (templateArguments)
+            return collapse(1, stack).peek().subsections.get(0);
+
         return collapse(1, stack).peek();
     };
 })();

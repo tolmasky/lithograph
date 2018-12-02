@@ -38,3 +38,5 @@ module.exports.expect = function expect(expected)
 
     return expectation;
 }
+
+Object.keys(jestExpect).map(key => module.exports.expect[key] = jestExpect[key]);
