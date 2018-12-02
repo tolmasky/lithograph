@@ -1,6 +1,7 @@
 const { is, data, union, number, boolean, parameterized, ftype } = require("@algebraic/type");
 const { Map, List } = require("@algebraic/collections");
-const { ResourceMap } = require("@lithograph/ast");
+const { Test, Suite, ResourceMap } = require("@lithograph/ast");
+const toExpression = require("@lithograph/ast/value-to-expression");
 
 const fMap = Map(number, ftype);
 const ScopeMap = Map(ftype, number);
@@ -29,9 +30,6 @@ const ResourcePath = union `ResourcePath` (
         resources   => ResourceMap,
         parent      => ResourcePath ),
     data `Root` ( ) );
-
-const { Test, Suite } = require("@lithograph/ast");
-const toExpression = require("./compile/value-to-expression");
 
 
 function printSuite(suite, nest = "")

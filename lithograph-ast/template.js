@@ -2,6 +2,7 @@ const { program } = require("@babel/template");
 const { data, string, getKind, parameterized, primitives } = require("@algebraic/type");
 const { List, Map, Set } = require("@algebraic/collections");
 const { Variable } = require("@lithograph/remark/parse-type");
+const toExpression = require("@lithograph/ast/value-to-expression");
 
 const isSetOrList = type => 
     parameterized.is(Set, type) || parameterized.is(List, type);
@@ -13,7 +14,7 @@ const flattened = (type, value, path = "") =>
     getKind(type) === data ? flattenedData(type, value, path) :
     type === primitives.string ? [[path, `"${value}"`]] :
     type === URL ? [[path, `new URL("${value}")`]] :
-    [[path, value]];
+    [[path, toExpression(value)]];
 const flattenedData = (type, value, path) =>
     [].concat(...data.fields(type)
         .map(([key, type]) =>
@@ -43,7 +44,7 @@ module.exports = function (type, templateArguments = false)
         const entries = flattened(type, templateArguments);
         const syntax = new RegExp(`{%(${entries
             .map(([path]) => path.replace(/\./g, "\\."))
-            .join("|")})%}`, "g");console.log(syntax);
+            .join("|")})%}`, "g");
         const replacements = Map(string, Object)
             (entries.map(([key, value]) =>
                 [toIdentifier(key), value]));
@@ -51,13 +52,13 @@ module.exports = function (type, templateArguments = false)
             (_, name) => toIdentifier(name)) +
             `\n(()=>(${replacements.keySeq().join(",")}))`;
         const placeholderPattern =
-            new RegExp(`^${replacements.keySeq().join("|")}$`);console.log(replacements.toObject());
+            new RegExp(`^${replacements.keySeq().join("|")}$`);console.log(replacements);
         const transformed = program(fixedSyntax,
         {
             allowAwaitOutsideFunction: true,
             preserveComments: true,
             placeholderPattern
-        })(replacements.toObject());console.log(transformed);
+        })(replacements.toObject());
         const value = generate(transformed).code;
 
         return { ...node, value };

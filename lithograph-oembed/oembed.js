@@ -44,6 +44,7 @@ const transformCase = (function ()
         const x = specification;
         const URLTestCase = data `URLTestCase` (
             URL             => Variable(string),
+            width           => number,
             specification   => [Specification, x]);
     
         const { preamble } = section;

@@ -2,7 +2,7 @@ const t = require("@babel/types");
 const { transformFromAst } = require("babel-core");
 const plugin = { visitor: { TaggedTemplateExpression } };
 const options = { plugins: [plugin] };
-const valueToExpression = require("./value-to-expression");
+const valueToExpression = require("@lithograph/ast/value-to-expression");
 const { isArray } = Array;
 
 
