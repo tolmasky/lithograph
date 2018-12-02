@@ -7,7 +7,7 @@ const { Reason } = Result.Failure;
 const Log = require("./log");
 
 const Pool = require("@cause/pool");
-const compile = require("./compile");
+const compile = require("@lithograph/compile");
 const GarbageCollector = require("./garbage-collector");
 const toEnvironment = require("./file-execution/to-environment");
 
