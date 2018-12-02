@@ -227,7 +227,6 @@ const parseFragment = (function ()
             // the `startLine`, so we have to do it ourselves.
             // https://github.com/babel/babel/issues/9015
             const { line: unmapped, column } = error.loc;
-            const { filename, start } = range;
             const line = unmapped + start.line;
             const message = error.message.replace(/\d+(?=:\d+\)$)/, line);
 

@@ -1,8 +1,8 @@
 ## Test Correct JSON Response
 
-```javascript
+```javascript (templated)
 const { stringify } = require("querystring");
-const query = stringify({ url: notebookURL, format:"json" });
+const query = stringify({ url: {%URL%}, format:"json" });
 const oembedURL = `https://embed.tonic.work/oembed?${query}`;
 const response = (await (await fetch(oembedURL)).json());
 

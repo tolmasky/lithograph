@@ -9,8 +9,10 @@ const Format = union `Format` (
     data `XML` () );
 
 const OEmbedConfiguration = data `OEmbedConfiguration` (
-    formats => Set(Format),
-    maxwidths => Set(number) );
+    providerName    => string,
+    providerURL     => URL,
+    formats         => Set(Format),
+    maxwidths       => Set(number) );
 
 
 module.exports = function OEmbedPlugin(section)
@@ -34,9 +36,10 @@ module.exports = function OEmbedPlugin(section)
 const transformCase = (function ()
 {
     const URLVariable = Variable(string);
+    
+    
     const URLTestCase = data `URLTestCase` (
-        URL         => URLVariable,
-        succeeds    => [boolean, true]);
+        URL         => URLVariable);
 
     return function transformCase(section)
     {
@@ -46,12 +49,12 @@ const transformCase = (function ()
         if (table.type !== "table")
             return section;
 
-        const configuration = fromTable(URLTestCase, table);
+        const testCaseArguments = fromTable(URLTestCase, table);
 
-        if (Failure.is(configuration))
-            throw TypeError(configuration.message);
+        if (Failure.is(testCaseArguments))
+            throw TypeError(testCaseArguments.message);
 
-        const child = Section.fromMarkdown(`${__dirname}/test-cases/json-response-implemented.md`);
+        const child = Section.fromMarkdown(`${__dirname}/test-cases/json-response-implemented.md`, testCaseArguments);
         const { subsections } = section;
 
         return Section({ ...section, subsections: subsections.push(child) });

@@ -10,7 +10,8 @@
   "author": "Francisco Ryan Tolmasky I",
   "license": "MIT",
   "dependencies": {
-    "remark": "^9.0.0"
+    "@babel/template": "^7.1.2",
+    "remark": "^10.0.1"
   },
   "peerDependencies": {
     "@algebraic/type": "1.0.0-alpha.4",

@@ -1,5 +1,6 @@
 const { data, number, string } = require("@algebraic/type");
 const { List, Stack } = require("@algebraic/collections");
+const template = require("./template");
 
 const Section = data `Section` (
     depth => number,
@@ -19,14 +20,15 @@ Section.fromMarkdown = (function ()
     const { readFileSync } = require("fs");
     const { parse } = require("remark");
 
-    return function (filename)
+    return function (filename, templateArguments = false)
     {
         const document = parse(readFileSync(filename));
-        const stack = document.children.reduce((stack, node) =>
-            node.type !== "heading" ?
+        const stack = document.children
+            .map(template(templateArguments))
+            .reduce((stack, node) => node.type !== "heading" ?
                 stack.pop().push(adopt("preamble", node, stack.peek())) :
                 collapse(node.depth, stack).push(toSection(node)),
-            Stack(Section).of(toSection(toHeading(filename))));
+                Stack(Section).of(toSection(toHeading(filename))));
 
         return collapse(1, stack).peek();
     };
