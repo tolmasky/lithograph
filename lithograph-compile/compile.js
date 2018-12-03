@@ -87,15 +87,16 @@ const fs = toFunctions(...toGenerator(...args)[0]);
         console.log((i++) + "after");
     }
 })();
-return { functions:Map(number, number)(), findShallowestScope:()=>{} };
-throw "DONE";
+        const functions = toFunctions(...toGenerator(...args)[0]);
+        return { functions:Map(number, Function)(functions).mapEntries(([key,value]) =>[+key,value]), findShallowestScope:()=>false };
+/*
         const compilations = toCompilations(toGenerator(...args));
         const functions = fMap(compilations.map(({ id, f }) => [id, f]));
 
         const scopes = ScopeMap(compilations.map(({ fscope, scope }) => [fscope, scope]));
         const findShallowestScope = toFindShallowestScope(scopes);
 
-        return { functions, findShallowestScope };
+        return { functions, findShallowestScope };*/
     }
 })();
 
@@ -165,6 +166,44 @@ const fromSerial = (function ()
         $statements;
     });
     const tscope = $f => yield(callExpression(yield({ scope: $f }), []), true);
+    const testReduce = function (ids, chunks, path)
+    {
+        const { id } = path.test.block;
+
+        ids.push(id);
+        chunks.push([statement(yield({ begin: id }))]);
+        chunks.push(inlineStatementsFromTest(path));
+    };
+    const suiteReduce = function (ids, chunks, childPath)
+    {
+        const { suite } = childPath;
+        const { mode, inserted } = suite;
+        
+        if (inserted)
+        {
+            testReduce(ids, chunks, Path.child(0, childPath));
+            suiteReduce(ids, chunks, Path.child(1, childPath));
+        }
+        else
+        {            
+            const nested = fromExecutable(childPath);
+    
+            if (mode === Suite.Mode.Serial)
+            {
+                if (inserted) { console.log("yes!"); }
+                ids.push(...nested[0].ids);
+                chunks.push([statement(tscope(nested[0].expression))]);
+            }
+            else
+            {
+                nested.reduce((_, composite) =>
+                    ids.push(...composite.ids), []);
+                const define = nested.map(
+                    ({ ids, expression }) => [ids, expression]);
+                chunks.push([yield({ define })]);
+            }
+        }
+    }
 
     return function fromSerial(suitePath, index)
     {
@@ -174,32 +213,10 @@ const fromSerial = (function ()
             .reduce(function ([ids, chunks], childPath)
             {
                 if (is(Path(Test), childPath))
-                {
-                    const { id } = childPath.test.block;
+                    testReduce(ids, chunks, childPath);
 
-                    ids.push(id);
-                    chunks.push([statement(yield({ begin: id }))]);
-                    chunks.push(inlineStatementsFromTest(childPath));
-                }
                 else
-                {
-                    const { mode } = childPath.suite;
-                    const nested = fromExecutable(childPath);
-
-                    if (mode === Suite.Mode.Serial)
-                    {
-                        ids.push(...nested[0].ids);
-                        chunks.push([statement(tscope(nested[0].expression))]);
-                    }
-                    else
-                    {
-                        nested.reduce((_, composite) =>
-                            ids.push(...composite.ids), []);
-                        const define = nested.map(
-                            ({ ids, expression }) => [ids, expression]);
-                        chunks.push([yield({ define })]);
-                    }
-                }
+                    suiteReduce(ids, chunks, childPath);
 
                 return [ids, chunks];
             }, [[], []]);

@@ -50,6 +50,7 @@ const Executable = union `Executable` (
 
     data `Suite` (
         block => Block,
+        inserted => [boolean, false],
         children => [Executable.List, Executable.List()],
         mode => [Mode, Mode.Concurrent] ) );
 const { Test, Suite } = Executable;
@@ -117,7 +118,7 @@ Executable.fromSection = (function ()
 
         if (!hasTest && !hasChildren)
             return [false, id];
-    
+
         const { disabled, title, mode } = fromHeading(section.heading);
         const block = Block({ id, title, disabled, resources });
 
@@ -137,7 +138,8 @@ Executable.fromSection = (function ()
         const content = Suite({ block: contentBlock, mode, children });
 
         const asChildren = List(Executable)([before, content]);
-        const suite = Suite({ block, mode: Mode.Serial, children: asChildren });
+        const inserted = true;
+        const suite = Suite({ block, inserted, mode: Mode.Serial, children: asChildren });
 
         return [suite, next];
     }
