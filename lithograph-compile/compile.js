@@ -56,14 +56,11 @@ module.exports = (function()
     const generate = require("@babel/generator").default;
 
     return function (environment, suite, filename)
-    {console.log("in...");
-        const fragment = fromSuite(Path(Suite)({ suite }));
-        const { code, map } = generate(toExpression(fragment), { sourceMaps: true });
-console.log(fragment);
-printSuite(suite);
-console.log(code);
-
-throw "d";
+    {
+        const composites = fromSuite(Path(Suite)({ suite }));
+        const expression = composites
+            .map(({ ids, expression }) => [ids, expression]);
+        const { code, map } = generate(toExpression(expression), { sourceMaps: true });
         const mapComment =
             "//# sourceMappingURL=data:application/json;charset=utf-8;base64," +
             Buffer.from(JSON.stringify(map), "utf-8").toString("base64");
@@ -78,7 +75,19 @@ throw "d";
         const toGenerator = module._compile(source, filename);
         const args = parameters.map(key => environment[key]);
 printSuite(suite);
-console.log(toGenerator(...args)+"");
+toGenerator(...args).map((keys, f) => console.log("FOR " + keys + "\n" + f));
+console.log(toFunctions(...toGenerator(...args)[0]))
+const fs = toFunctions(...toGenerator(...args)[0]);
+(async function ()
+{
+    var i = 0;
+    for (const id of Object.keys(fs))
+    {
+        await fs[id]();
+        console.log((i++) + "after");
+    }
+})();
+return { functions:Map(number, number)(), findShallowestScope:()=>{} };
 throw "DONE";
         const compilations = toCompilations(toGenerator(...args));
         const functions = fMap(compilations.map(({ id, f }) => [id, f]));
@@ -147,13 +156,15 @@ const inlineStatementsFromTest = (function ()
 
 const fromSerial = (function ()
 {
-    const { yieldExpression, expressionStatement } = require("@babel/types");
+    const { yieldExpression, expressionStatement, callExpression } = require("@babel/types");
     const yield = (argument, delegate) =>
-        expressionStatement(yieldExpression(toExpression(argument), delegate));
+        yieldExpression(toExpression(argument), delegate);
+    const statement = expressionStatement;
     const SERIAL_TEMPLATE = ftemplate(async function * ()
     {
         $statements;
     });
+    const tscope = $f => yield(callExpression(yield({ scope: $f }), []), true);
 
     return function fromSerial(suitePath, index)
     {
@@ -167,8 +178,8 @@ const fromSerial = (function ()
                     const { id } = childPath.test.block;
 
                     ids.push(id);
+                    chunks.push([statement(yield({ begin: id }))]);
                     chunks.push(inlineStatementsFromTest(childPath));
-                    chunks.push([yield({ end: id })]);
                 }
                 else
                 {
@@ -178,7 +189,7 @@ const fromSerial = (function ()
                     if (mode === Suite.Mode.Serial)
                     {
                         ids.push(...nested[0].ids);
-                        chunks.push([yield(nested[0].expression, true)]);
+                        chunks.push([statement(tscope(nested[0].expression))]);
                     }
                     else
                     {
@@ -295,6 +306,112 @@ const parseFragment = (function ()
         }
     }
 })();
+
+function toFunctions(ids, f)
+{
+    const None = { };
+    const state = { active:None, next:ids[0] };
+    const generator = f();
+
+    const resolvable = (fs = []) =>
+        [new Promise((...args) => fs = args), ...fs];
+    const observers = toObject(ids.map(id => [id, resolvable()]));
+
+    generator.next();
+
+    return toObject(ids.map(id => [id, () => step(id)]));
+
+    function step(id, [promise, resolve] = observers[id])
+    {
+        if (state.active !== None || state.next !== id)
+            throw Error(`Attempting to call test ${id} before it is ready.`);
+
+        state.active = id;
+        state.next = None;
+
+        generator.next().then(function finish({ value, done })
+        {
+            if (value && value.scope)
+                return generator.next(value.scope).then(finish);
+
+            state.active = None;
+            !done && (state.next = value.begin);
+            resolve();
+        });
+
+        return promise;
+    };
+}
+
+function toObject(pairs)
+{console.log(pairs);
+    return pairs.reduce((object, [id, f]) => (object[id] = f, object), { });
+}
+
+
+function toFunctionMap(keys, f)
+{
+
+    const Resolvable = ([resolve, reject]) =>
+        [new Promise((...args) =>
+            resolve = args[0], reject = args[1]),
+            resolve, reject];
+    const promises = Map(number, Object)
+        (keys.map(key => [key, Resolvable()]));
+    const functions = Map(number, Function)
+        (promises.map(([key, [promise]]) =>
+            [key, () => promise]));
+    const toFunction = (id, promise) => function ()
+    {
+        if (state.current !== false || state.next !== id)
+            throw Error(`Attempting to call test ${id} before it is ready.`);
+
+        state.step();
+
+        return promise;
+    }
+
+    const state = { next:keys[0], step:orchastrator };
+
+
+    async function orchestrator()
+    {
+        try
+        {
+            state.active = state.next;
+
+            const generator = f();
+
+            while (state.message = await generator.next())
+            {
+                const { done, value } = state.message;
+                const { resolve } = promises[state.active];
+
+                state.active = false;
+                
+                if (!done)
+                {
+                    state.next = value.begin;
+                    [state.blocking, state.step] = Resolvable();
+                }
+
+                resolve();
+
+                if (done)
+                    return;
+
+                await state.blocking;
+
+                state.active = state.next;
+                state.next = false;
+            }
+        }
+        catch (error)
+        {
+            promises[state.active].reject(error)
+        }
+    }
+}
 
 function toCompilations(generator)
 {
