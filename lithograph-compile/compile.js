@@ -3,10 +3,16 @@ const { Map, List } = require("@algebraic/collections");
 const { Test, Suite, ResourceMap } = require("@lithograph/ast");
 const toExpression = require("@lithograph/ast/value-to-expression");
 
+
+const Composite = data `Composite` (
+    ids         => List(number),
+    expression  => Object);
+const CompositeList = List(Composite);
+
 const fMap = Map(number, ftype);
 const ScopeMap = Map(ftype, number);
 Error.stackTraceLimit = 1000;
-const Compilation = data `Compilation` (
+const Compilation2 = data `Compilation` (
     scope       => number,
     id          => number,
     f           => ftype,
@@ -50,9 +56,14 @@ module.exports = (function()
     const generate = require("@babel/generator").default;
 
     return function (environment, suite, filename)
-    {
+    {console.log("in...");
         const fragment = fromSuite(Path(Suite)({ suite }));
-        const { code, map } = generate(fragment, { sourceMaps: true });
+        const { code, map } = generate(toExpression(fragment), { sourceMaps: true });
+console.log(fragment);
+printSuite(suite);
+console.log(code);
+
+throw "d";
         const mapComment =
             "//# sourceMappingURL=data:application/json;charset=utf-8;base64," +
             Buffer.from(JSON.stringify(map), "utf-8").toString("base64");
@@ -68,6 +79,7 @@ module.exports = (function()
         const args = parameters.map(key => environment[key]);
 printSuite(suite);
 console.log(toGenerator(...args)+"");
+throw "DONE";
         const compilations = toCompilations(toGenerator(...args));
         const functions = fMap(compilations.map(({ id, f }) => [id, f]));
 
@@ -89,13 +101,9 @@ function fromSuite(suitePath)
 {
     const { suite } = suitePath;
 
-    return suite.children.size === 1 ?
-        fromExecutable(Path.child(0, suitePath)) :
-        suite.mode === Suite.Mode.Serial ?
-            suite.inserted ?
-                fromInserted(suitePath) :
-                fromSerial(suitePath, 0) :
-            fromConcurrent(suitePath);
+    return suite.mode === Suite.Mode.Serial ?
+        fromSerial(suitePath) :
+        fromConcurrent(suitePath);
 }
 
 const ftemplate = (function ()
@@ -110,24 +118,20 @@ const ftemplate = (function ()
 
 const fromTest = (function ()
 {
-    const template = ftemplate(function * ()
-    {
-        return (yield "test")($id, async () => { $statements });
-    });
+    const template = ftemplate(async () => { $statements });
 
     return function fromTest(testPath)
     {
-        const $id = toExpression(testPath.test.block.id);
+        const ids = List(number)([testPath.test.block.id]);
         const $statements = inlineStatementsFromTest(testPath);
+        const expression = template({ $statements });
 
-        return template({ $id, $statements });
+        return [Composite({ ids, expression })];
     }
 })();
 
 const inlineStatementsFromTest = (function ()
 {
-    const { yieldExpression } = require("@babel/types");
-    const fromTopLevelAwait = argument => yieldExpression(argument);
     const transformStatements = require("./transform-statements");
 
     return function inlineStatementsFromTest(testPath)
@@ -141,32 +145,65 @@ const inlineStatementsFromTest = (function ()
 })();
 
 
-const { fromSerial, fromInserted } = (function ()
+const fromSerial = (function ()
 {
-    const SERIAL_TEMPLATE = ftemplate(function * ()
+    const { yieldExpression, expressionStatement } = require("@babel/types");
+    const yield = (argument, delegate) =>
+        expressionStatement(yieldExpression(toExpression(argument), delegate));
+    const SERIAL_TEMPLATE = ftemplate(async function * ()
     {
-        return (yield "serial")(async function ()
-        {
-            await this($children);
-            $statements;
-        });
+        $statements;
     });
 
-    return { fromSerial, fromInserted };
-
-    function fromInserted(suitePath)
+    return function fromSerial(suitePath, index)
     {
-        const scope = suitePath.parent.suite.block.id;
-        const $statements =
-            inlineStatementsFromTest(Path.child(0, suitePath));
-        const $children = toExpression([scope,
-            fromExecutable(Path.child(1, suitePath))]);
+        const { suite } = suitePath;
+        const [ids, chunks] = suite.children
+            .map((_, index) => Path.child(index, suitePath))
+            .reduce(function ([ids, chunks], childPath)
+            {
+                if (is(Path(Test), childPath))
+                {
+                    const { id } = childPath.test.block;
 
-        return SERIAL_TEMPLATE({ $statements, $children });
-    }
+                    ids.push(id);
+                    chunks.push(inlineStatementsFromTest(childPath));
+                    chunks.push([yield({ end: id })]);
+                }
+                else
+                {
+                    const { mode } = childPath.suite;
+                    const nested = fromExecutable(childPath);
 
-    function fromSerial(suitePath, index)
-    {
+                    if (mode === Suite.Mode.Serial)
+                    {
+                        ids.push(...nested[0].ids);
+                        chunks.push([yield(nested[0].expression, true)]);
+                    }
+                    else
+                    {
+                        nested.reduce((_, composite) =>
+                            ids.push(...composite.ids), []);
+                        const define = nested.map(
+                            ({ ids, expression }) => [ids, expression]);
+                        chunks.push([yield({ define })]);
+                    }
+                }
+
+                return [ids, chunks];
+            }, [[], []]);
+
+        const $statements = [].concat(...chunks);
+        const expression = SERIAL_TEMPLATE({ $statements });
+
+        return [Composite({ ids: List(number)(ids), expression })];
+/*
+        const statements = [].concat(...children
+            .map(([statements]) => [yieldExpression, ...statements]);
+        const generators = children
+            .map(([, generator]) => generator)
+            .filter(generator => !!generator)    
+
         const childPath = Path.child(index, suitePath);
         const isTestPath = is(Path(Test), childPath);
         const isImplicitPath = !isTestPath && childPath.suite.implicit;
@@ -185,26 +222,18 @@ const { fromSerial, fromInserted } = (function ()
             [];
         const $children = toExpression([scope, current, ...next]);
 
-        return SERIAL_TEMPLATE({ $statements, $children });
+        return SERIAL_TEMPLATE({ $statements, $children });*/
     }
 })();
 
 
 
-const fromConcurrent = (function ()
+function fromConcurrent(suitePath)
 {
-    const template = ftemplate(function * ()
-        { return (yield "concurrent")($children); });
-
-    return function fromConcurrent(suitePath)
-    {
-        const { suite: { children } } = suitePath;
-        const paths = children.map((_, index) => Path.child(index, suitePath));
-        const $children = toExpression(paths.map(fromExecutable));
-
-        return template({ $children });
-    }
-})();
+    return suitePath.suite.children
+        .map((_, index) => Path.child(index, suitePath))
+        .flatMap(fromExecutable).toArray();
+}
 
 function getResource(executablePath, URL)
 {
