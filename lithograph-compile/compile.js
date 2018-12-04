@@ -74,7 +74,7 @@ module.exports = (function()
 
         const toGenerator = module._compile(source, filename);
         const args = parameters.map(key => environment[key]);
-printSuite(suite);
+/*printSuite(suite);
 toGenerator(...args).map((keys, f) => console.log("FOR " + keys + "\n" + f));
 console.log(toFunctions(...toGenerator(...args)[0]))
 const fs = toFunctions(...toGenerator(...args)[0]);
@@ -86,9 +86,10 @@ const fs = toFunctions(...toGenerator(...args)[0]);
         await fs[id]();
         console.log((i++) + "after");
     }
-})();
-        const functions = toFunctions(...toGenerator(...args)[0]);
-        return { functions:Map(number, Function)(functions).mapEntries(([key,value]) =>[+key,value]), findShallowestScope:()=>false };
+})();*/
+console.log(toGenerator(...args)[0]+"");
+        const getFunction = toGetter(toFunctions(...toGenerator(...args)[0]));
+        return { getFunction, findShallowestScope:()=>false };
 /*
         const compilations = toCompilations(toGenerator(...args));
         const functions = fMap(compilations.map(({ id, f }) => [id, f]));
@@ -128,7 +129,7 @@ const ftemplate = (function ()
 
 const fromTest = (function ()
 {
-    const template = ftemplate(async () => { $statements });
+    const template = ftemplate(async function * () { $statements });
 
     return function fromTest(testPath)
     {
@@ -140,38 +141,44 @@ const fromTest = (function ()
     }
 })();
 
+const t = require("@babel/types");
+const yield = (argument, delegate) =>
+    t.yieldExpression(toExpression(argument), delegate);
+
 const inlineStatementsFromTest = (function ()
 {
     const transformStatements = require("./transform-statements");
 
     return function inlineStatementsFromTest(testPath)
     {
-        const { fragments } = testPath.test;
+        const { fragments, block: { id } } = testPath.test;
         const concatenated = fragments.flatMap(parseFragment);
         const getResource = URL => getResource(testPath, URL);
+        const transformed = transformStatements(concatenated, { getResource });
+        const beginStatement = t.expressionStatement(yield({ begin: id }));
 
-        return transformStatements(concatenated, { getResource });
+        return [beginStatement, ...transformed];
     }
 })();
 
 
 const fromSerial = (function ()
 {
-    const { yieldExpression, expressionStatement, callExpression } = require("@babel/types");
+    const t = require("@babel/types");
     const yield = (argument, delegate) =>
-        yieldExpression(toExpression(argument), delegate);
-    const statement = expressionStatement;
+        t.yieldExpression(toExpression(argument), delegate);
+    const await = argument =>
+        t.awaitExpression(t.parenthesizedExpression(toExpression(argument)));
     const SERIAL_TEMPLATE = ftemplate(async function * ()
     {
         $statements;
     });
-    const tscope = $f => yield(callExpression(yield({ scope: $f }), []), true);
+    const tscope = $f => yield(t.callExpression(yield({ scope: $f }), []), true);
     const testReduce = function (ids, chunks, path)
     {
         const { id } = path.test.block;
 
         ids.push(id);
-        chunks.push([statement(yield({ begin: id }))]);
         chunks.push(inlineStatementsFromTest(path));
     };
     const suiteReduce = function (ids, chunks, childPath)
@@ -190,9 +197,8 @@ const fromSerial = (function ()
     
             if (mode === Suite.Mode.Serial)
             {
-                if (inserted) { console.log("yes!"); }
                 ids.push(...nested[0].ids);
-                chunks.push([statement(tscope(nested[0].expression))]);
+                chunks.push([t.expressionStatement(tscope(nested[0].expression))]);
             }
             else
             {
@@ -200,7 +206,7 @@ const fromSerial = (function ()
                     ids.push(...composite.ids), []);
                 const define = nested.map(
                     ({ ids, expression }) => [ids, expression]);
-                chunks.push([yield({ define })]);
+                chunks.push([t.expressionStatement(yield({ define }))]);
             }
         }
     }
@@ -324,22 +330,31 @@ const parseFragment = (function ()
     }
 })();
 
-function toFunctions(ids, f)
+function toGetter(functions)
 {
+    return function (id)
+    {
+        return functions[id];
+    }
+}
+
+function toFunctions(ids, f)
+{console.log("MADE " + ids);
     const None = { };
-    const state = { active:None, next:ids[0] };
+    const state = { active:None, next:ids[0] };console.log(state);
     const generator = f();
+    const started = generator.next();
 
     const resolvable = (fs = []) =>
         [new Promise((...args) => fs = args), ...fs];
     const observers = toObject(ids.map(id => [id, resolvable()]));
+started.then(() => console.log("INITIATED " + ids));
+    const functions = toObject(ids.map(id => [id, () => started.then(() => (console.log("STARTING " + 6,step(id))))]));
 
-    generator.next();
-
-    return toObject(ids.map(id => [id, () => step(id)]));
+    return functions;
 
     function step(id, [promise, resolve] = observers[id])
-    {
+    {console.log("MY " + ids + " " + state.active + " " + state.next);
         if (state.active !== None || state.next !== id)
             throw Error(`Attempting to call test ${id} before it is ready.`);
 
@@ -351,6 +366,17 @@ function toFunctions(ids, f)
             if (value && value.scope)
                 return generator.next(value.scope).then(finish);
 
+            if (value && value.define)
+            {
+                const last = functions[6];
+                value.define
+                    .map(pair => toFunctions(...pair))
+                    .map(replacements => Object.keys(replacements)
+                        .map(key => functions[key] = replacements[key]));
+                console.log("-->" + (functions[6] === last), );// + " " + (toFunctions(...value.define[0])[6] === last));
+//console.log("DONE " + value.active + " " + done, value.define
+//                    .map(pair => toFunctions(...pair)));
+            }
             state.active = None;
             !done && (state.next = value.begin);
             resolve();
@@ -363,71 +389,6 @@ function toFunctions(ids, f)
 function toObject(pairs)
 {console.log(pairs);
     return pairs.reduce((object, [id, f]) => (object[id] = f, object), { });
-}
-
-
-function toFunctionMap(keys, f)
-{
-
-    const Resolvable = ([resolve, reject]) =>
-        [new Promise((...args) =>
-            resolve = args[0], reject = args[1]),
-            resolve, reject];
-    const promises = Map(number, Object)
-        (keys.map(key => [key, Resolvable()]));
-    const functions = Map(number, Function)
-        (promises.map(([key, [promise]]) =>
-            [key, () => promise]));
-    const toFunction = (id, promise) => function ()
-    {
-        if (state.current !== false || state.next !== id)
-            throw Error(`Attempting to call test ${id} before it is ready.`);
-
-        state.step();
-
-        return promise;
-    }
-
-    const state = { next:keys[0], step:orchastrator };
-
-
-    async function orchestrator()
-    {
-        try
-        {
-            state.active = state.next;
-
-            const generator = f();
-
-            while (state.message = await generator.next())
-            {
-                const { done, value } = state.message;
-                const { resolve } = promises[state.active];
-
-                state.active = false;
-                
-                if (!done)
-                {
-                    state.next = value.begin;
-                    [state.blocking, state.step] = Resolvable();
-                }
-
-                resolve();
-
-                if (done)
-                    return;
-
-                await state.blocking;
-
-                state.active = state.next;
-                state.next = false;
-            }
-        }
-        catch (error)
-        {
-            promises[state.active].reject(error)
-        }
-    }
 }
 
 function toCompilations(generator)
