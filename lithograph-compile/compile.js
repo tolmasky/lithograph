@@ -52,7 +52,7 @@ module.exports = (function()
 
     return function (environment, suite, filename)
     {
-        const { ids, expression } = fromSuite(Path(Suite)({ suite }));
+        const expression = fromSuite(Path(Suite)({ suite }));
         const { code, map } = generate(toExpression(expression), { sourceMaps: true });
         const mapComment =
             "//# sourceMappingURL=data:application/json;charset=utf-8;base64," +
@@ -82,8 +82,8 @@ const fs = toFunctions(...toGenerator(...args)[0]);
 })();*/
 console.log(toGenerator(...args) +"");
 console.log(code);
-        const getFunction = toGetFunction(ids, toGenerator(...args));
-        return { getFunction, findShallowestScope:()=>false };
+        const functions = fMap(toGenerator(...args));
+        return { functions, findShallowestScope:()=>false };
 /*
         const compilations = toCompilations(toGenerator(...args));
         const functions = fMap(compilations.map(({ id, f }) => [id, f]));
@@ -136,7 +136,7 @@ const fromTest = (function ()
         const $statements = inlineStatementsFromTest(testPath);
         const expression = tAsyncFunction({ $title, $statements });
     
-        return Composite({ ids:List(number)([id]), expression });
+        return [[id, expression]];
     }
 })();
 
@@ -206,6 +206,17 @@ const fromSerial = (function ()
         const { suite } = suitePath;
         const [ids, chunks] = suite.children
             .map((_, index) => Path.child(index, suitePath))
+            .reduce(function ([hasTest, ], path, index = 0)
+            {
+                if (is(Path(Test), path))
+                    return [yield(path.test.block.id), ...inlineStatementsFromTest(path)];
+                
+                if (hasTest)
+                    { //...
+                }
+                
+                
+            })
             .reduce(function ([ids, chunks], childPath)
             {
                 if (is(Path(Test), childPath))
@@ -225,28 +236,13 @@ const fromSerial = (function ()
     }
 })();
 
-const fromConcurrent = (function ()
+function fromConcurrent(suitePath)
 {
-    const tFunction = ftemplate(function () { $title; return $definitions; });
+    return [].concat(...suitePath.suite.children
+        .map((_, index) => Path.child(index, suitePath))
+        .map(fromExecutable));
+};
 
-    return function fromConcurrent(suitePath)
-    {
-        const { block: { title }, children } = suitePath.suite;
-        const [ids, definitions] = children
-            .map((_, index) => Path.child(index, suitePath))
-            .map(fromExecutable)
-            .reduce(([ids, definitions], definition) =>
-            [
-                ids.concat(definition.ids),
-                definitions.concat([[definition.ids, definition.expression]])
-            ], [List(number)(), []]);
-        const $definitions = toExpression(definitions);
-        const $title = t.stringLiteral(title);
-        const expression = tFunction({ $title, $definitions });
-
-        return Composite({ ids, expression });
-    };
-})();
 
 function getResource(executablePath, URL)
 {
@@ -309,85 +305,48 @@ const parseFragment = (function ()
     }
 })();
 
-const toGetFunction = (function ()
+const toFunctions = (function ()
 {
     const { getPrototypeOf } = Object;
     const constructor = object =>
         getPrototypeOf(object).constructor;
-    const AsyncFunction = constructor((async () => { }));     
     const AsyncGeneratorFunction = constructor((async function * () { }));
 
-    return (ids, definition) => 
-        definition instanceof AsyncGeneratorFunction ?
-            toSerialGetFunction(ids, definition) :
-        definition instanceof AsyncFunction ?
-            id => definition :
-            toConcurrentGetFunction(ids, definition);
+    return function toFunctions(definition)
+    {
+        return typeof definition !== "function" ?
+            definition :
+            definition instanceof AsyncGeneratorFunction ?
+                toPartialFunction(definition) :       
+                toAvailableFunctions(definition);
+    }
 })();
 
-const resolvable = (fs = []) =>
-    [new Promise((...args) => fs = args), ...fs];
-
-function toConcurrentGetFunction(ids, f)
+function toAvailableFunctions(definition)
 {
-    const functions = f()
-        .map(([ids, g]) => [ids, toGetFunction(ids, g)])
-        .reduce((functions, [ids, f]) =>
-            ids.reduce((functions, id) =>
-                (functions[id] = f, functions),
-                functions),
-            { });
-
-    return id => { console.log(id, functions); return functions[id](id) };
+    return [].concat(...definition().map(toFunctions));
 }
 
-function toSerialGetFunction(ids, f)
+function toPartialFunction(definition)
 {
-console.log("MADE " + ids);
-    const None = { };
-    const state = { active:None, next:ids[0] };console.log(state);
-    const generator = f();
+    const immediate = [];
+    const generator = definition
+        .apply((...args) => immediate.push(...args));
     const started = generator.next();
+    const [id, definitions] = immediate; //FIXME: clean this up.
+    const functions = [].concat(...definitions.map(toFunctions));
 
-    const resolvable = (fs = []) =>
-        [new Promise((...args) => fs = args), ...fs];
-    const observers = toObject(ids.map(id => [id, resolvable()]));
-started.then(() => console.log("INITIATED " + ids));
-    const functions = toObject(ids.map(id => [id, id => () => started.then(() => (console.log("STARTING " + 6,step(id))))]));
+    if (typeof id !== "number")
+        return functions;
 
-    return id => functions[id](id);
+    const step = () => generator
+        .next()
+        .then(({ value, done }) =>
+            done ? fMap() :
+            typeof value === "number" ? fMap([[value, step]]) :
+            toFunctions(value));
 
-    function step(id, [promise, resolve] = observers[id])
-    {console.log("MY " + ids + " " + state.active + " " + state.next);
-        if (state.active !== None || state.next !== id)
-            throw Error(`Attempting to call test ${id} before it is ready.`);
-
-        state.active = id;
-        state.next = None;
-
-        generator.next().then(function finish({ value, done })
-        {
-            if (Array.isArray(value))
-            {
-                const [ids, definition] = value;
-                const getFunction = toGetFunction(ids, definition);
-                console.log(getFunction);
-                ids.map(id => functions[id] = getFunction);
-                return;
-            }
-
-            state.active = None;
-            !done && (state.next = value.begin);
-            resolve();
-        });
-
-        return promise;
-    };
-}
-
-function toObject(pairs)
-{console.log(pairs);
-    return pairs.reduce((object, [id, f]) => (object[id] = f, object), { });
+    return [[id, () => started.then(step)]];
 }
 
 function toFindShallowestScope(scopes)

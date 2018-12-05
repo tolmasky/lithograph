@@ -23,7 +23,7 @@ const FileExecution = Cause("FileExecution",
     [field `status`]: -1,
 
     [field `running`]: Map(),
-    [field `getFunction`]: -1,
+    [field `functions`]: Map(),
     [field `garbageCollector`]: -1,
 
     [field `pool`]: Pool.create({ count: 100 }),
@@ -42,13 +42,13 @@ const FileExecution = Cause("FileExecution",
         const { unblocked, status } = Status.initialStatusOfNode(suite);
 
         const { allocate } = garbageCollector;
-        const { getFunction, findShallowestScope } =
+        const { functions, findShallowestScope } =
             compile(toEnvironment(type =>
                 allocate(findShallowestScope(), type)),
             suite, filename);
 
         const outFileExecution = fileExecution
-            .set("getFunction", getFunction)
+            .set("functions", functions)
             .set("status", status);
 
         return update.in(
@@ -65,7 +65,7 @@ const FileExecution = Cause("FileExecution",
 
     [event.on (Pool.Retained)]: (fileExecution, { index, request: testPath }) =>
     {
-        const getFunction = fileExecution.getFunction;
+        const functions = fileExecution.functions;
         const { status, test } = Status.updateTestPathToRunning(
             fileExecution.status,
             testPath,
@@ -74,7 +74,7 @@ const FileExecution = Cause("FileExecution",
         return fileExecution
             .set("status", status)
             .setIn(["running", test.block.id],
-                IO.fromAsync(() => testRun({ getFunction, test, testPath, index })));
+                IO.fromAsync(() => testRun({ functions, test, testPath, index })));
     },
 
     // FIXME: Shouldn't need to do this with keyPath. Right?
@@ -131,17 +131,17 @@ function testFinished(fileExecution, event)
 
 module.exports = FileExecution;
 
-async function testRun({ getFunction, test, testPath, index })
+async function testRun({ functions, test, testPath, index })
 {
     const start = Date.now();
     const { id, title } = test.block;
-    const f = getFunction(id);
+    const f = functions.get(id);
 console.log(f+"");
     // FIXME: Would be nice to use Log() here...
     console.log("  STARTED: " + title);
 
-    const [succeeded, error] = await f()
-        .then(() => [true])
+    const [succeeded, result] = await f()
+        .then(unblocked => [true, unblocked])
         .catch(error => [false, error]);
     const end = Date.now();
     const report = succeeded ?
@@ -153,6 +153,6 @@ console.log(f+"");
                 Reason.Error(error) :
                 Reason.Value({ stringified: JSON.stringify(error) })
         });
-
+console.log("UNBCLOEKD ARE " + result);
     return FileExecution.Report({ testPath, test, index, start, end, report });
 }
