@@ -81,8 +81,9 @@ const fs = toFunctions(...toGenerator(...args)[0]);
     }
 })();*/
 console.log(toGenerator(...args) +"");
-console.log(code);
-        const functions = fMap(toGenerator(...args));
+console.log("-->"+code);
+console.log("RESULT ", toFunctions(toGenerator(...args)));
+        const functions = fMap(toFunctions(toGenerator(...args)));
         return { functions, findShallowestScope:()=>false };
 /*
         const compilations = toCompilations(toGenerator(...args));
@@ -135,7 +136,7 @@ const fromTest = (function ()
         const $title = t.stringLiteral(title);
         const $statements = inlineStatementsFromTest(testPath);
         const expression = tAsyncFunction({ $title, $statements });
-    
+
         return [[id, expression]];
     }
 })();
@@ -160,7 +161,7 @@ const fromSerial = (function ()
 {
     const t = require("@babel/types");
     const yield = (argument, delegate) =>
-        t.yieldExpression(toExpression(argument), delegate);
+        t.expressionStatement(t.yieldExpression(toExpression(argument), delegate));
     const await = argument =>
         t.awaitExpression(t.parenthesizedExpression(toExpression(argument)));
     const tAsyncGenerator = ftemplate(async function * () { $title; $statements });
@@ -183,9 +184,9 @@ const fromSerial = (function ()
             suiteReduce(ids, chunks, Path.child(1, childPath));
         }
         else
-        {            
+        {
             const nested = fromExecutable(childPath);
-    
+
             if (mode === Suite.Mode.Serial)
             {
                 ids.push(...nested.ids);
@@ -193,7 +194,6 @@ const fromSerial = (function ()
             }
             else
             {
-                
             console.log(nested);
                 ids.push(...nested.ids);
                 chunks.push([t.expressionStatement(yield([nested.ids, nested.expression]))]);
@@ -201,48 +201,47 @@ const fromSerial = (function ()
         }
     }
 
+    const TEMPLATE = ftemplate(async function * () { this($id, $prefix); $statements });
+
     return function fromSerial(suitePath, index)
     {
         const { suite } = suitePath;
-        const [ids, chunks] = suite.children
-            .map((_, index) => Path.child(index, suitePath))
-            .reduce(function ([hasTest, ], path, index = 0)
+        const paths = suite.children
+            .map((_, index) => Path.child(index, suitePath));
+        const isTestPath = is(Path(Test));
+        const firstTestPath = paths.findIndex(isTestPath);
+        const $prefix = toExpression(paths
+            .take(firstTestPath)
+            .flatMap(fromExecutable));
+        const $statements = paths
+            .skip(firstTestPath)
+            .flatMap(function (path)
             {
-                if (is(Path(Test), path))
+                if (isTestPath(path))
                     return [yield(path.test.block.id), ...inlineStatementsFromTest(path)];
                 
-                if (hasTest)
-                    { //...
-                }
-                
-                
-            })
-            .reduce(function ([ids, chunks], childPath)
-            {
-                if (is(Path(Test), childPath))
-                    testReduce(ids, chunks, childPath);
-
-                else
-                    suiteReduce(ids, chunks, childPath);
-
-                return [ids, chunks];
-            }, [[], []]);
-
-        const $title = t.stringLiteral(suite.block.title);
-        const $statements = [].concat(...chunks);
-        const expression = tAsyncGenerator({ $title, $statements });
-
-        return Composite({ ids: List(number)(ids), expression });
-    }
+                return [yield(fromExecutable(path))];
+            }).toArray();
+        const $id = toExpression(
+            firstTestPath < paths.size ?
+            paths.get(firstTestPath).test.block.id : void 0);
+        return TEMPLATE({ $id, $prefix, $statements });
+    };
 })();
 
-function fromConcurrent(suitePath)
+const fromConcurrent = (function ()
 {
-    return [].concat(...suitePath.suite.children
-        .map((_, index) => Path.child(index, suitePath))
-        .map(fromExecutable));
-};
+    const recurse = ftemplate(() => $children);
 
+    return function fromConcurrent(suitePath)
+    {
+        const children = [].concat(...suitePath.suite.children
+            .map((_, index) => Path.child(index, suitePath))
+            .map(fromExecutable));
+
+        return recurse({ $children: toExpression(children) });
+    };
+})();
 
 function getResource(executablePath, URL)
 {
@@ -315,9 +314,9 @@ const toFunctions = (function ()
     return function toFunctions(definition)
     {
         return typeof definition !== "function" ?
-            definition :
+            [definition] :
             definition instanceof AsyncGeneratorFunction ?
-                toPartialFunction(definition) :       
+                toPartialFunction(definition) :
                 toAvailableFunctions(definition);
     }
 })();
@@ -328,14 +327,14 @@ function toAvailableFunctions(definition)
 }
 
 function toPartialFunction(definition)
-{
+{//console.log("PARTIAL!");
     const immediate = [];
     const generator = definition
         .apply((...args) => immediate.push(...args));
     const started = generator.next();
     const [id, definitions] = immediate; //FIXME: clean this up.
     const functions = [].concat(...definitions.map(toFunctions));
-
+//console.log(id, definitions, typeof id);
     if (typeof id !== "number")
         return functions;
 
@@ -344,9 +343,9 @@ function toPartialFunction(definition)
         .then(({ value, done }) =>
             done ? fMap() :
             typeof value === "number" ? fMap([[value, step]]) :
-            toFunctions(value));
-
-    return [[id, () => started.then(step)]];
+            fMap(toFunctions(value)));
+//console.log(functions);
+    return [[id, () => started.then(step)], ...functions];
 }
 
 function toFindShallowestScope(scopes)

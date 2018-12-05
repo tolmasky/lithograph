@@ -89,18 +89,19 @@ const FileExecution = Cause("FileExecution",
         return [fileExecution, [event.update("fromKeyPath", fromKeyPath => fromKeyPath.next)]]
     },
 
-    [event.in `Report`]: { testPath:-1, test:-1, index: -1, report:-1, start:-1 },
+    [event.in `Report`]: { testPath:-1, test:-1, index: -1, report:-1, start:-1, unblockedf:-1 },
     [event.on `Report`]: testFinished
 });
 
 function testFinished(fileExecution, event)
 {
-    const { testPath, test, index, report, start } = event;
+    const { testPath, test, index, report, start, unblockedf  } = event;
     const { status } = fileExecution;
     const { status: updatedStatus, unblocked, scopes } =
         Status.updateTestPathWithReport(status, testPath, report);
     const withUpdatedStatus = fileExecution
         .set("status", updatedStatus)
+        .update("functions", functions => functions.concat(unblockedf))
         .removeIn(["running", test.block.id]);
 
     const [withUpdatedHelpers, events] = update.in.reduce(withUpdatedStatus,
@@ -136,7 +137,7 @@ async function testRun({ functions, test, testPath, index })
     const start = Date.now();
     const { id, title } = test.block;
     const f = functions.get(id);
-console.log(f+"");
+//console.log(f+"");
     // FIXME: Would be nice to use Log() here...
     console.log("  STARTED: " + title);
 
@@ -153,6 +154,7 @@ console.log(f+"");
                 Reason.Error(error) :
                 Reason.Value({ stringified: JSON.stringify(error) })
         });
-console.log("UNBCLOEKD ARE " + result);
-    return FileExecution.Report({ testPath, test, index, start, end, report });
+    const unblockedf = succeeded && result || Map();
+
+    return FileExecution.Report({ testPath, test, index, start, end, report, unblockedf });
 }
