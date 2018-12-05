@@ -57,9 +57,7 @@ module.exports = (function()
 
     return function (environment, suite, filename)
     {
-        const composites = fromSuite(Path(Suite)({ suite }));
-        const expression = composites
-            .map(({ ids, expression }) => [ids, expression]);
+        const { ids, expression } = fromSuite(Path(Suite)({ suite }));
         const { code, map } = generate(toExpression(expression), { sourceMaps: true });
         const mapComment =
             "//# sourceMappingURL=data:application/json;charset=utf-8;base64," +
@@ -87,8 +85,9 @@ const fs = toFunctions(...toGenerator(...args)[0]);
         console.log((i++) + "after");
     }
 })();*/
-console.log(toGenerator(...args)[0]+"");
-        const getFunction = toGetter(toFunctions(...toGenerator(...args)[0]));
+console.log(toGenerator(...args) +"");
+console.log(code);
+        const getFunction = toGetFunction(ids, toGenerator(...args));
         return { getFunction, findShallowestScope:()=>false };
 /*
         const compilations = toCompilations(toGenerator(...args));
@@ -111,7 +110,7 @@ function fromExecutable(executablePath)
 function fromSuite(suitePath)
 {
     const { suite } = suitePath;
-
+console.log(fromConcurrent+"");
     return suite.mode === Suite.Mode.Serial ?
         fromSerial(suitePath) :
         fromConcurrent(suitePath);
@@ -127,23 +126,28 @@ const ftemplate = (function ()
         (template(`(${string})`, options)))
 })();
 
-const fromTest = (function ()
-{
-    const template = ftemplate(async function * () { $statements });
-
-    return function fromTest(testPath)
-    {
-        const ids = List(number)([testPath.test.block.id]);
-        const $statements = inlineStatementsFromTest(testPath);
-        const expression = template({ $statements });
-
-        return [Composite({ ids, expression })];
-    }
-})();
-
 const t = require("@babel/types");
 const yield = (argument, delegate) =>
     t.yieldExpression(toExpression(argument), delegate);
+const tAsyncGenerator = 
+    (tAsyncGenerator => ($title, $statements) =>
+        tAsyncGenerator({ $statements, $title: t.stringLiteral($title) }))
+    (ftemplate(async function * () { $title; $statements }));
+
+const fromTest = (function ()
+{
+    const tAsyncFunction = ftemplate(async function () { $title; $statements });
+
+    return function fromTest(testPath)
+    {
+        const { title, id } = testPath.test.block;
+        const $title = t.stringLiteral(title);
+        const $statements = inlineStatementsFromTest(testPath);
+        const expression = tAsyncFunction({ $title, $statements });
+    
+        return Composite({ ids:List(number)([id]), expression });
+    }
+})();
 
 const inlineStatementsFromTest = (function ()
 {
@@ -157,7 +161,7 @@ const inlineStatementsFromTest = (function ()
         const transformed = transformStatements(concatenated, { getResource });
         const beginStatement = t.expressionStatement(yield({ begin: id }));
 
-        return [beginStatement, ...transformed];
+        return transformed;//[beginStatement, ...transformed];
     }
 })();
 
@@ -169,23 +173,20 @@ const fromSerial = (function ()
         t.yieldExpression(toExpression(argument), delegate);
     const await = argument =>
         t.awaitExpression(t.parenthesizedExpression(toExpression(argument)));
-    const SERIAL_TEMPLATE = ftemplate(async function * ()
-    {
-        $statements;
-    });
+    const tAsyncGenerator = ftemplate(async function * () { $title; $statements });
     const tscope = $f => yield(t.callExpression(yield({ scope: $f }), []), true);
     const testReduce = function (ids, chunks, path)
     {
         const { id } = path.test.block;
 
         ids.push(id);
-        chunks.push(inlineStatementsFromTest(path));
+        chunks.push([t.expressionStatement(yield({ begin: id })), ...inlineStatementsFromTest(path)]);
     };
     const suiteReduce = function (ids, chunks, childPath)
     {
         const { suite } = childPath;
         const { mode, inserted } = suite;
-        
+
         if (inserted)
         {
             testReduce(ids, chunks, Path.child(0, childPath));
@@ -197,16 +198,15 @@ const fromSerial = (function ()
     
             if (mode === Suite.Mode.Serial)
             {
-                ids.push(...nested[0].ids);
-                chunks.push([t.expressionStatement(tscope(nested[0].expression))]);
+                ids.push(...nested.ids);
+                chunks.push([t.expressionStatement(tscope(nested.expression))]);
             }
             else
             {
-                nested.reduce((_, composite) =>
-                    ids.push(...composite.ids), []);
-                const define = nested.map(
-                    ({ ids, expression }) => [ids, expression]);
-                chunks.push([t.expressionStatement(yield({ define }))]);
+                
+            console.log(nested);
+                ids.push(...nested.ids);
+                chunks.push([t.expressionStatement(nested.expression)]);
             }
         }
     }
@@ -227,47 +227,38 @@ const fromSerial = (function ()
                 return [ids, chunks];
             }, [[], []]);
 
+        const $title = t.stringLiteral(suite.block.title);
         const $statements = [].concat(...chunks);
-        const expression = SERIAL_TEMPLATE({ $statements });
+        const expression = tAsyncGenerator({ $title, $statements });
 
-        return [Composite({ ids: List(number)(ids), expression })];
-/*
-        const statements = [].concat(...children
-            .map(([statements]) => [yieldExpression, ...statements]);
-        const generators = children
-            .map(([, generator]) => generator)
-            .filter(generator => !!generator)    
-
-        const childPath = Path.child(index, suitePath);
-        const isTestPath = is(Path(Test), childPath);
-        const isImplicitPath = !isTestPath && childPath.suite.implicit;
-        const { suite: { block, children } } = suitePath;
-        const scope = block.id;
-        const next = index < children.size - 1 ?
-            [fromSerial(suitePath, index + 1)] :
-            [];
-        const current = isTestPath ?
-            toExpression(childPath.test.block.id) :
-            fromExecutable(childPath);
-
-        const $statements =
-            isTestPath ? inlineStatementsFromTest(childPath) :
-            isImplicitPath ? inlineStatementsFromTest(childPath.suite.test) :
-            [];
-        const $children = toExpression([scope, current, ...next]);
-
-        return SERIAL_TEMPLATE({ $statements, $children });*/
+        return Composite({ ids: List(number)(ids), expression });
     }
 })();
 
 
 
-function fromConcurrent(suitePath)
+const fromConcurrent = (function ()
 {
-    return suitePath.suite.children
-        .map((_, index) => Path.child(index, suitePath))
-        .flatMap(fromExecutable).toArray();
-}
+    const tFunction = ftemplate(function () { $title; return $definitions; });
+
+    return function fromConcurrent(suitePath)
+    {
+        const { block: { title }, children } = suitePath.suite;
+        const [ids, definitions] = children
+            .map((_, index) => Path.child(index, suitePath))
+            .map(fromExecutable)
+            .reduce(([ids, definitions], definition) =>
+            [
+                ids.concat(definition.ids),
+                definitions.concat([[definition.ids, definition.expression]])
+            ], [List(number)(), []]);
+        const $definitions = toExpression(definitions);
+        const $title = t.stringLiteral(title);
+        const expression = tFunction({ $title, $definitions });
+
+        return Composite({ ids, expression });
+    };
+})();
 
 function getResource(executablePath, URL)
 {
@@ -338,8 +329,41 @@ function toGetter(functions)
     }
 }
 
-function toFunctions(ids, f)
-{console.log("MADE " + ids);
+const toGetFunction = (function ()
+{
+    const { getPrototypeOf } = Object;
+    const constructor = object =>
+        getPrototypeOf(object).constructor;
+    const AsyncFunction = constructor((async () => { }));     
+    const AsyncGeneratorFunction = constructor((async function * () { }));
+
+    return (ids, definition) => 
+        definition instanceof AsyncGeneratorFunction ?
+            toSerialGetFunction(ids, definition) :
+        definition instanceof AsyncFunction ?
+            id => definition :
+            toConcurrentGetFunction(ids, definition);
+})();
+
+const resolvable = (fs = []) =>
+    [new Promise((...args) => fs = args), ...fs];
+
+function toConcurrentGetFunction(ids, f)
+{
+    const functions = f()
+        .map(([ids, g]) => [ids, toGetFunction(ids, g)])
+        .reduce((functions, [ids, f]) =>
+            ids.reduce((functions, id) =>
+                (functions[id] = f, functions),
+                functions),
+            { });
+
+    return id => functions[id](id);
+}
+
+function toSerialGetFunction(ids, f)
+{
+console.log("MADE " + ids);
     const None = { };
     const state = { active:None, next:ids[0] };console.log(state);
     const generator = f();
@@ -351,18 +375,18 @@ function toFunctions(ids, f)
 started.then(() => console.log("INITIATED " + ids));
     const functions = toObject(ids.map(id => [id, () => started.then(() => (console.log("STARTING " + 6,step(id))))]));
 
-    return functions;
+    return id => functions[id];
 
     function step(id, [promise, resolve] = observers[id])
     {console.log("MY " + ids + " " + state.active + " " + state.next);
-        if (state.active !== None || state.next !== id)
-            throw Error(`Attempting to call test ${id} before it is ready.`);
+        //if (state.active !== None || state.next !== id)
+        //    throw Error(`Attempting to call test ${id} before it is ready.`);
 
         state.active = id;
         state.next = None;
 
         generator.next().then(function finish({ value, done })
-        {
+        {console.log("NO THAR");
             if (value && value.scope)
                 return generator.next(value.scope).then(finish);
 

@@ -23,7 +23,7 @@ const FileExecution = Cause("FileExecution",
     [field `status`]: -1,
 
     [field `running`]: Map(),
-    [field `functions`]: Map(),
+    [field `getFunction`]: -1,
     [field `garbageCollector`]: -1,
 
     [field `pool`]: Pool.create({ count: 100 }),
@@ -42,13 +42,13 @@ const FileExecution = Cause("FileExecution",
         const { unblocked, status } = Status.initialStatusOfNode(suite);
 
         const { allocate } = garbageCollector;
-        const { functions, findShallowestScope } =
+        const { getFunction, findShallowestScope } =
             compile(toEnvironment(type =>
                 allocate(findShallowestScope(), type)),
             suite, filename);
 
         const outFileExecution = fileExecution
-            .set("functions", functions)
+            .set("getFunction", getFunction)
             .set("status", status);
 
         return update.in(
@@ -65,7 +65,7 @@ const FileExecution = Cause("FileExecution",
 
     [event.on (Pool.Retained)]: (fileExecution, { index, request: testPath }) =>
     {
-        const functions = fileExecution.functions;
+        const getFunction = fileExecution.getFunction;
         const { status, test } = Status.updateTestPathToRunning(
             fileExecution.status,
             testPath,
@@ -74,7 +74,7 @@ const FileExecution = Cause("FileExecution",
         return fileExecution
             .set("status", status)
             .setIn(["running", test.block.id],
-                IO.fromAsync(() => testRun({ functions, test, testPath, index })));
+                IO.fromAsync(() => testRun({ getFunction, test, testPath, index })));
     },
 
     // FIXME: Shouldn't need to do this with keyPath. Right?
@@ -131,12 +131,12 @@ function testFinished(fileExecution, event)
 
 module.exports = FileExecution;
 
-async function testRun({ functions, test, testPath, index })
+async function testRun({ getFunction, test, testPath, index })
 {
     const start = Date.now();
     const { id, title } = test.block;
-    const f = functions.get(id);
-
+    const f = getFunction(id);
+console.log(f+"");
     // FIXME: Would be nice to use Log() here...
     console.log("  STARTED: " + title);
 
