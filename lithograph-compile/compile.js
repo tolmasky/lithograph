@@ -12,11 +12,6 @@ const CompositeList = List(Composite);
 const fMap = Map(number, ftype);
 const ScopeMap = Map(ftype, number);
 Error.stackTraceLimit = 1000;
-const Compilation2 = data `Compilation` (
-    scope       => number,
-    id          => number,
-    f           => ftype,
-    fscope      => ftype);
 
 const Path = parameterized (T =>
     data `Path <${T}>` (
@@ -110,7 +105,7 @@ function fromExecutable(executablePath)
 function fromSuite(suitePath)
 {
     const { suite } = suitePath;
-console.log(fromConcurrent+"");
+
     return suite.mode === Suite.Mode.Serial ?
         fromSerial(suitePath) :
         fromConcurrent(suitePath);
@@ -129,10 +124,6 @@ const ftemplate = (function ()
 const t = require("@babel/types");
 const yield = (argument, delegate) =>
     t.yieldExpression(toExpression(argument), delegate);
-const tAsyncGenerator = 
-    (tAsyncGenerator => ($title, $statements) =>
-        tAsyncGenerator({ $statements, $title: t.stringLiteral($title) }))
-    (ftemplate(async function * () { $title; $statements }));
 
 const fromTest = (function ()
 {
@@ -159,9 +150,8 @@ const inlineStatementsFromTest = (function ()
         const concatenated = fragments.flatMap(parseFragment);
         const getResource = URL => getResource(testPath, URL);
         const transformed = transformStatements(concatenated, { getResource });
-        const beginStatement = t.expressionStatement(yield({ begin: id }));
 
-        return transformed;//[beginStatement, ...transformed];
+        return transformed;
     }
 })();
 
@@ -206,7 +196,7 @@ const fromSerial = (function ()
                 
             console.log(nested);
                 ids.push(...nested.ids);
-                chunks.push([t.expressionStatement(nested.expression)]);
+                chunks.push([t.expressionStatement(yield([nested.ids, nested.expression]))]);
             }
         }
     }
@@ -234,8 +224,6 @@ const fromSerial = (function ()
         return Composite({ ids: List(number)(ids), expression });
     }
 })();
-
-
 
 const fromConcurrent = (function ()
 {
@@ -321,14 +309,6 @@ const parseFragment = (function ()
     }
 })();
 
-function toGetter(functions)
-{
-    return function (id)
-    {
-        return functions[id];
-    }
-}
-
 const toGetFunction = (function ()
 {
     const { getPrototypeOf } = Object;
@@ -358,7 +338,7 @@ function toConcurrentGetFunction(ids, f)
                 functions),
             { });
 
-    return id => functions[id](id);
+    return id => { console.log(id, functions); return functions[id](id) };
 }
 
 function toSerialGetFunction(ids, f)
@@ -373,34 +353,29 @@ console.log("MADE " + ids);
         [new Promise((...args) => fs = args), ...fs];
     const observers = toObject(ids.map(id => [id, resolvable()]));
 started.then(() => console.log("INITIATED " + ids));
-    const functions = toObject(ids.map(id => [id, () => started.then(() => (console.log("STARTING " + 6,step(id))))]));
+    const functions = toObject(ids.map(id => [id, id => () => started.then(() => (console.log("STARTING " + 6,step(id))))]));
 
-    return id => functions[id];
+    return id => functions[id](id);
 
     function step(id, [promise, resolve] = observers[id])
     {console.log("MY " + ids + " " + state.active + " " + state.next);
-        //if (state.active !== None || state.next !== id)
-        //    throw Error(`Attempting to call test ${id} before it is ready.`);
+        if (state.active !== None || state.next !== id)
+            throw Error(`Attempting to call test ${id} before it is ready.`);
 
         state.active = id;
         state.next = None;
 
         generator.next().then(function finish({ value, done })
-        {console.log("NO THAR");
-            if (value && value.scope)
-                return generator.next(value.scope).then(finish);
-
-            if (value && value.define)
+        {
+            if (Array.isArray(value))
             {
-                const last = functions[6];
-                value.define
-                    .map(pair => toFunctions(...pair))
-                    .map(replacements => Object.keys(replacements)
-                        .map(key => functions[key] = replacements[key]));
-                console.log("-->" + (functions[6] === last), );// + " " + (toFunctions(...value.define[0])[6] === last));
-//console.log("DONE " + value.active + " " + done, value.define
-//                    .map(pair => toFunctions(...pair)));
+                const [ids, definition] = value;
+                const getFunction = toGetFunction(ids, definition);
+                console.log(getFunction);
+                ids.map(id => functions[id] = getFunction);
+                return;
             }
+
             state.active = None;
             !done && (state.next = value.begin);
             resolve();
@@ -413,42 +388,6 @@ started.then(() => console.log("INITIATED " + ids));
 function toObject(pairs)
 {console.log(pairs);
     return pairs.reduce((object, [id, f]) => (object[id] = f, object), { });
-}
-
-function toCompilations(generator)
-{
-    const iterator = generator();
-    const type = iterator.next().value;
-
-    return iterator.next(builders[type]).value;
-}
-
-const builders =
-{
-    concurrent: children =>
-        [].concat(...children.map(toCompilations)),
-
-    serial(fInspect)
-    {
-        const fData = { };
-        const fPromise = fInspect.apply(function ([scope, current, next])
-        {
-            fData.current = current;
-            fData.next = next;
-            fData.scope = scope;
-
-            return new Promise(resolve => fData.resolve = resolve);
-        });
-        const { current, next, scope, resolve } = fData;
-        const f = () => (resolve(), fPromise);
-        const pairs = typeof current === "number" ?
-            [Compilation({ id: current, scope, fscope:fInspect, f })] :
-            toCompilations(current);
-
-        return next ? pairs.concat(toCompilations(next)) : pairs;
-    },
-
-    test: (id, f) => [Compilation({ id, scope: id, f, fscope:f })]
 }
 
 function toFindShallowestScope(scopes)
