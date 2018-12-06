@@ -1,13 +1,8 @@
+const t = require("@babel/types");
 const { is, data, union, number, boolean, parameterized, ftype } = require("@algebraic/type");
 const { Map, List } = require("@algebraic/collections");
 const { Test, Suite, ResourceMap } = require("@lithograph/ast");
 const toExpression = require("@lithograph/ast/value-to-expression");
-
-
-const Composite = data `Composite` (
-    ids         => List(number),
-    expression  => Object);
-const CompositeList = List(Composite);
 
 const fMap = Map(number, ftype);
 const ScopeMap = Map(ftype, number);
@@ -67,32 +62,15 @@ module.exports = (function()
 
         const toGenerator = module._compile(source, filename);
         const args = parameters.map(key => environment[key]);
-/*printSuite(suite);
-toGenerator(...args).map((keys, f) => console.log("FOR " + keys + "\n" + f));
-console.log(toFunctions(...toGenerator(...args)[0]))
-const fs = toFunctions(...toGenerator(...args)[0]);
-(async function ()
-{
-    var i = 0;
-    for (const id of Object.keys(fs))
-    {
-        await fs[id]();
-        console.log((i++) + "after");
-    }
-})();*/
-console.log(toGenerator(...args) +"");
+
 console.log("-->"+code);
 console.log("RESULT ", toFunctions(toGenerator(...args)));
         const functions = fMap(toFunctions(toGenerator(...args)));
+
+//        const scopes = ScopeMap(compilations.map(({ fscope, scope }) => [fscope, scope]));
+//        const findShallowestScope = toFindShallowestScope(scopes);
+
         return { functions, findShallowestScope:()=>false };
-/*
-        const compilations = toCompilations(toGenerator(...args));
-        const functions = fMap(compilations.map(({ id, f }) => [id, f]));
-
-        const scopes = ScopeMap(compilations.map(({ fscope, scope }) => [fscope, scope]));
-        const findShallowestScope = toFindShallowestScope(scopes);
-
-        return { functions, findShallowestScope };*/
     }
 })();
 
@@ -121,10 +99,6 @@ const ftemplate = (function ()
         ((template => options => template(options).expression)
         (template(`(${string})`, options)))
 })();
-
-const t = require("@babel/types");
-const yield = (argument, delegate) =>
-    t.yieldExpression(toExpression(argument), delegate);
 
 const fromTest = (function ()
 {
@@ -156,51 +130,11 @@ const inlineStatementsFromTest = (function ()
     }
 })();
 
-
 const fromSerial = (function ()
 {
-    const t = require("@babel/types");
     const yield = (argument, delegate) =>
         t.expressionStatement(t.yieldExpression(toExpression(argument), delegate));
-    const await = argument =>
-        t.awaitExpression(t.parenthesizedExpression(toExpression(argument)));
-    const tAsyncGenerator = ftemplate(async function * () { $title; $statements });
     const tscope = $f => yield(t.callExpression(yield({ scope: $f }), []), true);
-    const testReduce = function (ids, chunks, path)
-    {
-        const { id } = path.test.block;
-
-        ids.push(id);
-        chunks.push([t.expressionStatement(yield({ begin: id })), ...inlineStatementsFromTest(path)]);
-    };
-    const suiteReduce = function (ids, chunks, childPath)
-    {
-        const { suite } = childPath;
-        const { mode, inserted } = suite;
-
-        if (inserted)
-        {
-            testReduce(ids, chunks, Path.child(0, childPath));
-            suiteReduce(ids, chunks, Path.child(1, childPath));
-        }
-        else
-        {
-            const nested = fromExecutable(childPath);
-
-            if (mode === Suite.Mode.Serial)
-            {
-                ids.push(...nested.ids);
-                chunks.push([t.expressionStatement(tscope(nested.expression))]);
-            }
-            else
-            {
-            console.log(nested);
-                ids.push(...nested.ids);
-                chunks.push([t.expressionStatement(yield([nested.ids, nested.expression]))]);
-            }
-        }
-    }
-
     const TEMPLATE = ftemplate(async function * () { this($id, $prefix); $statements });
 
     return function fromSerial(suitePath, index)
@@ -218,13 +152,9 @@ const fromSerial = (function ()
             .flatMap(fromExecutable));
         const $statements = paths
             .skip(firstTestPath)
-            .flatMap(function (path)
-            {
-                if (isTestPath(path))
-                    return [yield(path.test.block.id), ...inlineStatementsFromTest(path)];
-                
-                return [yield(fromExecutable(path))];
-            }).toArray();
+            .flatMap(path => isTestPath(path) ?
+                [yield(path.test.block.id), ...inlineStatementsFromTest(path)] :
+                [yield(fromExecutable(path))]).toArray();
         const $id = toExpression(
             firstTestPath < paths.size ?
             paths.get(firstTestPath).test.block.id : void 0);
