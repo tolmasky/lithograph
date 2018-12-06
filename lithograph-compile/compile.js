@@ -39,12 +39,6 @@ Path.child = (index, parent) =>
         Path(Suite)({ suite: executable, parent }))
     (parent.suite.children.get(index));
 
-const ResourcePath = union `ResourcePath` (
-    data `Child` (
-        resources   => ResourceMap,
-        parent      => ResourcePath ),
-    data `Root` ( ) );
-
 
 module.exports = (function()
 {
@@ -72,12 +66,15 @@ module.exports = (function()
 
 console.log("-->"+code);
 console.log("RESULT ", toPairs(toGenerator(...args)));
-        const context = Context.fromPairs(toPairs(toGenerator(...args)));
+        const pairs = toPairs(toGenerator(...args));
+        const grouped = List(Object)(pairs)
+            .groupBy(pair => typeof pair[0] === "number");
+        const functions = fMap(grouped.get(true, List(Object)));
+        const scopes = ScopeMap(grouped.get(false, List(Object)));
 
-//        const scopes = ScopeMap(compilations.map(({ fscope, scope }) => [fscope, scope]));
-//        const findShallowestScope = toFindShallowestScope(scopes);
+        const findShallowestScope = toFindShallowestScope(scopes);
 
-        return { context, findShallowestScope:()=>false };
+        return { functions, findShallowestScope };
     }
 })();
 
@@ -145,7 +142,7 @@ const fromSerial = (function ()
     const yield = (argument, delegate) =>
         t.expressionStatement(t.yieldExpression(toExpression(argument), delegate));
     const tAsyncGenerator = ftemplate(async function * ()
-        { $title; this($scope, $id, $prefix); $statements });
+        { $title; this($scope, $steps, $children); $statements });
 
     return function fromSerial(suitePath, index)
     {
@@ -156,22 +153,18 @@ const fromSerial = (function ()
             .flatMap(path => isTestPath(path) || !path.suite.inserted ?
                 [path] :
                 [Path.child(0, path), Path.child(1, path)]);
-        const firstTestPath = paths.findIndex(isTestPath);
-        const $prefix = toExpression(paths
-            .take(firstTestPath)
-            .flatMap(fromExecutable));
-        const $statements = paths
-            .skip(firstTestPath)
-            .flatMap(path => isTestPath(path) ?
-                [yield(path.test.block.id), ...inlineStatementsFromTest(path)] :
-                [yield(fromExecutable(path))]).toArray();
-        const $id = toExpression(
-            firstTestPath < paths.size ?
-            paths.get(firstTestPath).test.block.id : void 0);
+        const grouped = paths.groupBy(isTestPath);
+        const tests = grouped.get(true, List(Path(Test))());
+        const $steps = toExpression(tests.map(path => path.test.block.id));
+        const $statements = tests.flatMap(path =>
+            [yield(path.test.block.id), ...inlineStatementsFromTest(path)])
+            .toArray();
+        const suites = grouped.get(false, List(Path(Suite))());
+        const $children = toExpression(suites.map(fromExecutable));
         const $scope = toExpression(suite.block.id);
         const $title = t.stringLiteral(suite.block.title);
 
-        return tAsyncGenerator({ $title, $scope, $id, $prefix, $statements });
+        return tAsyncGenerator({ $title, $scope, $steps, $children, $statements });
     };
 })();
 
@@ -261,55 +254,37 @@ const toPairs = (function ()
         return typeof definition !== "function" ?
             [definition, [definition[1], definition[0]]] :
             definition instanceof AsyncGeneratorFunction ?
-                toPartialFunction(definition) :
-                toAvailableFunctions(definition);
+                toSerialPairs(definition) :
+                toConcurrentPairs(definition);
     }
 })();
 
-function toAvailableFunctions(definition)
+function toConcurrentPairs(definition)
 {
     return [].concat(...definition().map(toPairs));
 }
 
-function toPartialFunction(definition)
+function toSerialPairs(definition)
 {
     // FIXME: Make this inaccessible? Or maybe piggyback off of
     // (typeof undefined)._magic()
     const immediate = [];
     const generator = definition.call((...args) => immediate.push(...args));
     const started = generator.next();
-    const [id, first, definitions] = immediate;
+    const [scope, steps, children] = immediate;
 
-    const scope = [definition, id];
-    const pairs = [].concat(...definitions.map(toPairs));
-//console.log(id, definitions, typeof id);
-    if (typeof first !== "number")
-        return [...functions, scope];
+    const step = () => generator.next().then(() => void(0));
 
-    const step = async function ()
-    {
-        var next = await generator.next();
-        const pairs = [];
-
-        while (typeof next.value === "function")
-        {
-            pairs.push(...toPairs(next.value));
-            next = await generator.next();
-        }
-
-        return Context.fromPairs(
-            typeof next.value === "number" ?
-                [[next.value, step], ...pairs] :
-                pairs);
-    };
-
-    return [[first, () => started.then(step)], scope, ...pairs];
+    return steps
+        .map(id => [id, () => started.then(step)])
+        .concat(...children.map(toPairs))
+        .concat([[definition, scope]]);
 }
 
 function toFindShallowestScope(scopes)
 {
     return function findShallowestScope()
-    {
+    {//console.log("LOOKING FOR SCOPES", scopes.keySeq().toList());
         const { stackTraceLimit } = Error;
         Error.stackTraceLimit = Infinity;
         const prepareStackTrace = Error.prepareStackTrace;

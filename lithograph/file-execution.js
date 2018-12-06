@@ -7,7 +7,7 @@ const { Reason } = Result.Failure;
 const Log = require("./log");
 
 const Pool = require("@cause/pool");
-const { Context, compile } = require("@lithograph/compile");
+const compile = require("@lithograph/compile");
 const GarbageCollector = require("./garbage-collector");
 const toEnvironment = require("./file-execution/to-environment");
 
@@ -23,7 +23,7 @@ const FileExecution = Cause("FileExecution",
     [field `status`]: -1,
 
     [field `running`]: Map(),
-    [field `context`]: Context({ }),
+    [field `functions`]: Map(),
     [field `garbageCollector`]: -1,
 
     [field `pool`]: Pool.create({ count: 100 }),
@@ -40,15 +40,14 @@ const FileExecution = Cause("FileExecution",
     {
         const { suite, filename, garbageCollector } = fileExecution;
         const { unblocked, status } = Status.initialStatusOfNode(suite);
-
         const { allocate } = garbageCollector;
-        const { context, findShallowestScope } =
+        const { functions, findShallowestScope } =
             compile(toEnvironment(type =>
                 allocate(findShallowestScope(), type)),
             suite, filename);
 
         const outFileExecution = fileExecution
-            .set("context", context)
+            .set("functions", functions)
             .set("status", status);
 
         return update.in(
@@ -65,7 +64,7 @@ const FileExecution = Cause("FileExecution",
 
     [event.on (Pool.Retained)]: (fileExecution, { index, request: testPath }) =>
     {
-        const functions = fileExecution.context.functions;
+        const functions = fileExecution.functions;
         const { status, test } = Status.updateTestPathToRunning(
             fileExecution.status,
             testPath,
@@ -89,19 +88,18 @@ const FileExecution = Cause("FileExecution",
         return [fileExecution, [event.update("fromKeyPath", fromKeyPath => fromKeyPath.next)]]
     },
 
-    [event.in `Report`]: { testPath:-1, test:-1, index: -1, report:-1, start:-1, newContext:-1 },
+    [event.in `Report`]: { testPath:-1, test:-1, index: -1, report:-1, start:-1 },
     [event.on `Report`]: testFinished
 });
 
 function testFinished(fileExecution, event)
 {
-    const { testPath, test, index, report, start, newContext  } = event;
+    const { testPath, test, index, report, start  } = event;
     const { status } = fileExecution;
     const { status: updatedStatus, unblocked, scopes } =
         Status.updateTestPathWithReport(status, testPath, report);
     const withUpdatedStatus = fileExecution
         .set("status", updatedStatus)
-        .update("context", context => Context.merge(context, newContext))
         .removeIn(["running", test.block.id]);
 
     const [withUpdatedHelpers, events] = update.in.reduce(withUpdatedStatus,
@@ -137,12 +135,12 @@ async function testRun({ functions, test, testPath, index })
     const start = Date.now();
     const { id, title } = test.block;
     const f = functions.get(id);
-//console.log(f+"");
+//console.log("GETTING " + id + " " + f+"");
     // FIXME: Would be nice to use Log() here...
     console.log("  STARTED: " + title);
-
-    const [succeeded, result] = await f()
-        .then(unblocked => [true, unblocked])
+console.log("CALLING " + f);
+    const [succeeded, error] = await f()
+        .then(() => [true])
         .catch(error => [false, error]);
     const end = Date.now();
     const report = succeeded ?
@@ -150,11 +148,10 @@ async function testRun({ functions, test, testPath, index })
         Status.Report.Failure(
         {
             end,
-            reason: result instanceof Error ?
-                Reason.Error(result) :
-                Reason.Value({ stringified: JSON.stringify(result) })
+            reason: error instanceof Error ?
+                Reason.Error(error) :
+                Reason.Value({ stringified: JSON.stringify(error) })
         });
-    const newContext = succeeded && result || Context({ });
 
-    return FileExecution.Report({ testPath, test, index, start, end, report, newContext });
+    return FileExecution.Report({ testPath, test, index, start, end, report });
 }
