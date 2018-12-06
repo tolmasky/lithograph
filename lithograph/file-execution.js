@@ -7,7 +7,7 @@ const { Reason } = Result.Failure;
 const Log = require("./log");
 
 const Pool = require("@cause/pool");
-const compile = require("@lithograph/compile");
+const { Context, compile } = require("@lithograph/compile");
 const GarbageCollector = require("./garbage-collector");
 const toEnvironment = require("./file-execution/to-environment");
 
@@ -23,7 +23,7 @@ const FileExecution = Cause("FileExecution",
     [field `status`]: -1,
 
     [field `running`]: Map(),
-    [field `functions`]: Map(),
+    [field `context`]: Context({ }),
     [field `garbageCollector`]: -1,
 
     [field `pool`]: Pool.create({ count: 100 }),
@@ -42,13 +42,13 @@ const FileExecution = Cause("FileExecution",
         const { unblocked, status } = Status.initialStatusOfNode(suite);
 
         const { allocate } = garbageCollector;
-        const { functions, findShallowestScope } =
+        const { context, findShallowestScope } =
             compile(toEnvironment(type =>
                 allocate(findShallowestScope(), type)),
             suite, filename);
 
         const outFileExecution = fileExecution
-            .set("functions", functions)
+            .set("context", context)
             .set("status", status);
 
         return update.in(
@@ -65,7 +65,7 @@ const FileExecution = Cause("FileExecution",
 
     [event.on (Pool.Retained)]: (fileExecution, { index, request: testPath }) =>
     {
-        const functions = fileExecution.functions;
+        const functions = fileExecution.context.functions;
         const { status, test } = Status.updateTestPathToRunning(
             fileExecution.status,
             testPath,
@@ -89,19 +89,19 @@ const FileExecution = Cause("FileExecution",
         return [fileExecution, [event.update("fromKeyPath", fromKeyPath => fromKeyPath.next)]]
     },
 
-    [event.in `Report`]: { testPath:-1, test:-1, index: -1, report:-1, start:-1, unblockedf:-1 },
+    [event.in `Report`]: { testPath:-1, test:-1, index: -1, report:-1, start:-1, newContext:-1 },
     [event.on `Report`]: testFinished
 });
 
 function testFinished(fileExecution, event)
 {
-    const { testPath, test, index, report, start, unblockedf  } = event;
+    const { testPath, test, index, report, start, newContext  } = event;
     const { status } = fileExecution;
     const { status: updatedStatus, unblocked, scopes } =
         Status.updateTestPathWithReport(status, testPath, report);
     const withUpdatedStatus = fileExecution
         .set("status", updatedStatus)
-        .update("functions", functions => functions.concat(unblockedf))
+        .update("context", context => Context.merge(context, newContext))
         .removeIn(["running", test.block.id]);
 
     const [withUpdatedHelpers, events] = update.in.reduce(withUpdatedStatus,
@@ -154,7 +154,7 @@ async function testRun({ functions, test, testPath, index })
                 Reason.Error(result) :
                 Reason.Value({ stringified: JSON.stringify(result) })
         });
-    const unblockedf = succeeded && result || Map();
+    const newContext = succeeded && result || Context({ });
 
-    return FileExecution.Report({ testPath, test, index, start, end, report, unblockedf });
+    return FileExecution.Report({ testPath, test, index, start, end, report, newContext });
 }

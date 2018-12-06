@@ -4,9 +4,27 @@ const { Map, List } = require("@algebraic/collections");
 const { Test, Suite, ResourceMap } = require("@lithograph/ast");
 const toExpression = require("@lithograph/ast/value-to-expression");
 
-const fMap = Map(number, ftype);
-const ScopeMap = Map(ftype, number);
-Error.stackTraceLimit = 1000;
+const fMap = Map(number, Function);
+const ScopeMap = Map(Function, number);
+const Context = data `Context` (
+    functions   => [fMap, fMap()],
+    scopes      => [ScopeMap, ScopeMap()] );
+
+Context.fromPairs = function ContextFromPairs(pairs)
+{
+    const grouped = List(Object)(pairs)
+        .groupBy(pair => typeof pair[0] === "number");
+    const functions = fMap(grouped.get(true));
+    const scopes = ScopeMap(grouped.get(false));
+
+    return Context({ functions, scopes });
+}
+
+Context.merge = (lhs, rhs) => Context(
+{
+    functions: lhs.functions.concat(rhs.functions),
+    scopes: lhs.scopes.concat(rhs.scopes)
+});
 
 const Path = parameterized (T =>
     data `Path <${T}>` (
@@ -27,17 +45,6 @@ const ResourcePath = union `ResourcePath` (
         parent      => ResourcePath ),
     data `Root` ( ) );
 
-
-function printSuite(suite, nest = "")
-{
-    console.log(nest + suite.block.title + " (" + suite.block.id + ") " + suite.mode);
-
-    for (const child of suite.children)
-        if (is(Test, child))
-            console.log(nest + "    " + child.block.title  + " (" + child.block.id + ") ");
-        else
-            printSuite(child, nest + "    ");
-}
 
 module.exports = (function()
 {
@@ -64,15 +71,18 @@ module.exports = (function()
         const args = parameters.map(key => environment[key]);
 
 console.log("-->"+code);
-console.log("RESULT ", toFunctions(toGenerator(...args)));
-        const functions = fMap(toFunctions(toGenerator(...args)));
+console.log("RESULT ", toPairs(toGenerator(...args)));
+        const context = Context.fromPairs(toPairs(toGenerator(...args)));
 
 //        const scopes = ScopeMap(compilations.map(({ fscope, scope }) => [fscope, scope]));
 //        const findShallowestScope = toFindShallowestScope(scopes);
 
-        return { functions, findShallowestScope:()=>false };
+        return { context, findShallowestScope:()=>false };
     }
 })();
+
+module.exports.compile = module.exports;
+module.exports.Context = Context;
 
 function fromExecutable(executablePath)
 {
@@ -134,8 +144,8 @@ const fromSerial = (function ()
 {
     const yield = (argument, delegate) =>
         t.expressionStatement(t.yieldExpression(toExpression(argument), delegate));
-    const tscope = $f => yield(t.callExpression(yield({ scope: $f }), []), true);
-    const TEMPLATE = ftemplate(async function * () { this($id, $prefix); $statements });
+    const tAsyncGenerator = ftemplate(async function * ()
+        { $title; this($scope, $id, $prefix); $statements });
 
     return function fromSerial(suitePath, index)
     {
@@ -158,7 +168,10 @@ const fromSerial = (function ()
         const $id = toExpression(
             firstTestPath < paths.size ?
             paths.get(firstTestPath).test.block.id : void 0);
-        return TEMPLATE({ $id, $prefix, $statements });
+        const $scope = toExpression(suite.block.id);
+        const $title = t.stringLiteral(suite.block.title);
+
+        return tAsyncGenerator({ $title, $scope, $id, $prefix, $statements });
     };
 })();
 
@@ -237,17 +250,16 @@ const parseFragment = (function ()
     }
 })();
 
-const toFunctions = (function ()
+const toPairs = (function ()
 {
     const { getPrototypeOf } = Object;
-    const constructor = object =>
-        getPrototypeOf(object).constructor;
+    const constructor = object => getPrototypeOf(object).constructor;
     const AsyncGeneratorFunction = constructor((async function * () { }));
 
-    return function toFunctions(definition)
+    return function toPairs(definition)
     {
         return typeof definition !== "function" ?
-            [definition] :
+            [definition, [definition[1], definition[0]]] :
             definition instanceof AsyncGeneratorFunction ?
                 toPartialFunction(definition) :
                 toAvailableFunctions(definition);
@@ -256,38 +268,42 @@ const toFunctions = (function ()
 
 function toAvailableFunctions(definition)
 {
-    return [].concat(...definition().map(toFunctions));
+    return [].concat(...definition().map(toPairs));
 }
 
 function toPartialFunction(definition)
-{//console.log("PARTIAL!");
+{
+    // FIXME: Make this inaccessible? Or maybe piggyback off of
+    // (typeof undefined)._magic()
     const immediate = [];
-    const generator = definition
-        .apply((...args) => immediate.push(...args));
+    const generator = definition.call((...args) => immediate.push(...args));
     const started = generator.next();
-    const [id, definitions] = immediate; //FIXME: clean this up.
-    const functions = [].concat(...definitions.map(toFunctions));
+    const [id, first, definitions] = immediate;
+
+    const scope = [definition, id];
+    const pairs = [].concat(...definitions.map(toPairs));
 //console.log(id, definitions, typeof id);
-    if (typeof id !== "number")
-        return functions;
+    if (typeof first !== "number")
+        return [...functions, scope];
 
     const step = async function ()
     {
         var next = await generator.next();
-        const functions = [];
+        const pairs = [];
 
         while (typeof next.value === "function")
         {
-            functions.push(...toFunctions(next.value));
+            pairs.push(...toPairs(next.value));
             next = await generator.next();
         }
 
-        return typeof next.value === "number" ?
-            fMap([[next.value, step], ...functions]) :
-            fMap(functions);
+        return Context.fromPairs(
+            typeof next.value === "number" ?
+                [[next.value, step], ...pairs] :
+                pairs);
     };
-//console.log(functions);
-    return [[id, () => started.then(step)], ...functions];
+
+    return [[first, () => started.then(step)], scope, ...pairs];
 }
 
 function toFindShallowestScope(scopes)
@@ -310,4 +326,15 @@ function toFindShallowestScope(scopes)
             false :
             scopes.get(backtrace[index].getFunction());
     }
+}
+
+function printSuite(suite, nest = "")
+{
+    console.log(nest + suite.block.title + " (" + suite.block.id + ") " + suite.mode);
+
+    for (const child of suite.children)
+        if (is(Test, child))
+            console.log(nest + "    " + child.block.title  + " (" + child.block.id + ") ");
+        else
+            printSuite(child, nest + "    ");
 }
