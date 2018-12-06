@@ -206,9 +206,12 @@ const fromSerial = (function ()
     return function fromSerial(suitePath, index)
     {
         const { suite } = suitePath;
-        const paths = suite.children
-            .map((_, index) => Path.child(index, suitePath));
         const isTestPath = is(Path(Test));
+        const paths = suite.children
+            .map((_, index) => Path.child(index, suitePath))
+            .flatMap(path => isTestPath(path) || !path.suite.inserted ?
+                [path] :
+                [Path.child(0, path), Path.child(1, path)]);
         const firstTestPath = paths.findIndex(isTestPath);
         const $prefix = toExpression(paths
             .take(firstTestPath)
@@ -338,12 +341,21 @@ function toPartialFunction(definition)
     if (typeof id !== "number")
         return functions;
 
-    const step = () => generator
-        .next()
-        .then(({ value, done }) =>
-            done ? fMap() :
-            typeof value === "number" ? fMap([[value, step]]) :
-            fMap(toFunctions(value)));
+    const step = async function ()
+    {
+        var next = await generator.next();
+        const functions = [];
+
+        while (typeof next.value === "function")
+        {
+            functions.push(...toFunctions(next.value));
+            next = await generator.next();
+        }
+
+        return typeof next.value === "number" ?
+            fMap([[next.value, step], ...functions]) :
+            fMap(functions);
+    };
 //console.log(functions);
     return [[id, () => started.then(step)], ...functions];
 }

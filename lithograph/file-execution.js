@@ -150,9 +150,9 @@ async function testRun({ functions, test, testPath, index })
         Status.Report.Failure(
         {
             end,
-            reason: error instanceof Error ?
-                Reason.Error(error) :
-                Reason.Value({ stringified: JSON.stringify(error) })
+            reason: result instanceof Error ?
+                Reason.Error(result) :
+                Reason.Value({ stringified: JSON.stringify(result) })
         });
     const unblockedf = succeeded && result || Map();
 
