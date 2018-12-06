@@ -64,14 +64,12 @@ module.exports = (function()
         const toGenerator = module._compile(source, filename);
         const args = parameters.map(key => environment[key]);
 
-console.log("-->"+code);
-console.log("RESULT ", toPairs(toGenerator(...args)));
         const pairs = toPairs(toGenerator(...args));
         const grouped = List(Object)(pairs)
             .groupBy(pair => typeof pair[0] === "number");
+
         const functions = fMap(grouped.get(true, List(Object)));
         const scopes = ScopeMap(grouped.get(false, List(Object)));
-
         const findShallowestScope = toFindShallowestScope(scopes);
 
         return { functions, findShallowestScope };
@@ -284,7 +282,7 @@ function toSerialPairs(definition)
 function toFindShallowestScope(scopes)
 {
     return function findShallowestScope()
-    {//console.log("LOOKING FOR SCOPES", scopes.keySeq().toList());
+    {
         const { stackTraceLimit } = Error;
         Error.stackTraceLimit = Infinity;
         const prepareStackTrace = Error.prepareStackTrace;

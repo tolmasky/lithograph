@@ -138,7 +138,7 @@ async function testRun({ functions, test, testPath, index })
 //console.log("GETTING " + id + " " + f+"");
     // FIXME: Would be nice to use Log() here...
     console.log("  STARTED: " + title);
-console.log("CALLING " + f);
+//console.log("CALLING " + f);
     const [succeeded, error] = await f()
         .then(() => [true])
         .catch(error => [false, error]);
