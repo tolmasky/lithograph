@@ -13,7 +13,7 @@ expect(response.width).toBe({%width%});
 expect(response.version).toBe("1.0");
 expect(response.provider_name).toBe({%specification.providerName%});
 expect(response.type).toBe({%type%});
-console.log(Object.keys(expect));
+
 if ({%type%} === "rich")
 {
     expect(response).toHaveProperty("html")
