@@ -38,7 +38,7 @@ var i=0;
 const transformCase = (function ()
 {
     const testCases = Map(string, string)
-        (["json-response-implemented"]
+        (["json-response-implemented", "rich"]
             .map(name =>
                 [name, `${__dirname}/test-cases/${name}.lit.md`]));
 
@@ -46,6 +46,7 @@ const transformCase = (function ()
     {
         const x = specification;
         const URLTestCase = data `URLTestCase${i++}` (
+            dirname         => [string, __dirname],
             URL             => Variable(string),
             width           => number,
             type            => string, // FIXME: Make enum.
@@ -62,13 +63,14 @@ const transformCase = (function ()
         if (Failure.is(testCaseArguments))
             throw TypeError(testCaseArguments.message);
 
-        const child = Section.fromMarkdown(
-            testCases.get("json-response-implemented"),
-            URLTestCase,
-            testCaseArguments);
-        const { subsections } = section;
+        const children = ["json-response-implemented", "rich"]
+            .map(name => Section.fromMarkdown(
+                testCases.get(name),
+                URLTestCase,
+                testCaseArguments));
+        const subsections = section.subsections.concat(children);
 
-        return Section({ ...section, subsections: subsections.push(child) });
+        return Section({ ...section, subsections });
     }
 })();
 

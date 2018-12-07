@@ -16,8 +16,9 @@ const Application = Object.assign(props => Application[props.data.state](props),
         const params = new URLSearchParams(URL.split("?")[1]);
         const interactive = params.has("items");
         const encoded = interactive ?
-            params.get("items") :
+            params.getAll("items") :
             ["0", Placeholder, "0"];
+        console.log(encoded);
         const items = List(encoded.map(
             item => item === Placeholder ?
                 Placeholder :

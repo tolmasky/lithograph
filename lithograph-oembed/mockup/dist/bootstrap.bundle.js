@@ -1,4 +1,298 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+const React = require("react");
+const { List, Record } = require("immutable");
+
+const OEmbed = require("./oembed");
+const LoremIpsum = React.createElement(require("./lorem-ipsum"));
+const InputBar = require("./input-bar");
+const Placeholder = React.createElement("div", null);
+
+const Application = Object.assign(props => Application[props.data.state](props), {
+    Data: Record({ state: "initial", URL: "", interactive: true, items: null, input: "" }),
+
+    initial({ data: { URL }, keyPath, update }) {
+        const params = new URLSearchParams(URL.split("?")[1]);
+        const interactive = params.has("items");
+        const encoded = interactive ? params.getAll("items") : ["0", Placeholder, "0"];
+        console.log(encoded);
+        const items = List(encoded.map(item => item === Placeholder ? Placeholder : item === "0" ? LoremIpsum : OEmbed.Data({ URL: item })));
+
+        update(keyPath, data => data.set("state", "loaded").set("items", items).set("interactive", interactive));
+
+        return React.createElement("div", null);
+    },
+
+    loaded: ({ data: { items, interactive, input }, keyPath, update }) => {
+        const onOEmbedURLChange = URL => update([...keyPath, "items", 1], () => OEmbed.Data({ URL }));
+
+        return React.createElement(
+            "div",
+            { id: "page" },
+            React.createElement(InputBar, { data: input,
+                keyPath: [...keyPath, "input"],
+                update: update,
+                action: onOEmbedURLChange }),
+            items.map((item, index) => !(item instanceof OEmbed.Data) ? item : React.createElement(OEmbed, {
+                keyPath: [...keyPath, "items", index],
+                update: update,
+                data: item }))
+        );
+    }
+});
+
+module.exports = Application;
+
+},{"./input-bar":4,"./lorem-ipsum":5,"./oembed":6,"immutable":7,"react":17}],2:[function(require,module,exports){
+const React = require("react");
+const ReactDOM = require("react-dom");
+
+const Application = require("./application");
+const root = document.getElementById("root");
+const update = ((data, updating) => function update(...args) {
+    if (updating) return setTimeout(() => update(...args), 0);
+
+    updating = true;
+
+    if (args.length > 0) data = data.updateIn(...args);
+
+    ReactDOM.render(React.createElement(Application, { data, update, keyPath: [] }), root);
+
+    updating = false;
+})(Application.Data({ URL: window.location.href }));
+
+update();
+
+},{"./application":1,"react":17,"react-dom":14}],3:[function(require,module,exports){
+var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
+
+const React = require("react");
+
+module.exports = ({ style, data }) => React.createElement(
+    "ul",
+    { style: _extends({}, FieldsULStyle, style) },
+    data.keySeq().map((key, index) => React.createElement(
+        "li",
+        { key: key, style: FieldsLIStyle },
+        React.createElement(Field, { label: key, value: data.get(key) })
+    ))
+);
+
+const FieldsULStyle = {
+    padding: 0,
+    border: 0,
+    margin: 0,
+    listStyleType: "none",
+    display: "block",
+    fontFamily: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"`
+};
+const FieldsLIStyle = {
+    display: "block"
+};
+
+const Field = ({ label, value }) => React.createElement(
+    React.Fragment,
+    null,
+    React.createElement(
+        "span",
+        { style: FieldLabelStyle },
+        label,
+        ":"
+    ),
+    React.createElement("input", { value: value, style: FieldValueStyle, readOnly: true })
+);
+
+const FieldLabelStyle = {
+    width: "50%",
+    display: "inline-block",
+    fontWeight: "bold",
+    textAlign: "right"
+};
+const FieldValueStyle = {
+    width: "calc(50% - 10px)",
+    display: "inline-block",
+    textAlign: "left",
+    marginLeft: "10px",
+    boxSizing: "border-box",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap"
+};
+
+},{"react":17}],4:[function(require,module,exports){
+const React = require("react");
+
+module.exports = ({ data, update, keyPath, action }) => {
+    const onChange = event => update(keyPath, () => event.target.value);
+    const onKeyPress = event => event.key === "Enter" ? action(data) : true;
+
+    return React.createElement(
+        "div",
+        { style: InputBarStyle },
+        React.createElement("input", { type: "text",
+            style: InputBarInputStyle,
+            value: data,
+            placeholder: "OEmbed-compatible URL",
+            onChange: onChange,
+            onKeyPress: onKeyPress })
+    );
+};
+
+const InputBarStyle = {
+    backgroundColor: "#fff",
+    height: "44px",
+    verticalAlign: "top",
+    borderRadius: "2px",
+    boxShadow: "0 2px 2px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.08)",
+    transition: "box-shadow 200ms cubic-bezier(0.4, 0.0, 0.2, 1)",
+    marginBottom: "50px"
+};
+
+const InputBarInputStyle = {
+    font: "16px arial, sans-serif",
+    lineHeight: "34px",
+    height: "34px !important",
+    border: "none",
+    padding: "6px 9px 4px 9px",
+    margin: "0px",
+    width: "calc(100% - 18px)",
+    outline: "none"
+};
+
+},{"react":17}],5:[function(require,module,exports){
+const React = require("react");
+
+module.exports = () => React.createElement(
+    "section",
+    { className: "lorem-ipsum" },
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur."
+);
+
+},{"react":17}],6:[function(require,module,exports){
+const React = require("react");
+const { Map, Record } = require("immutable");
+const Fields = require("./fields");
+
+const OEmbed = Object.assign(props => OEmbed[props.data.state](props), {
+    Data: Record({
+        state: "initial",
+        URL: "",
+        result: null,
+        error: null,
+        height: 20,
+        width: "100%"
+    }),
+
+    initial({ data: { URL }, keyPath, update }) {
+        fetchOEmbed({ URL, maxwidth: 700 }).then(value => update(keyPath, data => data.set("state", "loaded").set("result", value))).catch(value => update(keyPath, data => data.set("state", "errored").set("error", value)));
+
+        update(keyPath, data => data.set("state", "loading"));
+
+        return React.createElement("section", { className: "oembed loading" });
+    },
+
+    loading: () => React.createElement("section", { className: "oembed loading" }),
+
+    errored: ({ data: { error } }) => React.createElement(
+        "section",
+        null,
+        error.message
+    ),
+
+    loaded: ({ data, update, keyPath }) => React.createElement(
+        "section",
+        { className: "oembed" },
+        React.createElement(OEmbedContainer, { data, keyPath, update })
+    )
+});
+
+const OEmbedContainer = function ({ data, keyPath, update }) {
+    window.addEventListener("message", function ({ data }) {
+        const { context, height } = JSON.parse(data);
+
+        if (context !== "iframe.resize") return;
+
+        update([...keyPath, "height"], () => height);
+    });
+
+    const result = data.result;
+    const __html = result.get("iframe").outerHTML;
+    const id = JSON.stringify(keyPath);
+    const height = data.height;
+    const style = Object.assign({}, IFrameContainerStyle, { height });
+
+    return React.createElement(
+        "div",
+        { id: id, style: style },
+        React.createElement("div", { style: OEmbedCalloutStyle }),
+        React.createElement(
+            "div",
+            { style: OEmbedInfoStyle },
+            React.createElement(Fields, { data: Map({ "dynamic-height": height }) }),
+            React.createElement(Fields, { data: result.get("JSON") })
+        ),
+        React.createElement("div", { style: { height: "100%", width: "100%" },
+            dangerouslySetInnerHTML: { __html } })
+    );
+};
+
+const OEmbedCalloutStyle = {
+    position: "absolute",
+    top: "-2px",
+    width: "20px",
+    right: "100%",
+    borderTop: "2px dashed red"
+};
+
+const OEmbedInfoStyle = {
+    position: "absolute",
+    top: "-2px",
+    width: "270px",
+    right: "100%",
+    lineHeight: "1.58",
+    marginRight: "20px",
+    paddingRight: "20px",
+    borderRight: "2px dashed red"
+};
+
+module.exports = OEmbed;
+
+const IFrameContainerStyle = {
+    position: "relative",
+    border: "2px dashed red",
+    width: "calc(100% + 2px)",
+    left: "-2px",
+    top: "-2px"
+};
+
+async function fetchOEmbed({ URL, maxwidth }) {
+    const format = "json";
+    const query = [["url", URL], ["format", format], ["maxwidth", maxwidth]].reduce((params, [key, value]) => (params.append(key, value), params), new URLSearchParams()).toString();
+    const oembedURL = `https://embed.tonic.work/oembed?${query}`;
+    const response = await fetch(oembedURL);
+
+    if (response.status !== 200) throw Object.assign(new Error(), { status });
+
+    const JSON = await response.json();
+
+    if (!JSON.html) throw new Error(`OEmbed response must contain an "html" property.`);
+
+    const fragment = Object.assign(document.createElement("div"), { innerHTML: JSON.html });
+
+    if (fragment.childNodes.length !== 1 || !fragment.firstElementChild || fragment.firstElementChild.tagName !== "IFRAME") throw new Error("OEmbed HTML must contain one iframe element.");
+
+    const iframe = Object.assign(fragment.firstElementChild, { style: "" });
+
+    if (parseInt(iframe.width, 10) + "" !== iframe.width) throw new Error(`OEmbed IFrame "width" attribute must be an integer.`);
+
+    if (parseInt(iframe.height, 10) + "" !== iframe.height) throw new Error(`OEmbed IFrame "height" attribute must be an integer.`);
+
+    iframe.width = "100%";
+    iframe.height = "100%";
+
+    return Map({ iframe, JSON: Map(JSON), response });
+}
+
+},{"./fields":3,"immutable":7,"react":17}],7:[function(require,module,exports){
 /**
  * Copyright (c) 2014-present, Facebook, Inc.
  *
@@ -4976,7 +5270,7 @@
   return Immutable;
 
 }));
-},{}],2:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 /*
 object-assign
 (c) Sindre Sorhus
@@ -5068,7 +5362,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 	return to;
 };
 
-},{}],3:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -5254,7 +5548,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],4:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 (function (process){
 /**
  * Copyright (c) 2013-present, Facebook, Inc.
@@ -5349,7 +5643,7 @@ function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
 module.exports = checkPropTypes;
 
 }).call(this,require('_process'))
-},{"./lib/ReactPropTypesSecret":5,"_process":3}],5:[function(require,module,exports){
+},{"./lib/ReactPropTypesSecret":11,"_process":9}],11:[function(require,module,exports){
 /**
  * Copyright (c) 2013-present, Facebook, Inc.
  *
@@ -5363,7 +5657,7 @@ var ReactPropTypesSecret = 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED';
 
 module.exports = ReactPropTypesSecret;
 
-},{}],6:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 (function (process){
 /** @license React v16.6.1
  * react-dom.development.js
@@ -25094,7 +25388,7 @@ module.exports = reactDom;
 }
 
 }).call(this,require('_process'))
-},{"_process":3,"object-assign":2,"prop-types/checkPropTypes":4,"react":11,"scheduler":16,"scheduler/tracing":17}],7:[function(require,module,exports){
+},{"_process":9,"object-assign":8,"prop-types/checkPropTypes":10,"react":17,"scheduler":22,"scheduler/tracing":23}],13:[function(require,module,exports){
 /** @license React v16.6.1
  * react-dom.production.min.js
  *
@@ -25345,7 +25639,7 @@ void 0:t("40");return a._reactRootContainer?(Oh(function(){$h(null,null,a,!1,fun
 Ka,La,Ca.injectEventPluginsByName,qa,Ra,function(a){za(a,Qa)},Ib,Jb,Jd,Ea]},unstable_createRoot:function(a,b){Yh(a)?void 0:t("299","unstable_createRoot");return new Xh(a,!0,null!=b&&!0===b.hydrate)}};(function(a){var b=a.findFiberByHostInstance;return Ve(n({},a,{findHostInstanceByFiber:function(a){a=nd(a);return null===a?null:a.stateNode},findFiberByHostInstance:function(a){return b?b(a):null}}))})({findFiberByHostInstance:Ia,bundleType:0,version:"16.6.3",rendererPackageName:"react-dom"});
 var ei={default:bi},fi=ei&&bi||ei;module.exports=fi.default||fi;
 
-},{"object-assign":2,"react":11,"scheduler":16}],8:[function(require,module,exports){
+},{"object-assign":8,"react":17,"scheduler":22}],14:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -25387,7 +25681,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 }).call(this,require('_process'))
-},{"./cjs/react-dom.development.js":6,"./cjs/react-dom.production.min.js":7,"_process":3}],9:[function(require,module,exports){
+},{"./cjs/react-dom.development.js":12,"./cjs/react-dom.production.min.js":13,"_process":9}],15:[function(require,module,exports){
 (function (process){
 /** @license React v16.6.1
  * react.development.js
@@ -27231,7 +27525,7 @@ module.exports = react;
 }
 
 }).call(this,require('_process'))
-},{"_process":3,"object-assign":2,"prop-types/checkPropTypes":4}],10:[function(require,module,exports){
+},{"_process":9,"object-assign":8,"prop-types/checkPropTypes":10}],16:[function(require,module,exports){
 /** @license React v16.6.1
  * react.production.min.js
  *
@@ -27257,7 +27551,7 @@ _currentValue:a,_currentValue2:a,_threadCount:0,Provider:null,Consumer:null};a.P
 if(null!=b){void 0!==b.ref&&(h=b.ref,f=K.current);void 0!==b.key&&(g=""+b.key);var l=void 0;a.type&&a.type.defaultProps&&(l=a.type.defaultProps);for(c in b)L.call(b,c)&&!M.hasOwnProperty(c)&&(d[c]=void 0===b[c]&&void 0!==l?l[c]:b[c])}c=arguments.length-2;if(1===c)d.children=e;else if(1<c){l=Array(c);for(var m=0;m<c;m++)l[m]=arguments[m+2];d.children=l}return{$$typeof:p,type:a.type,key:g,ref:h,props:d,_owner:f}},createFactory:function(a){var b=N.bind(null,a);b.type=a;return b},isValidElement:O,version:"16.6.3",
 __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED:{ReactCurrentOwner:K,assign:k}};X.unstable_ConcurrentMode=x;X.unstable_Profiler=u;var Y={default:X},Z=Y&&X||Y;module.exports=Z.default||Z;
 
-},{"object-assign":2}],11:[function(require,module,exports){
+},{"object-assign":8}],17:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -27268,7 +27562,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 }).call(this,require('_process'))
-},{"./cjs/react.development.js":9,"./cjs/react.production.min.js":10,"_process":3}],12:[function(require,module,exports){
+},{"./cjs/react.development.js":15,"./cjs/react.production.min.js":16,"_process":9}],18:[function(require,module,exports){
 (function (process){
 /** @license React v16.6.1
  * scheduler-tracing.development.js
@@ -27692,7 +27986,7 @@ exports.unstable_unsubscribe = unstable_unsubscribe;
 }
 
 }).call(this,require('_process'))
-},{"_process":3}],13:[function(require,module,exports){
+},{"_process":9}],19:[function(require,module,exports){
 /** @license React v16.6.1
  * scheduler-tracing.production.min.js
  *
@@ -27704,7 +27998,7 @@ exports.unstable_unsubscribe = unstable_unsubscribe;
 
 'use strict';Object.defineProperty(exports,"__esModule",{value:!0});var b=0;exports.__interactionsRef=null;exports.__subscriberRef=null;exports.unstable_clear=function(a){return a()};exports.unstable_getCurrent=function(){return null};exports.unstable_getThreadID=function(){return++b};exports.unstable_trace=function(a,d,c){return c()};exports.unstable_wrap=function(a){return a};exports.unstable_subscribe=function(){};exports.unstable_unsubscribe=function(){};
 
-},{}],14:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 (function (process){
 /** @license React v16.6.1
  * scheduler.development.js
@@ -28347,7 +28641,7 @@ exports.unstable_shouldYield = unstable_shouldYield;
 }
 
 }).call(this,require('_process'))
-},{"_process":3}],15:[function(require,module,exports){
+},{"_process":9}],21:[function(require,module,exports){
 /** @license React v16.6.1
  * scheduler.production.min.js
  *
@@ -28370,7 +28664,7 @@ exports.unstable_scheduleCallback=function(a,b){var c=-1!==k?k:exports.unstable_
 b=c.previous;b.next=c.previous=a;a.next=c;a.previous=b}return a};exports.unstable_cancelCallback=function(a){var b=a.next;if(null!==b){if(b===a)d=null;else{a===d&&(d=b);var c=a.previous;c.next=b;b.previous=c}a.next=a.previous=null}};exports.unstable_wrapCallback=function(a){var b=h;return function(){var c=h,e=k;h=b;k=exports.unstable_now();try{return a.apply(this,arguments)}finally{h=c,k=e,v()}}};exports.unstable_getCurrentPriorityLevel=function(){return h};
 exports.unstable_shouldYield=function(){return!f&&(null!==d&&d.expirationTime<l||w())};
 
-},{}],16:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -28381,7 +28675,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 }).call(this,require('_process'))
-},{"./cjs/scheduler.development.js":14,"./cjs/scheduler.production.min.js":15,"_process":3}],17:[function(require,module,exports){
+},{"./cjs/scheduler.development.js":20,"./cjs/scheduler.production.min.js":21,"_process":9}],23:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -28392,299 +28686,4 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 }).call(this,require('_process'))
-},{"./cjs/scheduler-tracing.development.js":12,"./cjs/scheduler-tracing.production.min.js":13,"_process":3}],18:[function(require,module,exports){
-const React = require("react");
-const { List, Record } = require("immutable");
-
-const OEmbed = require("./oembed");
-const LoremIpsum = React.createElement(require("./lorem-ipsum"));
-const InputBar = require("./input-bar");
-const Placeholder = React.createElement("div", null);
-
-const Application = Object.assign(props => Application[props.data.state](props), {
-    Data: Record({ state: "initial", URL: "", interactive: true, items: null, input: "" }),
-
-    initial({ data: { URL }, keyPath, update }) {
-        const params = new URLSearchParams(URL.split("?")[1]);
-        const interactive = params.has("items");
-        const encoded = interactive ? params.get("items") : ["0", Placeholder, "0"];
-        const items = List(encoded.map(item => item === Placeholder ? Placeholder : item === "0" ? LoremIpsum : OEmbed.Data({ URL: item })));
-
-        update(keyPath, data => data.set("state", "loaded").set("items", items).set("interactive", interactive));
-
-        return React.createElement("div", null);
-    },
-
-    loaded: ({ data: { items, interactive, input }, keyPath, update }) => {
-        const onOEmbedURLChange = URL => update([...keyPath, "items", 1], () => OEmbed.Data({ URL }));
-
-        return React.createElement(
-            "div",
-            { id: "page" },
-            React.createElement(InputBar, { data: input,
-                keyPath: [...keyPath, "input"],
-                update: update,
-                action: onOEmbedURLChange }),
-            items.map((item, index) => !(item instanceof OEmbed.Data) ? item : React.createElement(OEmbed, {
-                keyPath: [...keyPath, "items", index],
-                update: update,
-                data: item }))
-        );
-    }
-});
-
-module.exports = Application;
-
-},{"./input-bar":21,"./lorem-ipsum":22,"./oembed":23,"immutable":1,"react":11}],19:[function(require,module,exports){
-const React = require("react");
-const ReactDOM = require("react-dom");
-
-const Application = require("./application");
-const root = document.getElementById("root");
-const update = ((data, updating) => function update(...args) {
-    if (updating) return setTimeout(() => update(...args), 0);
-
-    updating = true;
-
-    if (args.length > 0) data = data.updateIn(...args);
-
-    ReactDOM.render(React.createElement(Application, { data, update, keyPath: [] }), root);
-
-    updating = false;
-})(Application.Data({ URL: window.location.href }));
-
-update();
-
-},{"./application":18,"react":11,"react-dom":8}],20:[function(require,module,exports){
-var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
-
-const React = require("react");
-
-module.exports = ({ style, data }) => React.createElement(
-    "ul",
-    { style: _extends({}, FieldsULStyle, style) },
-    data.keySeq().map((key, index) => React.createElement(
-        "li",
-        { key: key, style: FieldsLIStyle },
-        React.createElement(Field, { label: key, value: data.get(key) })
-    ))
-);
-
-const FieldsULStyle = {
-    padding: 0,
-    border: 0,
-    margin: 0,
-    listStyleType: "none",
-    display: "block",
-    fontFamily: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"`
-};
-const FieldsLIStyle = {
-    display: "block"
-};
-
-const Field = ({ label, value }) => React.createElement(
-    React.Fragment,
-    null,
-    React.createElement(
-        "span",
-        { style: FieldLabelStyle },
-        label,
-        ":"
-    ),
-    React.createElement("input", { value: value, style: FieldValueStyle, readOnly: true })
-);
-
-const FieldLabelStyle = {
-    width: "50%",
-    display: "inline-block",
-    fontWeight: "bold",
-    textAlign: "right"
-};
-const FieldValueStyle = {
-    width: "calc(50% - 10px)",
-    display: "inline-block",
-    textAlign: "left",
-    marginLeft: "10px",
-    boxSizing: "border-box",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap"
-};
-
-},{"react":11}],21:[function(require,module,exports){
-const React = require("react");
-
-module.exports = ({ data, update, keyPath, action }) => {
-    const onChange = event => update(keyPath, () => event.target.value);
-    const onKeyPress = event => event.key === "Enter" ? action(data) : true;
-
-    return React.createElement(
-        "div",
-        { style: InputBarStyle },
-        React.createElement("input", { type: "text",
-            style: InputBarInputStyle,
-            value: data,
-            placeholder: "OEmbed-compatible URL",
-            onChange: onChange,
-            onKeyPress: onKeyPress })
-    );
-};
-
-const InputBarStyle = {
-    backgroundColor: "#fff",
-    height: "44px",
-    verticalAlign: "top",
-    borderRadius: "2px",
-    boxShadow: "0 2px 2px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.08)",
-    transition: "box-shadow 200ms cubic-bezier(0.4, 0.0, 0.2, 1)",
-    marginBottom: "50px"
-};
-
-const InputBarInputStyle = {
-    font: "16px arial, sans-serif",
-    lineHeight: "34px",
-    height: "34px !important",
-    border: "none",
-    padding: "6px 9px 4px 9px",
-    margin: "0px",
-    width: "calc(100% - 18px)",
-    outline: "none"
-};
-
-},{"react":11}],22:[function(require,module,exports){
-const React = require("react");
-
-module.exports = () => React.createElement(
-    "section",
-    { className: "lorem-ipsum" },
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur."
-);
-
-},{"react":11}],23:[function(require,module,exports){
-const React = require("react");
-const { Map, Record } = require("immutable");
-const Fields = require("./fields");
-
-const OEmbed = Object.assign(props => OEmbed[props.data.state](props), {
-    Data: Record({
-        state: "initial",
-        URL: "",
-        result: null,
-        error: null,
-        height: 20,
-        width: "100%"
-    }),
-
-    initial({ data: { URL }, keyPath, update }) {
-        fetchOEmbed({ URL, maxwidth: 700 }).then(value => update(keyPath, data => data.set("state", "loaded").set("result", value))).catch(value => update(keyPath, data => data.set("state", "errored").set("error", value)));
-
-        update(keyPath, data => data.set("state", "loading"));
-
-        return React.createElement("section", { className: "oembed loading" });
-    },
-
-    loading: () => React.createElement("section", { className: "oembed loading" }),
-
-    errored: ({ data: { error } }) => React.createElement(
-        "section",
-        null,
-        error.message
-    ),
-
-    loaded: ({ data, update, keyPath }) => React.createElement(
-        "section",
-        { className: "oembed" },
-        React.createElement(OEmbedContainer, { data, keyPath, update })
-    )
-});
-
-const OEmbedContainer = function ({ data, keyPath, update }) {
-    console.log("set up.");
-    window.addEventListener("message", function ({ data }) {
-        console.log("???");
-        const { context, height } = JSON.parse(data);
-        console.log("HEREERER");
-        if (context !== "iframe.resize") return;
-
-        update([...keyPath, "height"], () => height);
-    });
-
-    const result = data.result;
-    const __html = result.get("iframe").outerHTML;
-    const id = JSON.stringify(keyPath);
-    const height = data.height;
-    const style = Object.assign({}, IFrameContainerStyle, { height });
-
-    return React.createElement(
-        "div",
-        { id: id, style: style },
-        React.createElement("div", { style: OEmbedCalloutStyle }),
-        React.createElement(
-            "div",
-            { style: OEmbedInfoStyle },
-            React.createElement(Fields, { data: Map({ "dynamic-height": height }) }),
-            React.createElement(Fields, { data: result.get("JSON") })
-        ),
-        React.createElement("div", { style: { height: "100%", width: "100%" },
-            dangerouslySetInnerHTML: { __html } })
-    );
-};
-
-const OEmbedCalloutStyle = {
-    position: "absolute",
-    top: "-2px",
-    width: "20px",
-    right: "100%",
-    borderTop: "2px dashed red"
-};
-
-const OEmbedInfoStyle = {
-    position: "absolute",
-    top: "-2px",
-    width: "270px",
-    right: "100%",
-    lineHeight: "1.58",
-    marginRight: "20px",
-    paddingRight: "20px",
-    borderRight: "2px dashed red"
-};
-
-module.exports = OEmbed;
-
-const IFrameContainerStyle = {
-    position: "relative",
-    border: "2px dashed red",
-    width: "calc(100% + 2px)",
-    left: "-2px",
-    top: "-2px"
-};
-
-async function fetchOEmbed({ URL, maxwidth }) {
-    const format = "json";
-    const query = [["url", URL], ["format", format], ["maxwidth", maxwidth]].reduce((params, [key, value]) => (params.append(key, value), params), new URLSearchParams()).toString();
-    const oembedURL = `https://embed.tonic.work/oembed?${query}`;
-    const response = await fetch(oembedURL);
-
-    if (response.status !== 200) throw Object.assign(new Error(), { status });
-
-    const JSON = await response.json();
-
-    if (!JSON.html) throw new Error(`OEmbed response must contain an "html" property.`);
-
-    const fragment = Object.assign(document.createElement("div"), { innerHTML: JSON.html });
-
-    if (fragment.childNodes.length !== 1 || !fragment.firstElementChild || fragment.firstElementChild.tagName !== "IFRAME") throw new Error("OEmbed HTML must contain one iframe element.");
-
-    const iframe = Object.assign(fragment.firstElementChild, { style: "" });
-
-    if (parseInt(iframe.width, 10) + "" !== iframe.width) throw new Error(`OEmbed IFrame "width" attribute must be an integer.`);
-
-    if (parseInt(iframe.height, 10) + "" !== iframe.height) throw new Error(`OEmbed IFrame "height" attribute must be an integer.`);
-
-    iframe.width = "100%";
-    iframe.height = "100%";
-
-    return Map({ iframe, JSON: Map(JSON), response });
-}
-
-},{"./fields":20,"immutable":1,"react":11}]},{},[19]);
+},{"./cjs/scheduler-tracing.development.js":18,"./cjs/scheduler-tracing.production.min.js":19,"_process":9}]},{},[2]);
