@@ -14,7 +14,6 @@ const Application = Object.assign(props => Application[props.data.state](props),
         const params = new URLSearchParams(URL.split("?")[1]);
         const interactive = params.has("items");
         const encoded = interactive ? params.getAll("items") : ["0", Placeholder, "0"];
-        console.log(encoded);
         const items = List(encoded.map(item => item === Placeholder ? Placeholder : item === "0" ? LoremIpsum : OEmbed.Data({ URL: item })));
 
         update(keyPath, data => data.set("state", "loaded").set("items", items).set("interactive", interactive));
@@ -27,7 +26,8 @@ const Application = Object.assign(props => Application[props.data.state](props),
 
         return React.createElement(
             "div",
-            { id: "page" },
+            { id: "page", style: { position: "relative" } },
+            React.createElement(BluePrint, null),
             React.createElement(InputBar, { data: input,
                 keyPath: [...keyPath, "input"],
                 update: update,
@@ -39,6 +39,21 @@ const Application = Object.assign(props => Application[props.data.state](props),
         );
     }
 });
+
+const BluePrint = function () {
+    const style = {
+        position: "fixed",
+        height: "100vh",
+        minHeight: "100%",
+        width: "inherit",
+        top: "0",
+        borderLeft: "1px dashed rgba(77, 103, 179, 1.0)",
+        borderRight: "1px dashed rgba(77, 103, 179, 1.0)",
+        zIndex: -1000
+    };
+
+    return React.createElement("div", { style: style });
+};
 
 module.exports = Application;
 
@@ -171,6 +186,7 @@ module.exports = () => React.createElement(
 const React = require("react");
 const { Map, Record } = require("immutable");
 const Fields = require("./fields");
+const SystemFontFamily = `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"`;
 
 const OEmbed = Object.assign(props => OEmbed[props.data.state](props), {
     Data: Record({
@@ -217,6 +233,7 @@ const OEmbedContainer = function ({ data, keyPath, update }) {
     const result = data.result;
     const __html = result.get("iframe").outerHTML;
     const id = JSON.stringify(keyPath);
+    const width = data.width;
     const height = data.height;
     const style = Object.assign({}, IFrameContainerStyle, { height });
 
@@ -231,7 +248,34 @@ const OEmbedContainer = function ({ data, keyPath, update }) {
             React.createElement(Fields, { data: result.get("JSON") })
         ),
         React.createElement("div", { style: { height: "100%", width: "100%" },
-            dangerouslySetInnerHTML: { __html } })
+            dangerouslySetInnerHTML: { __html } }),
+        React.createElement(OEmbedSize, { width: width, height: height })
+    );
+};
+
+const OEmbedSize = function ({ width, height }) {
+    const style = {
+        color: "red",
+        padding: "10px",
+        textAlign: "center",
+        fontFamily: SystemFontFamily,
+        fontWeight: "bold"
+    };
+
+    return React.createElement(
+        "div",
+        { style: style },
+        React.createElement(
+            "span",
+            { className: "dynamic-width" },
+            width
+        ),
+        "\xA0\xD7\xA0",
+        React.createElement(
+            "span",
+            { className: "dynamic-height" },
+            height
+        )
     );
 };
 

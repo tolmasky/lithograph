@@ -18,7 +18,6 @@ const Application = Object.assign(props => Application[props.data.state](props),
         const encoded = interactive ?
             params.getAll("items") :
             ["0", Placeholder, "0"];
-        console.log(encoded);
         const items = List(encoded.map(
             item => item === Placeholder ?
                 Placeholder :
@@ -39,7 +38,8 @@ const Application = Object.assign(props => Application[props.data.state](props),
         const onOEmbedURLChange = URL =>
             update([...keyPath, "items", 1], () => OEmbed.Data({ URL }));
 
-        return  <div id = "page">
+        return  <div id = "page" style = { { position: "relative" } }>
+                    <BluePrint/>
                     <InputBar   data = { input }
                                 keyPath = { [...keyPath, "input"] }
                                 update = { update }
@@ -56,5 +56,22 @@ const Application = Object.assign(props => Application[props.data.state](props),
                 </div>;
     }
 });
+
+const BluePrint = function ()
+{
+    const style =
+    {
+        position: "fixed",
+        height: "100vh",
+        minHeight: "100%",
+        width: "inherit",
+        top:"0",
+        borderLeft:"1px dashed rgba(77, 103, 179, 1.0)",
+        borderRight:"1px dashed rgba(77, 103, 179, 1.0)",
+        zIndex:-1000
+    };
+
+    return <div style = { style } />;
+}
 
 module.exports = Application;

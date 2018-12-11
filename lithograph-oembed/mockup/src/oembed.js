@@ -1,6 +1,7 @@
 const React = require("react");
 const { Map, Record } = require("immutable");
 const Fields = require("./fields");
+const SystemFontFamily = `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"`;
 
 
 const OEmbed = Object.assign(props => OEmbed[props.data.state](props),
@@ -55,6 +56,7 @@ const OEmbedContainer = function ({ data, keyPath, update })
     const result = data.result;
     const __html = result.get("iframe").outerHTML;
     const id = JSON.stringify(keyPath);
+    const width = data.width;
     const height = data.height;
     const style = Object.assign({ }, IFrameContainerStyle, { height });
 
@@ -66,7 +68,26 @@ const OEmbedContainer = function ({ data, keyPath, update })
                 </div>
                 <div    style = { { height:"100%", width: "100%" } }
                         dangerouslySetInnerHTML = { { __html } } />
+                <OEmbedSize width = { width } height = { height } />
             </div>
+}
+
+const OEmbedSize = function ({ width, height })
+{
+    const style =
+    {
+        color:"red",
+        padding: "10px",
+        textAlign: "center",
+        fontFamily: SystemFontFamily,
+        fontWeight: "bold"
+    };
+
+    return  <div style = { style } >
+                <span className = "dynamic-width">{width}</span>
+                &nbsp;×&nbsp;
+                <span className = "dynamic-height">{height}</span>
+            </div>;
 }
 
 const OEmbedCalloutStyle =
