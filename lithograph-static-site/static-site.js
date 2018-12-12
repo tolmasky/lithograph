@@ -19,7 +19,7 @@ module.exports = async function goto(browserContext, mounts, URL)
     page.removeListener("pageerror", onError);
 
 //    await this.setRequestInterception(false);
-console.log(errors);
+// console.log(errors);
 //    if (errors.length > 0)
 //        throw errors[0];
     return page;
@@ -46,7 +46,7 @@ function proxies(mounts)
 }
 
 function proxy(URL, path)
-{console.log("ROUTE: " + `${URL}/*rest`);
+{//console.log("ROUTE: " + `${URL}/*rest`);
     const route = new Route(`${URL}/*rest`);
     const match = URL =>
         (matches => matches && `${path}/${matches.rest}`)
