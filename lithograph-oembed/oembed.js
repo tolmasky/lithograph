@@ -3,7 +3,7 @@ const { Map, Set } = require("@algebraic/collections");
 const fromTable = require("@lithograph/plugin/from-table");
 const { Failure, Variable } = require("@lithograph/remark/parse-type");
 const Section = require("@lithograph/ast/section");
-console.log(Variable);
+
 const Format = union `Format` (
     data `JSON` (),
     data `XML` () );
@@ -25,18 +25,26 @@ module.exports = function OEmbedPlugin(section)
     if (Failure.is(specification))
         throw TypeError(specification.message);
 
-    const { formats, maxwidths } = specification;
-    const transformed = subsections.map(subsection =>
-        transformCase(subsection, specification));
-
-    console.log(specification);
-
-    return Section({ ...section, subsections: transformed });
+    return transformCases(section, specification);
 }
 
-var i=0;
+function transformCases(section, specification)
+{
+    const subsections = section.subsections.map(function (subsection)
+    {
+        const transformed = transformCase(subsection, specification);
+
+        return transformed === subsection ?
+            transformCases(subsection, specification) :
+            transformed;
+    });
+
+    return Section({ ...section, subsections });
+}
+
 const transformCase = (function ()
 {
+    var i = 0;
     const testCases = Map(string, string)
         (["json-response-implemented", "rich"]
             .map(name =>
@@ -45,13 +53,14 @@ const transformCase = (function ()
     return function transformCase(section, specification)
     {
         const x = specification;
-        const URLTestCase = data `URLTestCase${i++}` (
+        const URLTestCase = data ([`URLTestCase${i++}`]) (
             dirname         => [string, __dirname],
             URL             => Variable(string),
             width           => number,
             type            => string, // FIXME: Make enum.
+            onReady         => Variable(Function),
             specification   => [Specification, x]);
-    
+
         const { preamble } = section;
         const table = preamble.last();
 

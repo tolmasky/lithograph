@@ -22,6 +22,7 @@ module.exports = async function goto(browserContext, mounts, URL)
 console.log(errors);
 //    if (errors.length > 0)
 //        throw errors[0];
+    return page;
 }
 
 function proxies(mounts)

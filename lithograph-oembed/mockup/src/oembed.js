@@ -55,7 +55,7 @@ const OEmbedContainer = function ({ data, keyPath, update })
 
     const result = data.result;
     const __html = result.get("iframe").outerHTML;
-    const id = JSON.stringify(keyPath);
+    const id = keyPath.join("-");
     const width = data.width;
     const height = data.height;
     const style = Object.assign({ }, IFrameContainerStyle, { height });
