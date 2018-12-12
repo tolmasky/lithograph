@@ -52,7 +52,7 @@ module.exports = function (type, templateArguments = false)
             (_, name) => toIdentifier(name)) +
             `\n(()=>(${replacements.keySeq().join(",")}))`;
         const placeholderPattern =
-            new RegExp(`^${replacements.keySeq().join("|")}$`);console.log(replacements);
+            new RegExp(`^${replacements.keySeq().join("|")}$`);
         const transformed = program(fixedSyntax,
         {
             allowAwaitOutsideFunction: true,

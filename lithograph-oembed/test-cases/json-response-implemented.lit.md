@@ -8,7 +8,6 @@ const response = (await (await fetch(oembedURL)).json());
 
 expect(response.provider_url).toBe({%specification.providerURL%});
 //expect(response.height).toBe(329);
-console.log(`${{%specification.APIEndpoint%}}?${query}`);
 expect(response.width).toBe({%width%});
 expect(response.version).toBe("1.0");
 expect(response.provider_name).toBe({%specification.providerName%});
