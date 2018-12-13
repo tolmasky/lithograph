@@ -1,5 +1,5 @@
 const { program } = require("@babel/template");
-const { data, string, getKind, parameterized, primitives } = require("@algebraic/type");
+const { is, data, union, string, getUnscopedTypename, getKind, parameterized, primitives } = require("@algebraic/type");
 const { List, Map, Set } = require("@algebraic/collections");
 const { Variable } = require("@lithograph/remark/parse-type");
 const toExpression = require("@lithograph/ast/value-to-expression");
@@ -11,16 +11,25 @@ const flattened = (type, value, path = "") =>
     isSetOrList(type) ? [] :
         //value.toArray().map(key => [path, value]) :
     Variable.is(value) ? [[path, value.name]] :
+    getKind(type) === union ? flattenedUnion(type, value, path) :
     getKind(type) === data ? flattenedData(type, value, path) :
     type === primitives.string ? [[path, `"${value}"`]] :
     type === URL ? [[path, `new URL("${value}")`]] :
     [[path, toExpression(value)]];
+const flattenedUnion = (type, value, path) =>
+    flattened(
+        union.components(type)
+            .find(type => is(type, value)),
+        value,
+        path);
 const flattenedData = (type, value, path) =>
-    [].concat(...data.fields(type)
-        .map(([key, type]) =>
-            [append(path, key), type, value[key]])
-        .map(([path, type, value]) =>
-            flattened(type, value, path)));
+    type === value ?
+        [[path, `"${getUnscopedTypename(value)}"`]] :
+        [].concat(...data.fields(type)
+            .map(([key, type]) =>
+                [append(path, key), type, value[key]])
+            .map(([path, type, value]) =>
+                flattened(type, value, path)));
 
 
 module.exports = function (type, templateArguments = false)

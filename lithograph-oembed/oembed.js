@@ -12,7 +12,8 @@ const Specification = data `Specification` (
     APIEndpoint     => string,
     providerName    => string,
     providerURL     => string,
-    formats         => Set(Format),
+    formats         => [Set(Format), Set(Format)([Format.JSON, Format.XML])],
+    defaultFormat   => Format,
     maxwidths       => Set(number) );
 
 
@@ -49,10 +50,17 @@ const URLVariable = union `URLVariable` (
 const transformCase = (function ()
 {
     var i = 0;
-    const testCases = Map(string, string)
-        (["json-response-implemented", "rich"]
-            .map(name =>
-                [name, `${__dirname}/test-cases/${name}.lit.md`]));
+    const testCases = Map(string, Function)
+    ({
+        "default-format-response":
+            tc => true,
+        "json-response-implemented":
+            tc => tc.specification.formats.has(Format.JSON),
+        "xml-response-unimplemented":
+            tc => !tc.specification.formats.has(Format.XML),
+        "rich":
+            tc => tc.type === "rich"
+    }).mapKeys(name => `${__dirname}/test-cases/${name}.lit.md`);
 
     return function transformCase(section, specification)
     {
@@ -77,9 +85,10 @@ const transformCase = (function ()
         if (Failure.is(testCaseArguments))
             throw TypeError(testCaseArguments.message);
 
-        const children = ["json-response-implemented", "rich"]
-            .map(name => Section.fromMarkdown(
-                testCases.get(name),
+        const children = testCases
+            .filter(predicate => predicate(testCaseArguments))
+            .map((_, filename) => Section.fromMarkdown(
+                filename,
                 URLTestCase,
                 testCaseArguments));
         const subsections = section.subsections.concat(children);
