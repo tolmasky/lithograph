@@ -12,7 +12,8 @@ Resource.fromMarkdownNode = function (node)
 
     if (type !== "blockquote" ||
         children.length !== 2 ||
-        children[0].type !== "paragraph")
+        children[0].type !== "paragraph" ||
+        children[1].type === "table")
         return false;
 
     const name = getInnerText(children[0]);
