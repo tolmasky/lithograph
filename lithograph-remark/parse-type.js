@@ -93,7 +93,7 @@ parse.variable = transformInlineCode(function (type, value)
 {
     return /^[$A-Z_][0-9A-Z_$]*$/i.test(value) ?
         type({ name: value }) :
-        fail(type, `Expected variable, but instead got ${value}`);
+        Failure(type)({ message: `Expected variable, but instead got ${value}` });
 });
 
 function transformEnum(...args)

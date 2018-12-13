@@ -2,7 +2,8 @@
 
 ```javascript (templated)
 const site = require("@lithograph/static-site");
-const query = [0, {%URL%}, 0]
+const URL = {%URL%};
+const query = [0, URL, 0]
     .reduce((params, value) =>
         (params.append("items", value), params),
         new URLSearchParams()) + "";
@@ -18,5 +19,5 @@ await page.waitForSelector(iframeSelector);
 const iframeElement = await page.$("#items-1 iframe");
 const iframeFrame = await iframeElement.contentFrame();
 
-await ({%onReady%})(iframeFrame);
+await ({%onReady%})(iframeFrame, URL);
 ```

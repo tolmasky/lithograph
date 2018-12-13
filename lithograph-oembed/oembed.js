@@ -42,6 +42,10 @@ function transformCases(section, specification)
     return Section({ ...section, subsections });
 }
 
+const URLVariable = union `URLVariable` (
+    Variable(string),
+    string);
+
 const transformCase = (function ()
 {
     var i = 0;
@@ -53,9 +57,10 @@ const transformCase = (function ()
     return function transformCase(section, specification)
     {
         const x = specification;
+
         const URLTestCase = data ([`URLTestCase${i++}`]) (
             dirname         => [string, __dirname],
-            URL             => Variable(string),
+            URL             => URLVariable,
             width           => number,
             type            => string, // FIXME: Make enum.
             onReady         => Variable(Function),
