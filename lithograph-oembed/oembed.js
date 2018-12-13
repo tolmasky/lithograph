@@ -52,6 +52,8 @@ const transformCase = (function ()
     var i = 0;
     const testCases = Map(string, Function)
     ({
+        "missing-url-response":
+            tc => true,
         "default-format-response":
             tc => true,
         "json-response-implemented":
