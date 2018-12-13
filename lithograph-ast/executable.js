@@ -96,7 +96,7 @@ Executable.fromSection = (function ()
                 fragment ? fragments.push(fragment) : fragments)
                 (Fragment.fromMarkdownNode(node, filename), accumulated[0]);
             const resources = ((resource, resources) => resource ?
-                resources.set(resource.name, resource.content) : resources)
+                resources.set(resource.name, resource) : resources)
                 (Resource.fromMarkdownNode(node, filename), accumulated[1]);
     
             return [fragments, resources];

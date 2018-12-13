@@ -128,8 +128,8 @@ const inlineStatementsFromTest = (function ()
     {
         const { fragments, block: { id } } = testPath.test;
         const concatenated = fragments.flatMap(parseFragment);
-        const getResource = URL => getResource(testPath, URL);
-        const transformed = transformStatements(concatenated, { getResource });
+        const transformed = transformStatements(concatenated,
+            { getResource: URL => getResource(testPath, URL) });
 
         return transformed;
     }
@@ -185,10 +185,12 @@ function getResource(executablePath, URL)
     if (executablePath === Path.Root)
         throw ReferenceError(`Resource "${URL}" is not defined.`);
 
-    const { resources } = executablePath.executable;
+    const { block: { resources } } = is(Path(Suite), executablePath) ?
+        executablePath.suite :
+        executablePath.test;
 
     if (resources.has(URL))
-        return resources.get(URL);
+        return resources.get(URL).content;
 
     return getResource(executablePath.parent, URL);
 }
