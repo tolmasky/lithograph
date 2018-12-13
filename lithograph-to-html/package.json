@@ -1,0 +1,16 @@
+{
+  "name": "@lithograph/to-html",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Francisco Ryan Tolmasky I",
+  "license": "MIT",
+  "dependencies": {
+    "hast-util-to-html": "^5.0.0",
+    "mdast-util-to-hast": "^4.0.0"
+  }
+}

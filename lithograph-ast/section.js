@@ -3,9 +3,10 @@ const { List, Stack } = require("@algebraic/collections");
 const template = require("./template");
 
 const Section = data `Section` (
-    depth => number,
-    heading => Object,
-    preamble => [List(Object), List(Object)()],
+    type        => [string, "Section"],
+    depth       => number,
+    heading     => Object,
+    preamble    => [List(Object), List(Object)()],
     subsections => [SectionList, SectionList()] );
 const SectionList = List(Section);
 
