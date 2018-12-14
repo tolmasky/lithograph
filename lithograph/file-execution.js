@@ -34,12 +34,13 @@ const FileExecution = Cause("FileExecution",
 
     [field `pool`]: Pool.create({ count: 100 }),
 
-    init: ({ path: filename, workspace }) =>
+    init: ({ file, workspace }) =>
     {
+        const { filename, id } = file;
         const section = Section.fromMarkdown(filename);
         const hast = toHAST(section);
-
-        write(`${workspace}/somefile.json`, JSON.stringify(hast), "utf-8");
+console.log(toHTML(hast));
+        write(`${workspace}/${id}.json`, JSON.stringify(hast), "utf-8");
 
         const suite = Suite.fromSection(section, filename);
         const garbageCollector = GarbageCollector.create({ });

@@ -1,10 +1,15 @@
 require("source-map-support").install({ hookRequire: true });
 
+const { declare, data } = require("@algebraic/type");
+const LitFile = require("./lit-file");
 const { Cause, IO, field, event, update } = require("@cause/cause");
 const FileExecution = require("./file-execution");
 const GarbageCollector = require("./garbage-collector");
 const Result = require("@lithograph/status/result");
 const Log = require("./log");
+
+const FIXME_ANY = declare({ is: () => true, serialize:[()=>0,true],deserialize:()=>undefined });
+const Execute = data `Execute` ( file => LitFile, fromKeyPath => [FIXME_ANY, null] );
 
 
 const FileProcess = Cause("FileProcess",
@@ -23,12 +28,11 @@ const FileProcess = Cause("FileProcess",
     [event._on(Log)]: (fileProcess, log) =>
         [fileProcess, [log.update("fromKeyPath", () => undefined)]],
 
-    [event.in `Execute`]: { path:-1 },
-    [event.on `Execute`]: (fileProcess, { path }) =>
+    [event._on (Execute)]: (fileProcess, { file }) =>
     {
         const fileExecution = FileExecution.create(
         {
-            path,
+            file,
             workspace: fileProcess.workspace
         });
 
@@ -56,5 +60,12 @@ const FileProcess = Cause("FileProcess",
             ["fileExecution", "garbageCollector"],
             GarbageCollector.Allocated({ id, resource: endpoint }))
 });
+
+Execute.prototype.update = function (key, f)
+{
+    return Execute({ ...this, [key]: f(this[key]) });
+}
+
+FileProcess.Execute = Execute;
 
 module.exports = FileProcess;

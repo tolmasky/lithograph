@@ -11,10 +11,10 @@ const Result = require("@lithograph/status/result");
 const Log = require("./log");
 
 
-module.exports = async function main(paths, options)
+module.exports = async function main(files, options)
 {
     const promise =
-        IO.toPromise(Main.create({ ...options, paths }));
+        IO.toPromise(Main.create({ ...options, files }));
 
     return await promise;
 }
@@ -22,23 +22,22 @@ module.exports = async function main(paths, options)
 const Main = Cause("Main",
 {
     [field `title`]: -1,
-    [field `paths`]: -1,
+    [field `files`]: -1,
     [field `results`]: List(),
 
     [field `browserPool`]: -1,
     [field `fileProcessPool`]: -1,
 
-    init({ paths: iterable, title, concurrency, requires, headless, workspace })
+    init({ files: iterable, title, concurrency, requires, headless, workspace })
     {
-        const paths = List(iterable);
-
+        const files = List(iterable);
         const browserPool = Pool.create(
             { items: Repeat(Browser.create({ headless }), concurrency) });
         const fork = Fork.create({ type: FileProcess, fields: { workspace, requires } });
         const fileProcessPool = Pool.create(
             { items: Repeat(fork, concurrency) });
 
-        return { fileProcessPool, browserPool, paths, title };
+        return { fileProcessPool, browserPool, files, title };
     },
 
     [event._on(Log)]: (main, log) => (console.log(log.message), [main, []]),
@@ -51,7 +50,7 @@ const Main = Cause("Main",
             "fileProcessPool",
             Pool.Release({ indexes: [index] }));
         const { results } = updated;
-        const finished = results.size === main.paths.size;
+        const finished = results.size === main.files.size;
 
         if (!finished)
             return [updated, events];
@@ -65,18 +64,18 @@ const Main = Cause("Main",
 
     [event.on (Pool.Retained) .from `fileProcessPool`](main, event)
     {
-        const { request: path, index } = event;
+        const { request: file, index } = event;
 
         return update.in(
             main,
             ["fileProcessPool", "items", index],
-            FileProcess.Execute({ path }));
+            FileProcess.Execute({ file }));
     },
 
     [event.on (Cause.Start)]: main =>
         update.in(main,
             "fileProcessPool",
-            Pool.Enqueue({ requests: main.paths })),
+            Pool.Enqueue({ requests: main.files })),
 
 
     [event.on (FileProcess.EndpointRequest)](main, { id, fromKeyPath })
