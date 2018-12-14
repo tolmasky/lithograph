@@ -30,10 +30,11 @@
     "@lithograph/ast": "1.0.0-alpha.26",
     "@lithograph/compile": "1.0.0-alpha.26",
     "@lithograph/plugin": "1.0.0-alpha.26",
-    "@lithograph/status": "1.0.0-alpha.26",
     "@lithograph/remark": "1.0.0-alpha.26",
+    "@lithograph/status": "1.0.0-alpha.26",
     "babel-core": "^6.26.3",
     "babel-template": "^6.26.0",
+    "bson": "^4.0.1",
     "commander": "^2.15.1",
     "expect": "^23.3.0",
     "fast-glob": "^2.2.2",
@@ -43,7 +44,9 @@
     "moment": "^2.22.2",
     "node-fetch": "^2.1.2",
     "puppeteer": "1.10.0",
-    "source-map-support": "^0.5.9"
+    "sf-fs": "^2.0.0",
+    "source-map-support": "^0.5.9",
+    "uuid": "^3.3.2"
   },
   "devDependencies": {
     "browserify": "^16.2.3"

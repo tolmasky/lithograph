@@ -1,6 +1,7 @@
 const { is } = require("@algebraic/type");
 const { Map } = require("immutable");
 const { Cause, IO, field, event, update } = require("@cause/cause");
+const Section = require("@lithograph/ast/section");
 const { Test, Suite } = require("@lithograph/ast");
 const { Status, Result } = require("@lithograph/status");
 const { Reason } = Result.Failure;
@@ -10,6 +11,11 @@ const Pool = require("@cause/pool");
 const compile = require("@lithograph/compile");
 const GarbageCollector = require("./garbage-collector");
 const toEnvironment = require("./file-execution/to-environment");
+const toHAST = require("@lithograph/to-html/to-hast");
+const { write } = require("sf-fs");
+//const { serialize } = require("@lithograph/to-html/serialize");
+const fast = require("@lithograph/to-html/fast");
+const toHTML = require("@lithograph/to-html/to-html");
 
 
 require("./magic-ws-puppeteer");
@@ -28,9 +34,14 @@ const FileExecution = Cause("FileExecution",
 
     [field `pool`]: Pool.create({ count: 100 }),
 
-    init: ({ path: filename }) =>
+    init: ({ path: filename, workspace }) =>
     {
-        const suite = Suite.fromMarkdown(filename);
+        const section = Section.fromMarkdown(filename);
+        const hast = toHAST(section);
+
+        write(`${workspace}/somefile.json`, JSON.stringify(hast), "utf-8");
+
+        const suite = Suite.fromSection(section, filename);
         const garbageCollector = GarbageCollector.create({ });
 
         return { suite, garbageCollector, filename };

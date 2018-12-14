@@ -1,9 +1,9 @@
 const { data, deserialize, serialize, union, declare, string, getTypename, parameterized } = require("@algebraic/type");
-const Section = require("@lithograph/ast/section");
-const section = Section.fromMarkdown("/Users/tolmasky/Desktop/test-serial-1.lit.md");
-const toHTML = require("mdast-util-to-hast");
-const all = require("mdast-util-to-hast/lib/all");
-const toHTMLString = require("hast-util-to-html");
+
+module.exports.serialize = function (node)
+{
+    return serialize(Element, node);
+}
 
 const array = parameterized (T =>
 {
@@ -48,24 +48,3 @@ const Element = Node("element",
 const Text = Node("text",
     data `Text` (
         value       => string ));
-
-
-
-const fromSection = function (h, section)
-{
-    const { preamble, subsections, heading } = section;
-    const title = heading ? [heading] : [];
-    const children = title.concat(preamble.toArray(), subsections.toArray());
-
-    return h(section, "section", all(h, { children }));
-}
-
-//console.log(toHTMLString(toHTML(section, { handlers: { Section: fromSection } })));
-console.log(JSON.stringify(toHTML(section, { handlers: { Section: fromSection } }), null, 2));
-console.log(JSON.stringify(deserialize(Element, serialize(Element, toHTML(section, { handlers: { Section: fromSection } }))), null, 2))
-
-
-module.exports = function (section)
-{
-    
-}

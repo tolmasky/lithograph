@@ -9,6 +9,9 @@ const toJUnitXML = require("../to-junit-xml");
 const { resolve } = require("path");
 const moment = require("moment");
 
+const uuid = require("uuid").v4;
+const { tstat, mkdirp } = require("sf-fs");
+
 const options = require("commander")
     .version(require("../package").version)
     .option("-c, --concurrency [concurrency]",
@@ -38,6 +41,7 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 
     options.requires = options.require.map(path => resolve(path));
     options.title = `${moment().format("YYYY-MM-DD-HH.mm.ss")}`;
+    options.workspace = tmp();
 
     const start = Date.now();
     const result = await main(paths, options);
@@ -67,3 +71,9 @@ function fail(...args)
     process.exit(1);
 }
 
+function tmp(extname)
+{
+    const path = `/tmp/lithograph/${uuid()}${extname || ""}`;
+
+    return tstat(path) ? tmp() : (mkdirp(path), path);
+}

@@ -12,11 +12,12 @@ const FileProcess = Cause("FileProcess",
     // FIXME: Make this not necessary...
     // Instead, some sort of compound Ready would be nice, since this
     // should really be in an IO.
-    init: ({ requires }) =>
-        (requires.map(path => require(path)), { }),
+    init: ({ requires, workspace }) =>
+        (requires.map(path => require(path)), { workspace }),
 
     [event.on (Cause.Start)]: event.ignore,
 
+    [field `workspace`]: -1,
     [field `fileExecution`]: -1,
 
     [event._on(Log)]: (fileProcess, log) =>
@@ -25,7 +26,11 @@ const FileProcess = Cause("FileProcess",
     [event.in `Execute`]: { path:-1 },
     [event.on `Execute`]: (fileProcess, { path }) =>
     {
-        const fileExecution = FileExecution.create({ path });
+        const fileExecution = FileExecution.create(
+        {
+            path,
+            workspace: fileProcess.workspace
+        });
 
         return update.in(
             fileProcess.set("fileExecution", fileExecution),

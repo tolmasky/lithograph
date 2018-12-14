@@ -61,18 +61,17 @@ Executable.List = List(Executable);
 Executable.Block = Block;
 Executable.Suite.Mode = Mode;
 
-Suite.fromMarkdown = (function ()
+Suite.fromSection = (function ()
 {
     const Module = require("module");
     const { dirname } = require("path");
 
-    return function fromMarkdown (filename)
+    return function fromSection (section, filename)
     {
         const paths = Module._nodeModulePaths(dirname(filename));
         const module = Object.assign(
             new Module(filename),
             { filename, paths, loaded: true });
-        const section = Section.fromMarkdown(filename);
 
         return Executable.fromSection(section, module)[0];
     }
