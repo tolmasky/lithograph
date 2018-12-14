@@ -31,6 +31,11 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
         [].concat(...patterns.map(pattern => glob.sync(pattern)))))
         .map(path => resolve(path));
 
+    if (paths.length <= 0)
+        return fail(
+            `\nNo files to process, perhaps there is a typo in your pattern:` +
+            `\n${patterns.map(pattern => `   ${pattern}`).join("\n")}\n`);
+
     options.requires = options.require.map(path => resolve(path));
     options.title = `${moment().format("YYYY-MM-DD-HH.mm.ss")}`;
 
@@ -50,10 +55,15 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
     //console.log(require("fs").readFileSync(filename, "utf-8"));
 
     if (is(Result.Failure, result))
-    {
-        console.log("TESTS FAILED TO PASS");
-        process.exit(1);
-    }
+        return fail("TESTS FAILED TO PASS")
 
     console.log("ALL ENABLED TESTS PASSED");
 })();
+
+
+function fail(...args)
+{
+    console.error(...args);
+    process.exit(1);
+}
+
