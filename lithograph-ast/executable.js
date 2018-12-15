@@ -61,21 +61,10 @@ Executable.List = List(Executable);
 Executable.Block = Block;
 Executable.Suite.Mode = Mode;
 
-Suite.fromSection = (function ()
+Suite.fromSection = function (section)
 {
-    const Module = require("module");
-    const { dirname } = require("path");
-
-    return function fromSection (section, filename)
-    {
-        const paths = Module._nodeModulePaths(dirname(filename));
-        const module = Object.assign(
-            new Module(filename),
-            { filename, paths, loaded: true });
-
-        return Executable.fromSection(section, module)[0];
-    }
-})();
+    return Executable.fromSection(section)[0];
+}
 
 Executable.fromSection = (function ()
 {
@@ -88,7 +77,7 @@ Executable.fromSection = (function ()
         (([title, key = "Concurrent"], disabled) =>
             ({ disabled, title, mode: Suite.Mode[key] }))
         (getInnerText(heading).split(modeRegExp), isCrossedOut(heading));
-    const fromPreamble = (preamble, { filename }) =>
+    const fromPreamble = (preamble, filename) =>
         preamble.reduce(function (accumulated, node)
         {
             const fragments = ((fragment, fragments) =>
@@ -101,17 +90,16 @@ Executable.fromSection = (function ()
             return [fragments, resources];
         }, [Fragment.List(), ResourceMap()]);
 
-    return function fromSection(section, module, id = 0)
+    return function fromSection(section, id = 0)
     {
-        const { preamble, subsections } = plugin(section, module);
-
-        const [fragments, resources] = fromPreamble(preamble, module);
+        const { preamble, subsections } = section;
+        const [fragments, resources] = fromPreamble(preamble, section.filename);
         const hasTest = fragments.size > 0;
 
         const [children, next] = subsections.reduce(([children, id], section) =>
             (([executable, id]) =>
                 [executable ? children.push(executable) : children, id])
-            (fromSection(section, module, id)),
+            (fromSection(section, id)),
             [Executable.List(), hasTest ? id + 3 : id + 1]);
         const hasChildren = children.size > 0;
 
@@ -149,7 +137,5 @@ Executable.fromSection = (function ()
         return [suite, next];
     }
 })();
-
-
 
 module.exports = Executable;

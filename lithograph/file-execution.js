@@ -42,7 +42,7 @@ const FileExecution = Cause("FileExecution",
 console.log(toHTML(hast));
         write(`${workspace}/${id}.json`, JSON.stringify(hast), "utf-8");
 
-        const suite = Suite.fromSection(section, filename);
+        const suite = Suite.fromSection(section);
         const garbageCollector = GarbageCollector.create({ });
 
         return { suite, garbageCollector, filename };
