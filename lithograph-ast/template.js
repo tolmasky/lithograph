@@ -59,7 +59,7 @@ module.exports = function (type, templateArguments = false)
                 [toIdentifier(key), value]));
         const fixedSyntax = original.replace(syntax,
             (_, name) => toIdentifier(name)) +
-            `\n(()=>(${replacements.keySeq().join(",")}))`;
+            `\n{${replacements.keySeq().join(";")}}`;
         const placeholderPattern =
             new RegExp(`^${replacements.keySeq().join("|")}$`);
         const transformed = program(fixedSyntax,
@@ -68,6 +68,10 @@ module.exports = function (type, templateArguments = false)
             preserveComments: true,
             placeholderPattern
         })(replacements.toObject());
+
+        // Remove the appended code.
+        transformed.body.pop();
+
         const value = generate(transformed).code;
 
         return { ...node, value };
