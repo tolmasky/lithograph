@@ -13,9 +13,6 @@ const GarbageCollector = require("./garbage-collector");
 const toEnvironment = require("./file-execution/to-environment");
 const toHAST = require("@lithograph/to-html/to-hast");
 const { write } = require("sf-fs");
-//const { serialize } = require("@lithograph/to-html/serialize");
-const fast = require("@lithograph/to-html/fast");
-const toHTML = require("@lithograph/to-html/to-html");
 
 
 require("./magic-ws-puppeteer");
@@ -39,7 +36,7 @@ const FileExecution = Cause("FileExecution",
         const { filename, id } = file;
         const section = Section.fromMarkdown(filename);
         const hast = toHAST(section);
-console.log(toHTML(hast));
+
         write(`${workspace}/${id}.json`, JSON.stringify(hast), "utf-8");
 
         const suite = Suite.fromSection(section);

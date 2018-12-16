@@ -59,19 +59,26 @@ const patterns = options.args.length <= 0 ? ["**/*.test.md"] : options.args;
 
     console.log("Test Time: " + time + "ms");
     console.log("Total Time (including writing results): " + (Date.now() - start) + "ms");
+const s_=Date.now();
+
+    require("sf-fs").copy(
+        require.resolve("@lithograph/to-html/bootstrap-reboot.min.css"),
+        `${options.workspace}/bootstrap-reboot.min.css`);
 
     const fd = open(`${options.workspace}/r.html`, "wx");
+
+    write(fd, `<!DOCTYPE HTML><html><head><link rel="stylesheet" type="text/css" href = "./bootstrap-reboot.min.css"></link></head><body>`);
 
     for (const file of files)
     {
         const hastJSON = read(`${options.workspace}/${file.id}.json`, "utf-8");
         const hast = JSON.parse(hastJSON);
-console.log(hast);
+
         write(fd, toHTML(hast), "utf-8");
     }
 
     close(fd);
-    console.log(`${options.workspace}/r.html`);
+    console.log(`${options.workspace}/r.html ${Date.now() - s_}`);
     //console.log(require("fs").readFileSync(filename, "utf-8"));
 
     if (is(Result.Failure, result))
