@@ -9,13 +9,13 @@ const Format = union `Format` (
     data `XML` () );
 
 const Specification = data `Specification` (
+    URLSchemes      => Set(string),
     APIEndpoint     => string,
     providerName    => string,
     providerURL     => string,
     formats         => [Set(Format), Set(Format)([Format.JSON, Format.XML])],
     defaultFormat   => Format,
     maxwidths       => Set(number) );
-
 
 module.exports = function OEmbedPlugin(section)
 {
@@ -100,7 +100,32 @@ const transformCase = (function ()
 })();
 
 
+/*
+const OEmbed = data `OEmbed` (
+    validateURL     => Function,
+    APIEndpoint     => string,
+    providerName    => string,
+    providerURL     => string,
+    formats         => Set(Format),
+    defaultFormat   => Format,
+    maxwidths       => Set(number) );
 
+const toOEmbed = (function ()
+{
+    const Route = require("route-parser");
+    const toRoute = URL => URL.split("/")
+        .map((pc, index) => pc === "*" ? `:${index}` : pc)
+        .join("/");
+    const toValidateURL = schemes =>
+        (routes => URL =>
+            routes.some(route => route.match(URL)))
+        (schemes.toList().map(toRoute));
+
+    return ({ URLSchemes, ...rest }) =>
+        OEmbed({ ...rest, validateURL: toValidateURL(URLSchemes) });
+})();
+
+*/
 
 
 

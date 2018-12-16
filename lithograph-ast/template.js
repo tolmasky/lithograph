@@ -2,20 +2,24 @@ const { program } = require("@babel/template");
 const { is, data, union, string, getUnscopedTypename, getKind, parameterized, primitives } = require("@algebraic/type");
 const { List, Map, Set } = require("@algebraic/collections");
 const { Variable } = require("@lithograph/remark/parse-type");
+const t = require("@babel/types");
 const toExpression = require("@lithograph/ast/value-to-expression");
 
 const isSetOrList = type => 
     parameterized.is(Set, type) || parameterized.is(List, type);
 const append = (path, key) => path ? `${path}.${key}` : key;
 const flattened = (type, value, path = "") =>
-    isSetOrList(type) ? [] :
-        //value.toArray().map(key => [path, value]) :
-    Variable.is(value) ? [[path, value.name]] :
+    isSetOrList(type) ? flattenedCollection(type, value, path) :
+    Variable.is(value) ? [[path, t.identifier(value.name)]] :
     getKind(type) === union ? flattenedUnion(type, value, path) :
     getKind(type) === data ? flattenedData(type, value, path) :
-    type === primitives.string ? [[path, `"${value}"`]] :
+    type === primitives.string ? [[path, value]] :
     type === URL ? [[path, `new URL("${value}")`]] :
-    [[path, toExpression(value)]];
+    [[path, value]];
+const flattenedCollection = (type, value, path = "") =>
+    [[path, value.toArray()
+        .map(value => flattened(parameterized.parameters(type)[0], value, ""))
+        .map(value => value[0][1])]];
 const flattenedUnion = (type, value, path) =>
     flattened(
         union.components(type)
@@ -24,7 +28,7 @@ const flattenedUnion = (type, value, path) =>
         path);
 const flattenedData = (type, value, path) =>
     type === value ?
-        [[path, `"${getUnscopedTypename(value)}"`]] :
+        [[path, getUnscopedTypename(value)]] :
         [].concat(...data.fields(type)
             .map(([key, type]) =>
                 [append(path, key), type, value[key]])
@@ -37,7 +41,7 @@ module.exports = function (type, templateArguments = false)
     if (templateArguments === false) 
         return node => node;
 
-    const toIdentifier = keyPath =>
+    const toTemplateIdentifier = keyPath =>
         `FIXME_TEMPLATE_${keyPath.replace(/\./g, "_")}`;
     const { default: generate } = require("@babel/generator");
 
@@ -50,15 +54,16 @@ module.exports = function (type, templateArguments = false)
             original.indexOf("{%") === -1)
             return node;
 
-        const entries = flattened(type, templateArguments);
+        const entries = flattened(type, templateArguments)
+            .map(([path, value]) => [path, toExpression(value)]);
         const syntax = new RegExp(`{%(${entries
             .map(([path]) => path.replace(/\./g, "\\."))
             .join("|")})%}`, "g");
         const replacements = Map(string, Object)
             (entries.map(([key, value]) =>
-                [toIdentifier(key), value]));
+                [toTemplateIdentifier(key), value]));
         const fixedSyntax = original.replace(syntax,
-            (_, name) => toIdentifier(name)) +
+            (_, name) => toTemplateIdentifier(name)) +
             `\n(()=>(${replacements.keySeq().join(",")}))`;
         const placeholderPattern =
             new RegExp(`^${replacements.keySeq().join("|")}$`);
