@@ -82,6 +82,8 @@ const transformCase = (function ()
         if (table.type !== "table")
             return section;
 
+        if (getInnerText(table.children[0][1]) === "")
+
         const testCaseArguments = fromTable(URLTestCase, table);
 
         if (Failure.is(testCaseArguments))
