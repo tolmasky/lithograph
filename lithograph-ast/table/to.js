@@ -1,4 +1,4 @@
-const { string, data, union } = require("@algebraic/type");
+const { string, number, data, union } = require("@algebraic/type");
 const { Map } = require("@algebraic/collections");
 const toProduct = require("./to-product");
 const toType = require("./to-type");
@@ -39,10 +39,16 @@ const document = require("remark").parse(`
   | - | - |
   | **https://tonic.work/tonic-test** | \`Unsupported\` |
   | **https://tonic.work/api/tonic-test** | \`Unsupported\` |
-  | **https://tonic.work/tonic-test-2** |\`Success\` |`);
+  | **https://tonic.work/tonic-test-2** |\`Success\` |
+  | └ \`type\`  |\`rich\`                 |
+  | └ \`width\` | \`450\`               |`);
 
 const table = document.children[0];
-const Result = union `Result` (data `Unsupported` (), data `Success` () );
+const Result = union `Result` (
+    data `Unsupported` (),
+    data `Success` (
+        type    => string,
+        width   => number));
 
 console.log(module.exports(Map(string, Result), { table }));
 

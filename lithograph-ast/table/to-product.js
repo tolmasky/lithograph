@@ -40,3 +40,5 @@ module.exports = function toEntries({ table, headers = false })
 
     return Product({ header:{}, entries });
 }
+
+module.exports.Product = Product;

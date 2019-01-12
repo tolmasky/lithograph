@@ -1,8 +1,8 @@
 const { data, string, union, parameterized, is, getUnscopedTypename } = require("@algebraic/type");
-const { Map } = require("@algebraic/collections");
+const { List, Map } = require("@algebraic/collections");
 const { ParseStrategy, Reduction } = require("./parse-strategy");
 const { parse, Failure } = require("@lithograph/remark/parse-type");
-const { Entry } = require("./to-pairs");
+const { Product } = require("./to-product");
 
 const Unset = data `Unset` ();
 const WorkingArgumentOf = parameterized (T =>
@@ -19,15 +19,15 @@ const WorkingArgumentsOf = parameterized (A =>
 module.exports = function toData(type, item)
 {
     if (data.fields(type).length === 0)
-    {
-        return  is(Entry, item) ?
+        return  is(Product, item) ?
                     Failure(type)({ message: "not this" }) :
                 item.children.length !== 1 ||
                 item.children[0].type !== "inlineCode" ||
                 item.children[0].value !== getUnscopedTypename(type) ?
                     Failure(type)({ message: "not this" }) :
                     type;
-}
+
+    const { entries } = item;
     const strategies = ParseStrategy.for(type);
     const WorkingArguments = WorkingArgumentsOf(type);
     const working = entries.reduce(function (working, entry)
