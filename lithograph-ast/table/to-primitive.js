@@ -1,29 +1,85 @@
-const toEntries = require("./to-entries");
+const { primitives } = require("@algebraic/type");
 
 
-module.exports = function toPrimitive(type, entries)
+module.exports = function toPrimitive(type, tableColumn)
 {
-    if (entries.size !== 1)
-        return fail(type,
-            `${type} expected single table entry, but got ${entries.size}.`);
-
-    const name = Object.keys(primitives)
-        .find(key => primitives[key] === type);
-
-    return to[name](type, entries.get(0));
+    return  type === primitives.string ? toString(tableColumn) :
+            type === primitives.number ? toNumber(tableColumn) :
+            type === primitives.boolean ? toBoolean(tableColumn) :
+            type === primitives.regexp ? toRegExp(tableColumn) :
+            fail(type, "Unexpected.");
 }
 
-function toString(type, tableColumn)
-{
+function toString(tableColumn)
+{console.log("HEY", tableColumn);
     const [child] = tableColumn.children;
-
+console.log(child);
     if (child.type === "link")
         return child.value;
 
     if (child.type === "inlineCode")
-        return child.value;
+        try
+        {
+            const string = JSON.parse(child.value);
+
+            return typeof string === "string" ?
+                string :
+                fail();
+        }
+        catch (e) { return fail("not a string.") };
 
     const message = `string can only be a link or inline code markdown element.`;
+
+    return fail(type, message);
+}
+/*
+
+parse.boolean = transformEnum({ true: true, false: false });
+parse.number = transformInlineCode((_, value) => +value);
+parse.regexp = transformInlineCode((_, value) =>
+    (([, pattern, flags]) => new RegExp(pattern, flags))
+    (value.match(/\/(.*)\/([gimuy]*)$/)));
+
+parse.variable = transformInlineCode(function (type, value)
+{
+    return /^[$A-Z_][0-9A-Z_$]*$/i.test(value) ?
+        type({ name: value }) :
+        Failure(type)({ message: `Expected variable, but instead got ${value}` });
+});
+
+function transformEnum(...args)
+{
+    if (args.length < 3)
+        return (...more) => transformEnum(...args, ...more);
+
+    const [values, ...rest] = args;
+
+    return transformInlineCode(function (type, value)
+    {
+        if (hasOwnProperty.call(values, value))
+            return values[value];
+
+        const quoted = Object.keys(values).map(value => `"${value}"`);
+        const message = `${type} must be one of either ${quoted.join(", or ")}`;
+
+        return Failure(type)({ message });
+    }, ...rest);
+}
+
+function transformInlineCode(...args)
+{
+    if (args.length < 3)
+        return (...more) => transformInlineCode(...args, ...more);
+
+    const [f, type, list] = args;
+    const { node, next } = list;
+
+    if (node.type === "inlineCode")
+        return [f(type, node.value), next];
+
+    const message =
+        `${getTypename(type)} expects a single inline ` +
+        `code markdown element, but instead found ${node.type}`
 
     return fail(type, message);
 }
@@ -132,5 +188,5 @@ console.log(module.exports("t", { table }));
 
 
 
-
+*/
 
