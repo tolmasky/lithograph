@@ -1,8 +1,11 @@
 const { data, string, union, parameterized, primitive, is, getKind } = require("@algebraic/type");
 const { List, Map, Set } = require("@algebraic/collections");
+const { parse, Failure } = require("@lithograph/remark/parse-type");
 
 
-module.exports = function toType(type, item)
+module.exports = toType;
+
+function toType(type, item)
 {
     const kind = getKind(type);
 console.log(kind);
