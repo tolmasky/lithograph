@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/oembed",
-  "version": "1.0.0-alpha.28",
+  "version": "1.0.0-alpha.29",
   "description": "",
   "main": "oembed.js",
   "scripts": {
@@ -13,9 +13,9 @@
     "route-parser": "0.0.5"
   },
   "peerDependencies": {
-    "@algebraic/type": "1.0.0-alpha.4",
-    "@algebraic/collections": "1.0.0-alpha.4",
-    "@lithograph/static-site": "1.0.0-alpha.26"
+    "@algebraic/type": "1.0.0-alpha.6",
+    "@algebraic/collections": "1.0.0-alpha.6",
+    "@lithograph/static-site": "1.0.0-alpha.29"
   },
   "devDependencies": {
     "babel-core": "^6.26.3",

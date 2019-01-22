@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/status",
-  "version": "1.0.0-alpha.28",
+  "version": "1.0.0-alpha.29",
   "description": "",
   "main": "status.js",
   "scripts": {
@@ -10,9 +10,9 @@
   "author": "Francisco Ryan Tolmasky I",
   "license": "MIT",
   "peerDependencies": {
-    "@algebraic/type": "1.0.0-alpha.4",
-    "@algebraic/collections": "1.0.0-alpha.4",
-    "@lithograph/ast": "1.0.0-alpha.26",
+    "@algebraic/type": "1.0.0-alpha.6",
+    "@algebraic/collections": "1.0.0-alpha.6",
+    "@lithograph/ast": "1.0.0-alpha.29",
     "immutable": "^3.8.2"
   }
 }
