@@ -9,7 +9,7 @@ const Format = union `Format` (
     data `XML` () );
 
 const Specification = data `Specification` (
-    URLSchemes      => Set(string),
+//    URLSchemes      => Set(string),
     APIEndpoint     => string,
     providerName    => string,
     providerURL     => string,
