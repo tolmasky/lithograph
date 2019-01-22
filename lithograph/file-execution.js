@@ -79,13 +79,13 @@ const FileExecution = Cause("FileExecution",
     // FIXME: Shouldn't need to do this with keyPath. Right?
     [event.on (GarbageCollector.Allocate)]: (fileExecution, event) => {
     //console.log(event, event.update("fromKeyPath", fromKeyPath => fromKeyPath.next));
-        return [fileExecution, [event.update("fromKeyPath", fromKeyPath => fromKeyPath.next)]]
+        return [fileExecution, [event]]
     },
 
     // FIXME: Shouldn't need to do this with keyPath. Right?
     [event.on (GarbageCollector.Deallocate)]: (fileExecution, event) => {
     //console.log(event, event.update("fromKeyPath", fromKeyPath => fromKeyPath.next));
-        return [fileExecution, [event.update("fromKeyPath", fromKeyPath => fromKeyPath.next)]]
+        return [fileExecution, [event]]
     },
 
     [event.in `Report`]: { testPath:-1, test:-1, index: -1, report:-1, start:-1 },

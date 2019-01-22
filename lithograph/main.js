@@ -43,9 +43,8 @@ const Main = Cause("Main",
 
     [event._on(Log)]: (main, log) => (console.log(log.message), [main, []]),
 
-    [event._on(Result.Suite)] (main, result)
+    [event._on(Result.Suite)] (main, result, [,, index])
     {
-        const [,, index] = result.fromKeyPath;
         const [updated, events] = update.in(
             main.update("results", results => results.push(result)),
             "fileProcessPool",
@@ -79,17 +78,15 @@ const Main = Cause("Main",
             Pool.Enqueue({ requests: main.paths })),
 
 
-    [event.on (FileProcess.EndpointRequest)](main, { id, fromKeyPath })
+    [event.on (FileProcess.EndpointRequest)](main, { id }, [,, fromFileProcess])
     {
-        const [,, fromFileProcess] = fromKeyPath;
         const requests = [List.of(fromFileProcess, id)];
 
         return update.in(main, "browserPool", Pool.Enqueue({ requests }));
     },
 
-    [event.on (FileProcess.EndpointRelease)](main, { ids, fromKeyPath })
+    [event.on (FileProcess.EndpointRelease)](main, { ids }, [,, fromFileProcess])
     {
-        const [,, fromFileProcess] = fromKeyPath;
         const requests = ids.map(id => List.of(fromFileProcess, id));
         const occupied = main.browserPool.occupied;
         const indexes = requests
@@ -100,7 +97,7 @@ const Main = Cause("Main",
             indexes.map(index => [["browserPool", "items", index], Browser.Reset()]));
     },
 
-    [event.on (Browser.DidReset)]: (main, { fromKeyPath: [,,index] }) =>
+    [event.on (Browser.DidReset)]: (main, _, [,, index]) =>
         update.in(main, "browserPool", Pool.Release({ indexes: [index] })),
 
     [event.on (Pool.Retained) .from `browserPool`](main, event)

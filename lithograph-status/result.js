@@ -1,18 +1,15 @@
 const { is, data, union, string, number, declare } = require("@algebraic/type");
 const { List } = require("@algebraic/collections");
 const { Test, Suite } = require("@lithograph/ast");
-const FIXME_ANY = declare({ is: () => true, serialize:[()=>0,true],deserialize:()=>undefined });
 
 
 const result = ([name]) => 
     (testFields, suiteFields) => union([name]) (
         data `Test` (
             ...testFields,
-            fromKeyPath => [FIXME_ANY, null],
             test => Test ),
         data `Suite` (
             ...suiteFields,
-            fromKeyPath => [FIXME_ANY, null],
             suite => Suite) );
 
 const Reason = union `Reason` (
@@ -45,16 +42,6 @@ const Result = union `Result` (
     result `Failure` (
         [duration => Duration, reason => Reason],
         [children => List(Result)]) );
-
-Result.Success.Suite.prototype.update = function (key, f)
-{
-    return Result.Success.Suite({ ...this, [key]: f(this[key]) });
-}
-
-Result.Failure.Suite.prototype.update = function (key, f)
-{
-    return Result.Failure.Suite({ ...this, [key]: f(this[key]) });
-}
 
 const Passed = union `Passed` (Result.Success, Result.Skipped);
 

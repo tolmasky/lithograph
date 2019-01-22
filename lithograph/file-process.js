@@ -20,7 +20,7 @@ const FileProcess = Cause("FileProcess",
     [field `fileExecution`]: -1,
 
     [event._on(Log)]: (fileProcess, log) =>
-        [fileProcess, [log.update("fromKeyPath", () => undefined)]],
+        [fileProcess, [log]],
 
     [event.in `Execute`]: { path:-1 },
     [event.on `Execute`]: (fileProcess, { path }) =>
@@ -35,7 +35,7 @@ const FileProcess = Cause("FileProcess",
 
     [event.out `Executed`]: { result:-1 },
     [event._on (Result)]: (fileProcess, result) =>
-        [fileProcess, [result.update("fromKeyPath", () => undefined)]],
+        [fileProcess, [result]],
 
     [event.out `EndpointRequest`]: { id: -1 },
     [event.on (GarbageCollector.Allocate)]: (fileProcess, { id }) =>
