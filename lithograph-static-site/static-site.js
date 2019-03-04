@@ -1,6 +1,14 @@
 const Route = require("route-parser");
+const { extname } = require("path");
 const { readFile } = require("fs");
 const { internalModuleStat } = process.binding("fs");
+const mimes =
+{
+    "html": "text/html; charset=utf-8",
+    "htm": "text/html; charset=utf-8",
+    "js": "application/javascript",
+    "css": "text/css"
+};
 
 
 module.exports = async function goto(browserContext, mounts, URL)
@@ -65,11 +73,12 @@ function proxy(URL, path)
         const revisedStat = initialStat == 1 ?
             internalModuleStat(revisedPath) : initialStat;
 
-        if (revisedStat != 0)
+        if (revisedStat !== 0)
             return request.respond({ status: 404 });
 
-        const status = revisedStat == 0 ? 200 : 404;
-        const contentType = "text/html; charset=utf-8";
+        const status = revisedStat === 0 ? 200 : 404;
+        const extension = extname(revisedPath);
+        const contentType = mimes[extension];
 
         readFile(revisedPath, "utf-8", (error, body) =>
             error ?
