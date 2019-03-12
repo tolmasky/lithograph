@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/static-site",
-  "version": "1.0.0-alpha.31",
+  "version": "1.0.0-alpha.32",
   "description": "",
   "main": "./static-site.js",
   "scripts": {
