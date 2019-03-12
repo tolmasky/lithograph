@@ -30,8 +30,8 @@
     "@lithograph/ast": "1.0.0-alpha.31",
     "@lithograph/compile": "1.0.0-alpha.31",
     "@lithograph/plugin": "1.0.0-alpha.31",
-    "@lithograph/status": "1.0.0-alpha.31",
     "@lithograph/remark": "1.0.0-alpha.31",
+    "@lithograph/status": "1.0.0-alpha.31",
     "babel-core": "^6.26.3",
     "babel-template": "^6.26.0",
     "commander": "^2.15.1",
@@ -42,7 +42,7 @@
     "magic-ws": "^1.0.0",
     "moment": "^2.22.2",
     "node-fetch": "^2.1.2",
-    "puppeteer": "1.10.0",
+    "puppeteer": "^1.13.0",
     "source-map-support": "^0.5.9"
   },
   "devDependencies": {
