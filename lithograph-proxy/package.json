@@ -10,8 +10,6 @@
   "author": "Francisco Ryan Tolmasky I",
   "license": "MIT",
   "dependencies": {
-    "mime": "^2.4.0",
-    "puppeteer": "^1.13.0",
     "route-parser": "0.0.5"
   }
 }
