@@ -4,14 +4,14 @@ const mime = require("mime");
 const puppeteer = require("puppeteer");
 
 
-module.exports = async function ({ destination, URL })
+module.exports = async function ({ destination, URL, headless })
 {
     fs.mkdirSync(destination, { recursive: true });
     fs.mkdirSync(`${destination}/responses`);
 
     
     const manifest = Object.create(null);
-    const browser = await puppeteer.launch({ headless: false });
+    const browser = await puppeteer.launch({ headless });
     const page = await browser.newPage();
     const onRequest = function (request)
     {
@@ -66,7 +66,7 @@ module.exports = async function ({ destination, URL })
     await page.setRequestInterception(false);
 
     fs.writeFileSync(`${destination}/manifest.json`, JSON.stringify(manifest));
+
+    await page.close();
+    await browser.close();
 }
-
-module.exports({ destination: "snapshot-2019-03-07", URL: "https://stripe.com" });
-
