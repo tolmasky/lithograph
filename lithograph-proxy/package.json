@@ -1,0 +1,17 @@
+{
+  "name": "@lithograph/proxy",
+  "version": "1.0.0-alpha.32",
+  "description": "",
+  "main": "proxy.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Francisco Ryan Tolmasky I",
+  "license": "MIT",
+  "dependencies": {
+    "mime": "^2.4.0",
+    "puppeteer": "^1.13.0",
+    "route-parser": "0.0.5"
+  }
+}
