@@ -1,9 +1,11 @@
-const { data, union, string, ftype, is, getUnscopedTypename } = require("@algebraic/type");
+const { data, union, string, number, ftype, is, getUnscopedTypename } = require("@algebraic/type");
 const { Set } = require("@algebraic/collections");
 
 const Route = union `Route` (
     data `Exact` (URL => string),
-    data `Pattern` (match => ftype) );
+    data `Pattern` (
+        pattern => string,
+        match   => ftype) );
 
 Route.fromPattern = (function ()
 {
@@ -11,12 +13,15 @@ Route.fromPattern = (function ()
     const toMatch = pattern =>
         (route => string => route.match(string))(new Parser(pattern));
 
-    return pattern => Route.Pattern({ match: toMatch(pattern) });
+    return pattern => Route.Pattern({ pattern, match: toMatch(pattern) });
 })();
 
 const Action = union `Action` (
-    data `Deny` (),
+    data `Block` (),
     data `Allow` (),
+    data `Redirect` (
+        status      => number,
+        location    => string ),
     data `Custom` ( callback => ftype) );
 
 const Method = union `Method` (

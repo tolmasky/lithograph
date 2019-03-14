@@ -1,6 +1,9 @@
 const { union, is } = require("@algebraic/type");
 const { Set, List } = require("@algebraic/collections");
-const SnapshotConfiguration = require("./snapshot-configuration");
+
+const Rule = require("./rule");
+const { SnapshotConfiguration, Record } = require("./snapshot-configuration");
+const toOnRequest = require("./to-on-request");
 
 const fs = require("fs");
 const { spawnSync: spawn } = require("child_process");
@@ -11,6 +14,7 @@ module.exports = async function proxySnapshot(browserContext, URL, ...rules)
 {
     const configuration = rules.find(is(SnapshotConfiguration));
     const destination = configuration.filename;
+    const snapshotRules = configuration.rules;
 
     if (fs.existsSync(destination))
         spawn("rm", ["-rf", destination]);
@@ -20,15 +24,16 @@ module.exports = async function proxySnapshot(browserContext, URL, ...rules)
 
     const manifest = Object.create(null);
     const page = await browserContext.newPage();
-    const onRequest = request => request.continue();
+    const onRequest = toOnRequest(snapshotRules);
     const onResponse = async function (response)
     {
         if (response.status() !== 200)
             return;
 
-        const URL = response.request().url();
+        const request = response.request();
+        const record = request.headers()["x-lithograph-proxy-record"] === "true";
 
-        if (hasOwnProperty.call(manifest, URL))
+        if (!record || hasOwnProperty.call(manifest, URL))
             return;
 
         console.log("SAVING " + URL);

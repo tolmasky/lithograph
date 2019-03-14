@@ -10,6 +10,11 @@ const SnapshotConfiguration = data `SnapshotConfiguration` (
 
 module.exports = SnapshotConfiguration;
 module.exports.SnapshotConfiguration = SnapshotConfiguration;
+
+const Record = Rule.Action.Custom({ callback: () => Record });
+
+module.exports.Record = Record;
+
 module.exports.toProxyRules = (function ()
 {
     const { dirname } = require("path");

@@ -24,13 +24,20 @@ module.exports = proxy;
 module.exports.proxy = proxy;
 
 proxy.allow = Rule.Action.Allow;
-proxy.deny = Rule.Action.Deny;
+proxy.block = Rule.Action.Block;
+proxy.redirect = (status, location) =>
+    Rule.Action.Redirect({ status, location });
+proxy.record = SnapshotConfiguration.Record;
 
 Object.assign(proxy, Rule.methods);
 
 proxy.snapshot = function snapshot(filename, ...rules)
 {
-    return SnapshotConfiguration({ filename, rules: List(Rule)(rules) });
+    const normalizedRules = List(Rule)(rules.length <= 0 ?
+        [proxy.all("*anything", SnapshotConfiguration.Record)] :
+        rules);
+
+    return SnapshotConfiguration({ filename, rules: normalizedRules });
 }
 
 function toOnRequest(ruleOrSnapshots)
