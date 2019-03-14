@@ -2,6 +2,7 @@ const { is } = require("@algebraic/type");
 const { List } = require("@algebraic/collections");
 
 const Rule = require("./rule");
+const toOnRequest = require("./to-on-request");
 const { SnapshotConfiguration, toProxyRules } = require("./snapshot-configuration");
 
 const proxy = process.env.SNAPSHOT ?
@@ -38,28 +39,4 @@ proxy.snapshot = function snapshot(filename, ...rules)
         rules);
 
     return SnapshotConfiguration({ filename, rules: normalizedRules });
-}
-
-function toOnRequest(ruleOrSnapshots)
-{
-    const rules = [].concat(...ruleOrSnapshots
-        .map(item => is(SnapshotConfiguration, item) ?
-           toProxyRules(item) :
-           item));
-
-    return function onRequest(request)
-    {
-        const method = request.method();
-        const URL = request.url();
-        const [action, args] = Rule.find(rules, method, URL);
-
-        if (action === false ||
-            action === Rule.Action.Deny)
-            return request.respond({ status: 404 });
-
-        if (action === Rule.Action.Allow)
-            return request.continue();
-
-        return action.callback(request, ...args);
-    }
 }

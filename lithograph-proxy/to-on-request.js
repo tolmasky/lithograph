@@ -32,11 +32,15 @@ module.exports = function toOnRequest(ruleOrSnapshots)
         }
 
         if (action === Record)
-            return request.continue(
+        {
+            const headers =
             {
                 ...request.headers(),
                 "x-lithograph-proxy-record": "true"
-            });
+            };
+
+            return request.continue({ headers });
+        }
 
         return action.callback(request, ...args);
     }

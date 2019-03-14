@@ -31,7 +31,17 @@ module.exports = async function proxySnapshot(browserContext, URL, ...rules)
             return;
 
         const request = response.request();
-        const record = request.headers()["x-lithograph-proxy-record"] === "true";
+        const URL = request.url();
+
+        // This should be a sufficient test:
+        //const record = request.headers()["x-lithograph-proxy-record"] === "true";
+
+        // But it seems that modified request headers don't stick in puppeteer:
+        // https://github.com/GoogleChrome/puppeteer/issues/4165
+
+        // So instead, we have to rerun our rules.
+        const [action] = Rule.find(snapshotRules, request.method(), URL);
+        const record = action === Record;
 
         if (!record || hasOwnProperty.call(manifest, URL))
             return;
@@ -65,7 +75,7 @@ module.exports = async function proxySnapshot(browserContext, URL, ...rules)
     {
         page.removeListener("request", onRequest);
         page.removeListener("response", onResponse);
-        
+
         fs.writeFileSync(`${destination}/manifest.json`, JSON.stringify(manifest));
     });
 
