@@ -43,24 +43,11 @@ const Main = Cause("Main",
 
     [event._on(Log)]: (main, log) => (console.log(log.message), [main, []]),
 
-    [event._on(Result.Suite)] (main, result, [,, index])
-    {
-        const [updated, events] = update.in(
+    [event._on(Result.Suite)]: (main, result, [,, index]) =>
+        andFinished(update.in(
             main.update("results", results => results.push(result)),
             "fileProcessPool",
-            Pool.Release({ indexes: [index] }));
-        const { results } = updated;
-        const finished = results.size === main.paths.size;
-
-        if (!finished)
-            return [updated, events];
-
-        const children = results.map(result => result.suite);
-        const suite = toRootSuite({ title: main.title, children });
-        const value = Result.Suite.fromChildren(suite, results);
-
-        return [updated, [...events, Cause.Finished({ value })]];
-    },
+            Pool.Release({ indexes: [index] }))),
 
     [event.on (Pool.Retained) .from `fileProcessPool`](main, event)
     {
@@ -98,7 +85,9 @@ const Main = Cause("Main",
     },
 
     [event.on (Browser.DidReset)]: (main, _, [,, index]) =>
-        update.in(main, "browserPool", Pool.Release({ indexes: [index] })),
+        andFinished(update.in(main,
+            "browserPool",
+            Pool.Release({ indexes: [index] }))),
 
     [event.on (Pool.Retained) .from `browserPool`](main, event)
     {
@@ -112,6 +101,21 @@ const Main = Cause("Main",
             FileProcess.EndpointResponse({ id, endpoint }));
     }
 });
+
+function andFinished([main, events])
+{
+    const { paths, results, browserPool } = main;
+
+    if (results.size !== paths.size ||
+        browserPool.occupied.size > 0)
+        return [main, events];
+
+    const children = results.map(result => result.suite);
+    const suite = toRootSuite({ title: main.title, children });
+    const value = Result.Suite.fromChildren(suite, results);
+
+    return [main, [...events, Cause.Finished({ value })]];
+}
 
 function toRootSuite({ title, children })
 {

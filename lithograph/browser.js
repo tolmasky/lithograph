@@ -47,7 +47,7 @@ async function reset(browser)
     {
         // FIXME: This is kind of a hack. Since we kill subprocesses at the end,
         // this may still be operating and hit a dead Chrome. Fixing this would
-        // increase complexity and increase time of tests, for now real benefit.
+        // increase complexity and increase time of tests, for no real benefit.
         // For now, just silently eat the error.
         // if (!(error instanceof Error && error.message ===
         //    "Protocol error (Page.getFrameTree): Target closed."))

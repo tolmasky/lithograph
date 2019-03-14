@@ -1,19 +1,20 @@
 const Rule = require("./rule");
 
+const proxy = process.env.SNAPSHOT ?
+    require("./proxy-snapshot") :
+    async function proxy(browserContext, URL, rules)
+    {
+        const onRequest = toOnRequest(Rule.parse(rules));
+        const page = await browserContext.newPage();
 
-async function proxy(browserContext, URL, rules)
-{
-    const onRequest = toOnRequest(Rule.parse(rules));
-    const page = await browserContext.newPage();
+        await page.setRequestInterception(true);
 
-    await page.setRequestInterception(true);
+        page.on("request", onRequest);
 
-    page.on("request", onRequest);
+        await page.goto(URL);
 
-    await page.goto(URL);
-
-    return page;
-}
+        return page;
+    };
 
 module.exports = proxy;
 module.exports.proxy = proxy;
@@ -23,7 +24,7 @@ module.exports.snapshot = (function ()
     const { dirname } = require("path");
     const { readFileSync } = require("fs");
     const readJSON = path => JSON.parse(readFileSync(path, "utf-8"));
-    
+
     return function fromSnapshotPath(snapshotPath)
     {
         const manifest = readJSON(`${snapshotPath}/manifest.json`);
