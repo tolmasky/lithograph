@@ -1,21 +1,17 @@
-const { data, union, string, ftype, is } = require("@algebraic/type");
+const { data, union, string, ftype, is, getUnscopedTypename } = require("@algebraic/type");
+const { Set } = require("@algebraic/collections");
 
 const Route = union `Route` (
     data `Exact` (URL => string),
     data `Pattern` (match => ftype) );
 
-Route.parse = (function ()
+Route.fromPattern = (function ()
 {
     const Parser = require("route-parser");
     const toMatch = pattern =>
         (route => string => route.match(string))(new Parser(pattern));
-    const fParseRegExp = /^[A-Za-z0-9]+\s+\=\>\s+"(.*)"$/;
 
-    return string => 
-        ((original, matches) => matches ?
-            Route.Pattern({ match: toMatch(matches[1]) }) :
-            Route.Exact({ URL: original }))
-        (string, string.match(fParseRegExp));
+    return pattern => Route.Pattern({ match: toMatch(pattern) });
 })();
 
 const Action = union `Action` (
@@ -23,32 +19,38 @@ const Action = union `Action` (
     data `Allow` (),
     data `Custom` ( callback => ftype) );
 
-Action.parse = (function ()
-{
-    return value =>
-        is(Action, value) ? value :
-        value === "deny" ? Action.Deny :
-        value === "allow" ? Action.Allow :
-        Action.Custom({ callback: value });
-})();
+const Method = union `Method` (
+    ...["GET", "HEAD", "POST", "PUT", "DELETE",
+        "CONNECT", "OPTIONS", "TRACE", "PATCH"]
+    .map(name => data([name]) ()));
 
-const Rule = data `Route` (
-    route => Route,
-    action => Action );
+const Rule = data `Rule` (
+    methods => Set(Method),
+    route   => Route,
+    action  => Action );
 
-Rule.parse = function (object)
+const toRoute = route => typeof route === "string" ?
+    Route.fromPattern(route) : route
+const methodConvinience = methods => (route, action) =>
+    Rule({ action, methods, route: toRoute(route) });
+
+Rule.methods =
 {
-    return Object
-        .entries(object)
-        .map(([key, value]) =>
-            [Route.parse(key), Action.parse(value)])
-        .map(([route, action]) => Rule({ route, action }));
+    ...union.components(Method)
+        .map(method => [getUnscopedTypename(method), Set(Method)([method])])
+        .reduce((value, [name, methods]) =>
+            (value[name.toLowerCase()] = methodConvinience(methods),
+            value), { }),
+    all: methodConvinience(Set(Method)(union.components(Method)))
 }
 
-Rule.find = function (rules, URL)
+Rule.find = function (rules, method, URL)
 {
     for (const rule of rules)
     {
+        if (!rule.methods.has(Method[method]))
+            continue;
+
         const isExact = is(Route.Exact, rule.route);
         const result = isExact ?
             rule.route.URL === URL :
@@ -65,5 +67,6 @@ Rule.find = function (rules, URL)
 
 module.exports = Rule;
 module.exports.Rule = Rule;
+module.exports.Method = Method;
 module.exports.Route = Route;
 module.exports.Action = Action;

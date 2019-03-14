@@ -1,10 +1,14 @@
+const { is } = require("@algebraic/type");
+const { List } = require("@algebraic/collections");
+
 const Rule = require("./rule");
+const { SnapshotConfiguration, toProxyRules } = require("./snapshot-configuration");
 
 const proxy = process.env.SNAPSHOT ?
     require("./proxy-snapshot") :
-    async function proxy(browserContext, URL, rules)
+    async function proxy(browserContext, URL, ...rules)
     {
-        const onRequest = toOnRequest(Rule.parse(rules));
+        const onRequest = toOnRequest(rules);
         const page = await browserContext.newPage();
 
         await page.setRequestInterception(true);
@@ -19,42 +23,28 @@ const proxy = process.env.SNAPSHOT ?
 module.exports = proxy;
 module.exports.proxy = proxy;
 
-module.exports.snapshot = (function ()
+proxy.allow = Rule.Action.Allow;
+proxy.deny = Rule.Action.Deny;
+
+Object.assign(proxy, Rule.methods);
+
+proxy.snapshot = function snapshot(filename, ...rules)
 {
-    const { dirname } = require("path");
-    const { readFileSync } = require("fs");
-    const readJSON = path => JSON.parse(readFileSync(path, "utf-8"));
+    return SnapshotConfiguration({ filename, rules: List(Rule)(rules) });
+}
 
-    return function fromSnapshotPath(snapshotPath)
-    {
-        const manifest = readJSON(`${snapshotPath}/manifest.json`);
-        const callback = function (request)
-        {
-            const URL = request.url();
-            const dataPath = `${snapshotPath}/${manifest[URL]}`;
-
-            const body = readFileSync(dataPath);
-            const headersPath = `${dirname(dataPath)}/headers.json`;
-            const headers = readJSON(headersPath);
-
-            request.respond({ ...headers, body });
-        }
-        const action = Rule.Action.Custom({ callback });
-
-        return Object
-            .keys(manifest)
-            .reduce((value, URL) =>
-                (value[URL] = action, value),
-                Object.create(null));
-    }
-})();
-
-function toOnRequest(rules)
+function toOnRequest(ruleOrSnapshots)
 {
+    const rules = [].concat(...ruleOrSnapshots
+        .map(item => is(SnapshotConfiguration, item) ?
+           toProxyRules(item) :
+           item));
+
     return function onRequest(request)
     {
+        const method = request.method();
         const URL = request.url();
-        const [action, args] = Rule.find(rules, URL);
+        const [action, args] = Rule.find(rules, method, URL);
 
         if (action === false ||
             action === Rule.Action.Deny)

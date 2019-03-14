@@ -1,14 +1,19 @@
+const { union, is } = require("@algebraic/type");
+const { Set, List } = require("@algebraic/collections");
+const SnapshotConfiguration = require("./snapshot-configuration");
+
 const fs = require("fs");
+const { spawnSync: spawn } = require("child_process");
 const mime = require("mime");
-const puppeteer = require("puppeteer");
 
 
-module.exports = async function proxySnapshot(browserContext, URL)
+module.exports = async function proxySnapshot(browserContext, URL, ...rules)
 {
-//    const { destination, ignores } = JSON.parse(
-//        process.env.SNAPSHOT);
-console.log("YES!");
-    const destination = "/Users/tolmasky/Development/tonic/app/__tests__/wild-embeds/stripe.com/snapshot-2019-03-19";
+    const configuration = rules.find(is(SnapshotConfiguration));
+    const destination = configuration.filename;
+
+    if (fs.existsSync(destination))
+        spawn("rm", ["-rf", destination]);
 
     fs.mkdirSync(destination, { recursive: true });
     fs.mkdirSync(`${destination}/responses`);
