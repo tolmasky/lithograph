@@ -5,6 +5,7 @@ const FileExecution = require("./file-execution");
 const GarbageCollector = require("./garbage-collector");
 const Result = require("@lithograph/status/result");
 const Log = require("./log");
+const getPackageDescriptions = require("magic-ws/get-package-descriptions");
 
 
 const FileProcess = Cause("FileProcess",
@@ -12,8 +13,14 @@ const FileProcess = Cause("FileProcess",
     // FIXME: Make this not necessary...
     // Instead, some sort of compound Ready would be nice, since this
     // should really be in an IO.
-    init: ({ requires }) =>
-        (requires.map(path => require(path)), { }),
+    init({ requires })
+    {
+        requires.map(path => require(path));
+        require("magic-ws/modify-resolve-lookup-paths")
+            (getPackageDescriptions([], requires));
+
+        return { };
+    },
 
     [event.on (Cause.Start)]: event.ignore,
 

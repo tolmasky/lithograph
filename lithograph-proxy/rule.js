@@ -22,6 +22,8 @@ const Action = union `Action` (
     data `Redirect` (
         status      => number,
         location    => string ),
+    data `Response` (
+        data        => Object ),
     data `Custom` ( callback => ftype) );
 
 const Method = union `Method` (

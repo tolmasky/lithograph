@@ -10,7 +10,7 @@ const { spawnSync: spawn } = require("child_process");
 const mime = require("mime");
 
 
-module.exports = async function proxySnapshot(browserContext, URL, ...rules)
+module.exports = async function proxySnapshot(browserContext, ...rules)
 {
     const configuration = rules.find(is(SnapshotConfiguration));
     const destination = configuration.filename;
@@ -24,7 +24,7 @@ module.exports = async function proxySnapshot(browserContext, URL, ...rules)
 
     const manifest = Object.create(null);
     const page = await browserContext.newPage();
-    const onRequest = toOnRequest(snapshotRules);
+    const onRequest = toOnRequest(rules, true);
     const onResponse = async function (response)
     {
         if (response.status() !== 200)
@@ -78,8 +78,6 @@ module.exports = async function proxySnapshot(browserContext, URL, ...rules)
 
         fs.writeFileSync(`${destination}/manifest.json`, JSON.stringify(manifest));
     });
-
-    await page.goto(URL);
 
     return page;
 }

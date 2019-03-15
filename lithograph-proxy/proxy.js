@@ -7,7 +7,7 @@ const { SnapshotConfiguration, toProxyRules } = require("./snapshot-configuratio
 
 const proxy = process.env.SNAPSHOT ?
     require("./proxy-snapshot") :
-    async function proxy(browserContext, URL, ...rules)
+    async function proxy(browserContext, ...rules)
     {
         const onRequest = toOnRequest(rules);
         const page = await browserContext.newPage();
@@ -15,8 +15,6 @@ const proxy = process.env.SNAPSHOT ?
         await page.setRequestInterception(true);
 
         page.on("request", onRequest);
-
-        await page.goto(URL);
 
         return page;
     };
@@ -29,6 +27,7 @@ proxy.block = Rule.Action.Block;
 proxy.redirect = (status, location) =>
     Rule.Action.Redirect({ status, location });
 proxy.record = SnapshotConfiguration.Record;
+proxy.response = data => Rule.Action.Response({ data });
 
 Object.assign(proxy, Rule.methods);
 

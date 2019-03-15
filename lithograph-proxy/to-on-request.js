@@ -1,14 +1,14 @@
 const { is } = require("@algebraic/type");
-const Rule = require("./rule");
+const { Rule, Action } = require("./rule");
 const { SnapshotConfiguration, Record, toProxyRules } =
     require("./snapshot-configuration");
 
 
-module.exports = function toOnRequest(ruleOrSnapshots)
+module.exports = function toOnRequest(ruleOrSnapshots, record = false)
 {
     const rules = [].concat(...ruleOrSnapshots
         .map(item => is(SnapshotConfiguration, item) ?
-           toProxyRules(item) :
+           record ? item.rules.toArray() : toProxyRules(item) :
            item));
 
     return function onRequest(request)
@@ -18,19 +18,24 @@ module.exports = function toOnRequest(ruleOrSnapshots)
         const [action, args] = Rule.find(rules, method, URL);
 
         if (action === false ||
-            action === Rule.Action.Deny)
+            action === Action.Block)
             return request.respond({ status: 404 });
 
-        if (action === Rule.Action.Allow)
+        if (action === Action.Allow)
             return request.continue();
 
-        if (is(Rule.Action.Redirect, action))
+        if (is(Action.Redirect, action))
         {
             const { status, location } = action;
 
             return request.respond({ status, headers: { location } });
         }
 
+        if (is(Action.Response, action))
+        {
+            console.log("REPLACE! " + URL);
+            return request.respond(action.data);
+}
         if (action === Record)
         {
             const headers =
