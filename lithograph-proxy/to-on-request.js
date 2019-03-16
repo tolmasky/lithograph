@@ -33,18 +33,16 @@ module.exports = function toOnRequest(ruleOrSnapshots, record = false)
 
         if (is(Action.Response, action))
         {
-            console.log("REPLACE! " + URL);
+            request.record = true;
+
             return request.respond(action.data);
-}
+        }
+
         if (action === Record)
         {
-            const headers =
-            {
-                ...request.headers(),
-                "x-lithograph-proxy-record": "true"
-            };
+            request.record = true;
 
-            return request.continue({ headers });
+            return request.continue();
         }
 
         return action.callback(request, ...args);
