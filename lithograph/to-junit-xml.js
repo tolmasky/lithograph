@@ -48,8 +48,10 @@ function toXML(fd, result, tabs)
         is (JUnitSkipped, result) ?
             () => tag(fd, tabs + 1, "skipped") :
             () => failure(fd, tabs + 1, result.reason);
+
+    // JUnit specifies time in seconds.
     const time = !is(JUnitSkipped, result) ?
-        result.duration.end - result.duration.start :
+        (result.duration.end - result.duration.start) / 1000 :
         0;
 
     return tag(fd, tabs, "testcase",
