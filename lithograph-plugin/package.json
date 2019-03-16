@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/plugin",
-  "version": "1.0.0-alpha.32",
+  "version": "1.0.0-alpha.33",
   "description": "",
   "main": "./plugin.js",
   "scripts": {
@@ -12,7 +12,7 @@
   "peerDependencies": {
     "@algebraic/type": "1.0.0-alpha.10",
     "@algebraic/collections": "1.0.0-alpha.10",
-    "@lithograph/remark": "1.0.0-alpha.32",
-    "@lithograph/ast": "1.0.0-alpha.32"
+    "@lithograph/remark": "1.0.0-alpha.33",
+    "@lithograph/ast": "1.0.0-alpha.33"
   }
 }
