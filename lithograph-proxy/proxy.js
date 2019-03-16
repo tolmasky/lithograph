@@ -22,6 +22,8 @@ const proxy = process.env.SNAPSHOT ?
 module.exports = proxy;
 module.exports.proxy = proxy;
 
+proxy.mount = require("./mount");
+
 proxy.allow = Rule.Action.Allow;
 proxy.block = Rule.Action.Block;
 proxy.redirect = (status, location) =>
