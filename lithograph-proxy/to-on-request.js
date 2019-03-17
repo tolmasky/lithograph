@@ -2,6 +2,7 @@ const { is } = require("@algebraic/type");
 const { Rule, Action } = require("./rule");
 const { SnapshotConfiguration, Record, toProxyRules } =
     require("./snapshot-configuration");
+const protocol = URLString => (new URL(URLString)).protocol
 
 
 module.exports = function toOnRequest(ruleOrSnapshots, record = false)
@@ -15,6 +16,10 @@ module.exports = function toOnRequest(ruleOrSnapshots, record = false)
     {
         const method = request.method();
         const URL = request.url();
+
+        if (protocol(URL) === "data:")
+            return request.continue();
+
         const [action, args] = Rule.find(rules, method, URL);
 
         if (action === false ||
