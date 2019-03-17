@@ -27,13 +27,12 @@ module.exports.toProxyRules = (function ()
         const callback = function (request)
         {
             const URL = request.url();
-            const dataPath = `${filename}/${manifest[URL]}`;
+            const responsePath = `${filename}/${manifest[URL]}`;
+            const { status, headers, bodyPath } = readJSON(responsePath);
+            const bodyComponent = bodyPath &&
+                { body: readFileSync(`${dirname(responsePath)}/${bodyPath}`) };
 
-            const body = readFileSync(dataPath);
-            const headersPath = `${dirname(dataPath)}/headers.json`;
-            const headers = readJSON(headersPath);
-
-            request.respond({ ...headers, body });
+            request.respond({ status, headers, ...bodyComponent });
         }
         const action = Rule.Action.Custom({ callback });
 

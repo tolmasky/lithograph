@@ -27,7 +27,9 @@ module.exports = async function proxySnapshot(browserContext, ...rules)
     const onRequest = toOnRequest(rules, true);
     const onResponse = async function (response)
     {
-        if (response.status() !== 200)
+        const status = response.status();
+
+        if (status < 200 || status >= 400)
             return;
 
         const request = response.request();
@@ -45,19 +47,22 @@ module.exports = async function proxySnapshot(browserContext, ...rules)
         const directory = `responses/${index}`;
 
         const headers = response.headers();
-        const extension = mime.getExtension(headers["content-type"]) || "data";
+        const bodyPath = getBodyPath(status, headers);
+        const serialized = { status, headers, bodyPath };
 
-        const dataPath = `${directory}/data.${extension}`;
-        const headersPath = `${directory}/headers.json`;
-
-        manifest[URL] = dataPath;
-
-        const buffer = await response.buffer();
+        manifest[URL] = `${directory}/response.json`;
 
         fs.mkdirSync(`${destination}/${directory}`);
-        fs.writeFileSync(`${destination}/${headersPath}`,
-            JSON.stringify(headers), "utf-8");
-        fs.writeFileSync(`${destination}/${dataPath}`, buffer);
+        fs.writeFileSync(`${destination}/${manifest[URL]}`,
+            JSON.stringify(serialized), "utf-8");
+
+        if (bodyPath === false)
+            return
+
+        const buffer = await response.buffer();
+        const absoluteBodyPath = `${destination}/${directory}/${bodyPath}`;
+
+        fs.writeFileSync(absoluteBodyPath, buffer);
     }
 
     await page.setRequestInterception(true);
@@ -73,4 +78,15 @@ module.exports = async function proxySnapshot(browserContext, ...rules)
     });
 
     return page;
+}
+
+function getBodyPath(status, headers)
+{
+    if (status < 200 || status >= 300)
+        return false;
+
+    const type = headers["content-type"];
+    const extension = mime.getExtension(type) || "data";
+
+    return `./data.${extension}`;
 }
