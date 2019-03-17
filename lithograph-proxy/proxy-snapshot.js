@@ -52,17 +52,20 @@ module.exports = async function proxySnapshot(browserContext, ...rules)
 
         manifest[URL] = `${directory}/response.json`;
 
+        // It's important that all the steps in writing the different components
+        // of the response happen synchronously, because if not the page might
+        // get closed part-way through the process(?). We were experiencing a
+        // bug where we had the headers but not the data, and I think this is
+        // why. For this reason, we put this up-front here, so we either have
+        // everything or nothing:
+        const buffer = bodyPath !== false && await response.buffer();
+
         fs.mkdirSync(`${destination}/${directory}`);
         fs.writeFileSync(`${destination}/${manifest[URL]}`,
             JSON.stringify(serialized), "utf-8");
 
-        if (bodyPath === false)
-            return
-
-        const buffer = await response.buffer();
-        const absoluteBodyPath = `${destination}/${directory}/${bodyPath}`;
-
-        fs.writeFileSync(absoluteBodyPath, buffer);
+        if (bodyPath !== false)
+            fs.writeFileSync(`${destination}/${directory}/${bodyPath}`, buffer);
     }
 
     await page.setRequestInterception(true);
