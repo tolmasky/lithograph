@@ -18,19 +18,19 @@ module.exports.Record = Record;
 module.exports.toProxyRules = (function ()
 {
     const { dirname } = require("path");
-    const { readFileSync } = require("fs");
-    const readJSON = path => JSON.parse(readFileSync(path, "utf-8"));
 
     return function toProxyRules({ filename })
     {
-        const manifest = readJSON(`${filename}/manifest.json`);
+        const tarRead = toTarRead(filename);
+        const readJSON = path => JSON.parse(tarRead(path, "utf-8"));
+        const manifest = readJSON("manifest.json");
         const callback = function (request)
         {
             const URL = request.url();
-            const responsePath = `${filename}/${manifest[URL]}`;
+            const responsePath = manifest[URL];
             const { status, headers, bodyPath } = readJSON(responsePath);
             const bodyComponent = bodyPath &&
-                { body: readFileSync(`${dirname(responsePath)}/${bodyPath}`) };
+                { body: tarRead(`${dirname(responsePath)}/${bodyPath}`) };
 
             request.respond({ status, headers, ...bodyComponent });
         }
@@ -39,5 +39,22 @@ module.exports.toProxyRules = (function ()
         return Object.keys(manifest)
             .map(URL => Rule.Route.Exact({ URL }))
             .map(route => Rule.methods.all(route, action));
+    }
+})();
+
+const toTarRead = (function ()
+{
+    const { spawnSync } = require("child_process");
+
+    return function toTarRead(tarPath)
+    {
+        return function tarRead(filename, format)
+        {
+            const { stdout } = spawnSync("tar", ["-xvOf", tarPath, filename]);
+
+            return format === "utf-8" ?
+                stdout.toString(format) :
+                stdout;
+        }
     }
 })();
