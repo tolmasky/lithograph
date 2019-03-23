@@ -85,7 +85,12 @@ module.exports = async function proxySnapshot(browserContext, ...rules)
         fs.writeFileSync(`${tmpDestination}/manifest.json`,
             JSON.stringify(manifest));
 
-        tar(configuration.filename, tmpDestination);
+        const { filename } = configuration;
+
+        if (fs.existsSync(filename))
+            fs.unlinkSync(filename);
+
+        tar(filename, tmpDestination);
         rmrf(tmpDestination);
     });
 
