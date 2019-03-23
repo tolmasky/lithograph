@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/ast",
-  "version": "1.0.0-alpha.37",
+  "version": "1.0.0-alpha.38",
   "description": "",
   "main": "executable.js",
   "scripts": {
@@ -17,8 +17,8 @@
   "peerDependencies": {
     "@algebraic/type": "1.0.0-alpha.10",
     "@algebraic/collections": "1.0.0-alpha.10",
-    "@lithograph/plugin": "1.0.0-alpha.37",
-    "@lithograph/remark": "1.0.0-alpha.37",
+    "@lithograph/plugin": "1.0.0-alpha.38",
+    "@lithograph/remark": "1.0.0-alpha.38",
     "immutable": "^3.8.2"
   }
 }
