@@ -44,13 +44,15 @@ module.exports.toProxyRules = (function ()
 
 const toTarRead = (function ()
 {
-    const { spawnSync } = require("child_process");
+    const { spawnSync: spawn } = require("child_process");
+    const { normalize } = require("path");
 
     return function toTarRead(tarPath)
     {
         return function tarRead(filename, format)
         {
-            const { stdout } = spawnSync("tar", ["-xvOf", tarPath, filename]);
+            const { stdout } =
+                spawn("tar", ["-xvOf", tarPath, normalize(filename)]);
 
             return format === "utf-8" ?
                 stdout.toString(format) :
