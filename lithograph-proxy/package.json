@@ -11,6 +11,7 @@
   "license": "MIT",
   "dependencies": {
     "mime": "^2.4.0",
-    "route-parser": "0.0.5"
+    "route-parser": "0.0.5",
+    "uuid": "^3.3.2"
   }
 }

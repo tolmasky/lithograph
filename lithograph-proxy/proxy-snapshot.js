@@ -5,22 +5,26 @@ const Rule = require("./rule");
 const { SnapshotConfiguration, Record } = require("./snapshot-configuration");
 const toOnRequest = require("./to-on-request");
 
+const mime = require("mime");
+const uuid = require("uuid").v4;
+
 const fs = require("fs");
 const { spawnSync: spawn } = require("child_process");
-const mime = require("mime");
+const rmrf = directory => spawn("rm", ["-rf", directory]);
+const tar = (filename, cwd) => spawn("tar", ["-cvf", filename, "."], { cwd });
 
 
 module.exports = async function proxySnapshot(browserContext, ...rules)
 {
     const configuration = rules.find(is(SnapshotConfiguration));
-    const destination = configuration.filename;
     const snapshotRules = configuration.rules;
+    const tmpDestination = `/tmp/${uuid()}`;
 
-    if (fs.existsSync(destination))
-        spawn("rm", ["-rf", destination]);
+    if (fs.existsSync(tmpDestination))
+        rmrf(tmpDestination);
 
-    fs.mkdirSync(destination, { recursive: true });
-    fs.mkdirSync(`${destination}/responses`);
+    fs.mkdirSync(tmpDestination, { recursive: true });
+    fs.mkdirSync(`${tmpDestination}/responses`);
 
     const manifest = Object.create(null);
     const page = await browserContext.newPage();
@@ -60,12 +64,13 @@ module.exports = async function proxySnapshot(browserContext, ...rules)
         // everything or nothing:
         const buffer = bodyPath !== false && await response.buffer();
 
-        fs.mkdirSync(`${destination}/${directory}`);
-        fs.writeFileSync(`${destination}/${manifest[URL]}`,
+        fs.mkdirSync(`${tmpDestination}/${directory}`);
+        fs.writeFileSync(`${tmpDestination}/${manifest[URL]}`,
             JSON.stringify(serialized), "utf-8");
 
         if (bodyPath !== false)
-            fs.writeFileSync(`${destination}/${directory}/${bodyPath}`, buffer);
+            fs.writeFileSync(`${tmpDestination}/${directory}/${bodyPath}`,
+                buffer);
     }
 
     await page.setRequestInterception(true);
@@ -77,7 +82,11 @@ module.exports = async function proxySnapshot(browserContext, ...rules)
         page.removeListener("request", onRequest);
         page.removeListener("response", onResponse);
 
-        fs.writeFileSync(`${destination}/manifest.json`, JSON.stringify(manifest));
+        fs.writeFileSync(`${tmpDestination}/manifest.json`,
+            JSON.stringify(manifest));
+
+        tar(configuration.filename, tmpDestination);
+        rmrf(tmpDestination);
     });
 
     return page;
