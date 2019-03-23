@@ -17,7 +17,7 @@ module.exports.Record = Record;
 
 module.exports.toProxyRules = (function ()
 {
-    const { dirname } = require("path");
+    const { dirname, normalize } = require("path");
 
     return function toProxyRules({ filename })
     {
@@ -29,8 +29,15 @@ module.exports.toProxyRules = (function ()
             const URL = request.url();
             const responsePath = manifest[URL];
             const { status, headers, bodyPath } = readJSON(responsePath);
-            const bodyComponent = bodyPath &&
-                { body: tarRead(`${dirname(responsePath)}/${bodyPath}`) };
+
+            // tar on Linux expects the internal paths to be ./responses/${blah}
+            // Speficially, we *need* the leading "./", and can't have
+            // un-normalized instances of "./" in the center of the path.
+            const normalizedBodyPath = bodyPath &&
+                `./${normalize(`${dirname(responsePath)}/${bodyPath}`)}`;
+
+            const bodyComponent = normalizedBodyPath &&
+                { body: tarRead(normalizedBodyPath) };
 
             request.respond({ status, headers, ...bodyComponent });
         }
@@ -45,14 +52,13 @@ module.exports.toProxyRules = (function ()
 const toTarRead = (function ()
 {
     const { spawnSync: spawn } = require("child_process");
-    const { normalize } = require("path");
 
     return function toTarRead(tarPath)
     {
         return function tarRead(filename, format)
         {
             const { stdout } =
-                spawn("tar", ["-xvOf", tarPath, normalize(filename)]);
+                spawn("tar", ["-xvOf", tarPath, filename]);
 
             return format === "utf-8" ?
                 stdout.toString(format) :
