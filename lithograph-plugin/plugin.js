@@ -1,8 +1,8 @@
 const { data, string, parameterized } = require("@algebraic/type");
 const { List } = require("@algebraic/collections");
 const Section = require("@lithograph/ast/section");
+const to = require("@lithograph/ast/table/to");
 
-const fromTable = require("./from-table");
 const { Failure } = require("@lithograph/remark/parse-type");
 const Configuration = data `Configuration` (plugin => string);
 const NodeList = List(Object);
@@ -20,7 +20,7 @@ module.exports = function transform(section, module)
     if (table.type !== "table")
         return section;
 
-    const configuration = fromTable(Configuration, table, { headers: true });
+    const configuration = to(Configuration, { table, headers: true });
 
     if (parameterized.belongs(Failure, configuration))
         return section;

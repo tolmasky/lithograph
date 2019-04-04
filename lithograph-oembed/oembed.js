@@ -1,6 +1,6 @@
 const { data, union, boolean, string, number, parameterized } = require("@algebraic/type");
 const { Map, Set } = require("@algebraic/collections");
-const tabelTo = require("@lithograph/ast/table/to");
+const tableTo = require("@lithograph/ast/table/to");
 const { Failure, Variable } = require("@lithograph/remark/parse-type");
 const Section = require("@lithograph/ast/section");
 const getType = object => Object.getPrototypeOf(object).constructor;
@@ -93,7 +93,7 @@ function transformCase(section, specification)
     if (table.type !== "table")
         return section;
 
-    const testCaseArguments = tabelTo(TestCase, { table });
+    const testCaseArguments = tableTo(TestCase, { table });
 
     if (Failure.is(testCaseArguments))
         throw TypeError(testCaseArguments.message);
