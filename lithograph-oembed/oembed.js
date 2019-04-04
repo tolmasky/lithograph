@@ -1,8 +1,10 @@
 const { data, union, boolean, string, number, parameterized } = require("@algebraic/type");
 const { Map, Set } = require("@algebraic/collections");
 const fromTable = require("@lithograph/plugin/from-table");
+const tabelTo = require("@lithograph/ast/table/to");
 const { Failure, Variable } = require("@lithograph/remark/parse-type");
 const Section = require("@lithograph/ast/section");
+const getType = object => Object.getPrototypeOf(object).constructor;
 
 const Format = union `Format` (
     data `JSON` (),
@@ -47,60 +49,80 @@ const URLVariable = union `URLVariable` (
     Variable(string),
     string);
 
-const transformCase = (function ()
-{
-    var i = 0;
-    const testCases = Map(string, Function)
-    ({
-        "missing-url-response":
-            tc => true,
-        "default-format-response":
-            tc => true,
+const TemplateArguments = parameterized  (T =>
+    data `TemplateArguments<${T}>` (
+        dirname         => [string, __dirname],
+        specification   => Specification,
+        ...data.fields(T).map(([name, type]) => new Function(
+            "__type", `return ${name} => __type`)(type))));
+const toTemplateArguments = (specification, testArguments) =>
+    TemplateArguments(getType(testArguments))
+        ({ ...testArguments, specification });
+
+const TestCase = union `TestCase` (
+    data `FoundURL` (
+        URL             => URLVariable,
+        width           => number,
+        type            => string, // FIXME: Make enum.
+        onReady         => Variable(Function)),
+    data `NotFoundURL` (
+        notFoundURL     => URLVariable ));
+
+const testCases = Map(Object, Map(string, Function))(
+[
+    toTestCasePair(TestCase.FoundURL,
+    {
+        "missing-url-response": tc => true,
+        "default-format-response": tc => true,
         "json-response-implemented":
             tc => tc.specification.formats.has(Format.JSON),
         "xml-response-unimplemented":
             tc => !tc.specification.formats.has(Format.XML),
-        "rich":
-            tc => tc.type === "rich"
-    }).mapKeys(name => `${__dirname}/test-cases/${name}.lit.md`);
-
-    return function transformCase(section, specification)
+        "rich": tc => tc.type === "rich"
+    }),
+    toTestCasePair(TestCase.NotFoundURL,
     {
-        const x = specification;
+        "not-found-url": tc => true
+    })
+]);
 
-        const URLTestCase = data ([`URLTestCase${i++}`]) (
-            dirname         => [string, __dirname],
-            URL             => URLVariable,
-            width           => number,
-            type            => string, // FIXME: Make enum.
-            onReady         => Variable(Function),
-            specification   => [Specification, x]);
+function transformCase(section, specification)
+{
+    const { preamble } = section;
+    const table = preamble.last();
 
-        const { preamble } = section;
-        const table = preamble.last();
+    if (table.type !== "table")
+        return section;
 
-        if (table.type !== "table")
-            return section;
+    const testCaseArguments = tabelTo(TestCase, { table });
 
-        if (getInnerText(table.children[0][1]) === "")
+    if (Failure.is(testCaseArguments))
+        throw TypeError(testCaseArguments.message);
 
-        const testCaseArguments = fromTable(URLTestCase, table);
+    const type = getType(testCaseArguments);
+    const templateArguments =
+        toTemplateArguments(specification, testCaseArguments);
+    const children = testCases.get(type)(templateArguments);
+    const subsections = section.subsections.concat(children);
 
-        if (Failure.is(testCaseArguments))
-            throw TypeError(testCaseArguments.message);
+    return Section({ ...section, subsections });
+}
 
-        const children = testCases
-            .filter(predicate => predicate(testCaseArguments))
+function toTestCasePair(type, tests)
+{
+    const testCases = Map(string, Function)(Object.entries(tests))
+        .mapKeys(name => `${__dirname}/test-cases/${name}.lit.md`);
+
+    return [type, function toTestCases(templateArguments)
+    {
+        return testCases
+            .filter(predicate => predicate(templateArguments))
             .map((_, filename) => Section.fromMarkdown(
                 filename,
-                URLTestCase,
-                testCaseArguments));
-        const subsections = section.subsections.concat(children);
-
-        return Section({ ...section, subsections });
-    }
-})();
-
+                getType(templateArguments),
+                templateArguments));
+    }];
+}
 
 /*
 const OEmbed = data `OEmbed` (
