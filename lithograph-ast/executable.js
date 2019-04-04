@@ -1,8 +1,8 @@
 const { data, union, is, boolean, string, number } = require("@algebraic/type");
 const { Map, List } = require("@algebraic/collections");
 const getInnerText = require("@lithograph/remark/get-inner-text");
-const plugin = require("@lithograph/plugin");
 
+const plugin = require("./plugin");
 const Section = require("./section");
 const Resource = require("./resource");
 
