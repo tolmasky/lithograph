@@ -1,6 +1,5 @@
 const { data, union, boolean, string, number, parameterized } = require("@algebraic/type");
 const { Map, Set } = require("@algebraic/collections");
-const fromTable = require("@lithograph/plugin/from-table");
 const tabelTo = require("@lithograph/ast/table/to");
 const { Failure, Variable } = require("@lithograph/remark/parse-type");
 const Section = require("@lithograph/ast/section");
@@ -23,7 +22,7 @@ module.exports = function OEmbedPlugin(section)
 {
     const { preamble, subsections } = section;
     const table = preamble.get(0);
-    const specification = fromTable(Specification, table);
+    const specification = tableTo(Specification, { table });
 
     if (Failure.is(specification))
         throw TypeError(specification.message);
