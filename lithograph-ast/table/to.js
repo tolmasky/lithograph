@@ -5,7 +5,7 @@ const toType = require("./to-type");
 
 
 module.exports = function to(type, { table, headers = false } = { })
-{console.log(toProduct({ table, headers }));
+{
     return toType(type, toProduct({ table, headers }));
 }
 
@@ -24,6 +24,7 @@ module.exports = function to(type, { table, headers = false } = { })
     if 
 }*/
 
+/*
 const document2 = require("remark").parse(`
   | key | value |
   | - | - |
@@ -50,7 +51,7 @@ const Result = union `Result` (
         type    => string,
         width   => number));
 
-console.log(module.exports(Map(string, Result), { table }));
+console.log(module.exports(Map(string, Result), { table }));*/
 
 
 

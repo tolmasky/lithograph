@@ -11,9 +11,9 @@ module.exports = function toPrimitive(type, tableColumn)
 }
 
 function toString(tableColumn)
-{console.log("HEY", tableColumn);
+{
     const [child] = tableColumn.children;
-console.log(child);
+
     if (child.type === "link")
         return child.value;
 

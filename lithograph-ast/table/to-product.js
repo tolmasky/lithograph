@@ -23,7 +23,7 @@ module.exports = function toEntries({ table, headers = false })
         table.children : table.children.slice(1);
     const entries = tableRows.reduce(function (entries, tableRow)
     {
-        const [keyColumn, value] = tableRow.children;console.log("HI");
+        const [keyColumn, value] = tableRow.children;
         const [, nested, key] = getInnerText(keyColumn).match(nestedRegExp);
         const entry = Entry({ key, value });
 

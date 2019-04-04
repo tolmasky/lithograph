@@ -8,7 +8,7 @@ module.exports = toType;
 function toType(type, item)
 {
     const kind = getKind(type);
-console.log(kind);
+
     return  parameterized.is(List, type) ||
             parameterized.is(Set, type) ||
             parameterized.is(Map, type) ? toCollection(type, item) :
