@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/remark",
-  "version": "1.0.0-alpha.40",
+  "version": "1.0.0-alpha.41",
   "description": "",
   "main": "get-inner-text.js",
   "scripts": {
