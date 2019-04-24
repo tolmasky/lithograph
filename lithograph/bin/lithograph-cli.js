@@ -1,3 +1,5 @@
+#! /usr/bin/env node
+
 const { is } = require("@algebraic/type");
 const Result = require("@lithograph/status/result");
 
