@@ -15,7 +15,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/runkitdev/lithograph.git"
+    "url": "https://github.com/runkit-open-source/lithograph.git"
   },
   "dependencies": {
     "@algebraic/collections": "1.0.0-alpha.10",
