@@ -63,11 +63,11 @@ const toTarRead = (function ()
             // fan of the magic number searching here, we should probably store
             // the size in the manifest file. Maybe we should also be storing it
             // *as* its original gzip too?
-            const maxBuffer = +(spawn("tar", ["-vtf", tarPath])
+            const maxBuffer = +spawn("tar", ["-vtf", tarPath])
                 .stdout.toString()
                 .split("\n")
                 .find(line => line.endsWith(inTarPath))
-                .split(/\s+/)[4]);
+                .split(/\s+/)[4];
 
             const { stdout } = spawn("tar",
                 ["-xvOf", tarPath, inTarPath],
