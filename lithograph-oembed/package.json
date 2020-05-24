@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/oembed",
-  "version": "1.0.0-alpha.42",
+  "version": "1.0.0-alpha.43",
   "description": "",
   "main": "oembed.js",
   "scripts": {
@@ -15,7 +15,7 @@
   "peerDependencies": {
     "@algebraic/type": "1.0.0-alpha.10",
     "@algebraic/collections": "1.0.0-alpha.10",
-    "@lithograph/proxy": "1.0.0-alpha.42"
+    "@lithograph/proxy": "1.0.0-alpha.43"
   },
   "devDependencies": {
     "babel-core": "^6.26.3",

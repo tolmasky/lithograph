@@ -1,6 +1,6 @@
 {
   "name": "@lithograph/proxy",
-  "version": "1.0.0-alpha.42",
+  "version": "1.0.0-alpha.43",
   "description": "",
   "main": "proxy.js",
   "scripts": {
