@@ -54,7 +54,7 @@ const toTarRead = (function ()
 
     return function toTarRead(tarPath)
     {
-        return function tarRead(filename)
+        return function tarRead(filename, format)
         {
             const inTarPath = toTarPath(filename);
 
