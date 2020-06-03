@@ -3,7 +3,7 @@ const { List } = require("@algebraic/collections");
 const Section = require("@lithograph/ast/section");
 
 const prologue = Section.fromMarkdown(`${__dirname}/prologue.template.md`);
-const epilogue = Section.fromMarkdown(`${__dirname}/prologue.template.md`);
+const epilogue = Section.fromMarkdown(`${__dirname}/epilogue.template.md`);
 
 // Remark heading
 const toRemarkHeading = value =>
