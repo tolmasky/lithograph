@@ -159,7 +159,11 @@ function initialStatusOfSuite(suite)
     const { block: { disabled, id }, children } = suite;
 
     if (disabled)
-        return assignOriginResultForNode(suite, Result.Skipped, id);
+    {
+        const status = assignOriginResultForNode(suite, Result.Skipped, id);
+
+        return { unblocked:TestPathList(), status };
+    }
 
     const isSerial = suite.mode === Mode.Serial;
     const { unblocked, waiting, completed } =
