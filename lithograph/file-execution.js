@@ -134,14 +134,26 @@ async function testRun({ functions, test, testPath, index })
 {
     const start = Date.now();
     const { id, title } = test.block;
+    const retriesMatch = title.match(/^ATTEMPTS=(\d+).*/);
+    const maxAttempts = retriesMatch ? parseInt(retriesMatch[1]) : 1;
     const f = functions.get(id);
 //console.log("GETTING " + id + " " + f+"");
     // FIXME: Would be nice to use Log() here...
     console.log("  STARTED: " + title);
 //console.log("CALLING " + f);
-    const [succeeded, error] = await f()
-        .then(() => [true])
-        .catch(error => [false, error]);
+    var attempt = 1;
+    while (true)
+    {
+        var [succeeded, error] = await f()
+            .then(() => [true])
+            .catch(error => [false, error]);
+
+        attempt++;
+        if (succeeded || attempt > maxAttempts)
+            break;
+
+        console.log(`  RETRY(${attempt}/${maxAttempts}): ${title}`);
+    }
     const end = Date.now();
     const report = succeeded ?
         Status.Report.Success({ end }) :
