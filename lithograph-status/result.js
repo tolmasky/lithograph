@@ -15,7 +15,7 @@ const result = ([name]) =>
 const Reason = union `Reason` (
     data `Error` (
         stack => string,
-        message => string ),
+        message => [string, ""] ),
 
     data `Value` ( stringified => string ) );
 
