@@ -49,7 +49,7 @@ function launch({ headless }, push)
     const state = { launched: false, cancelled: false, puppeteerBrowser: null };
 
     setImmediate(async function ()
-    {
+    {try { 
         if (state.cancelled)
             return;
 
@@ -58,6 +58,7 @@ function launch({ headless }, push)
         state.launched = true;
 
         push(Browser.Launched({ puppeteerBrowser: state.puppeteerBrowser }));
+        } catch (error) { console.log("OH NO!", error); throw error; } 
     });
 
     return function ()
