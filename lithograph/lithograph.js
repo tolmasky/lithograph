@@ -1,20 +1,16 @@
 #!/usr/bin/env -S clf
 
-const { join } = require("path");
+const { join, resolve } = require("path");
 
 const fail = require("@reified/fail");
 
 const { is } = require("@algebraic/type");
 const Result = require("@lithograph/status/result");
-
-const main = () => true;
-//const main = require("./main");
-console.log("here!");
 const glob = require("fast-glob");
-const toJUnitXML = require("./to-junit-xml");
-console.log("here!");
-const { resolve } = require("path");
 const moment = require("moment");
+
+const toJUnitXML = require("./to-junit-xml");
+const main = require("./main");
 
 
 module.exports = async function (
@@ -31,14 +27,11 @@ module.exports = async function (
         .from(new Set(implicitPatterns.flatMap(pattern => glob.sync(pattern))))
         .map(path => resolve(path));
 
-    console.log("THE PATTERNS ARE: ", patterns);
-    console.log("THE PATHS ARE: ", paths);
-/*
     if (paths.length <= 0)
         return fail(
             `\nNo files to process, perhaps there is a typo in your pattern:` +
             `\n${implicitPatterns.map(pattern => `   ${pattern}`).join("\n")}\n`);
-*/
+
     const title = `${moment().format("YYYY-MM-DD-HH.mm.ss")}`;
     const start = Date.now();
 

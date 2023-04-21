@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "Francisco Ryan Tolmasky I",
+  "author": "Francisco Ryan Tolmasky I <tolmasky@gmail.com> (https://tolmasky.com/)",
   "license": "MIT",
   "dependencies": {
     "@babel/generator": "^7.1.6",

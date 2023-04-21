@@ -38,7 +38,7 @@
     "fast-glob": "^2.2.2",
     "immutable": "^3.8.2",
     "jest-mock": "^23.2.0",
-    "magic-ws": "^1.0.0",
+    "magic-ws": "^2.0.0",
     "moment": "^2.22.2",
     "node-fetch": "^2.1.2",
     "puppeteer": "^1.13.0",
