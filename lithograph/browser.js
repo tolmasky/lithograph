@@ -1,6 +1,8 @@
 const { Cause, IO, field, event, update } = require("@cause/cause");
 const puppeteer = require("puppeteer");
 
+const ExecutablePath = "/all/@lithograph/lithograph-chrome-linux/chrome.space.js"
+
 
 const Browser = Cause("Browser",
 {
@@ -53,8 +55,13 @@ function launch({ headless }, push)
         if (state.cancelled)
             return;
 
-        state.puppeteerBrowser =
-            await puppeteer.launch({ headless });
+        state.puppeteerBrowser = await puppeteer.launch
+        ({
+            headless,
+            dumpio: true,
+            executablePath: ExecutablePath,
+            args: ["--user-data-dir=/home/chromeuser/user-data"/*, "--remote-debugging-address=host.docker.internal"/*, "--remote-debugging-port=27184"*/]
+        });
         state.launched = true;
 
         push(Browser.Launched({ puppeteerBrowser: state.puppeteerBrowser }));
